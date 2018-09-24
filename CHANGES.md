@@ -1,3 +1,8 @@
+## 0.2.0
+
+- Enhancement: Add system icons
+- Refactoring: Use Jamilih
+
 ## 0.1.0
 
 - First working version

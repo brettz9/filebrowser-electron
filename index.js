@@ -1,6 +1,12 @@
 import {jml, $} from 'es6://node_modules/jamilih/dist/jml-es.js';
+const {fromByteArray} = require('base64-js');
 
 const path = require('path');
+const {
+  getIconForPath,
+  ICON_SIZE_EXTRA_SMALL
+  // ICON_SIZE_MEDIUM // ICON_SIZE_EXTRA_SMALL (16), ICON_SIZE_SMALL (32), ICON_SIZE_MEDIUM (64), ICON_SIZE_LARGE (256), ICON_SIZE_EXTRA_LARGE (512; only 256 on Windows)
+} = require('system-icon');
 
 function getBasePath () {
   const params = new URLSearchParams(window.location.hash.slice(1));
@@ -11,7 +17,7 @@ function getBasePath () {
 
 const isWebAppFind = false;
 
-function changePath () {
+async function changePath () {
   // console.log('change path');
   const basePath = getBasePath();
   if (!basePath.match(/^[\w./ -]*$/)) {
@@ -41,10 +47,28 @@ function changePath () {
     return [stat.isDirectory() || stat.isSymbolicLink(), fileOrDir];
   });
   // console.log('result', result);
-  addItems(result);
+  await addItems(result);
 }
 
-function addItems (result) {
+function getIconForFile (filePath, size = ICON_SIZE_EXTRA_SMALL) {
+  return new Promise((resolve, reject) => {
+    getIconForPath(filePath, size, (err, result) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(result);
+      }
+    });
+  });
+}
+
+async function getIconDataURLForFile (filePath, size) {
+  const result = await getIconForFile(filePath, size);
+  const encoded = fromByteArray(result);
+  return 'data:image/png;base64,' + encoded;
+}
+
+async function addItems (result) {
   const basePath = getBasePath();
   $('i').hidden = true;
   const ul = $('ul');
@@ -53,7 +77,7 @@ function addItems (result) {
   }
   // Todo: Do for WebAppFind
   jml(ul, [
-    !isWebAppFind && basePath !== '/'
+    (!isWebAppFind && basePath !== '/'
       ? [
         'li', [
           ['a', {
@@ -63,9 +87,15 @@ function addItems (result) {
           ]]
         ]
       ]
-      : '',
-    ...result.map(([isDir, title]) => {
-      return ['li', [isDir
+      : ''),
+    ...(await Promise.all(result.map(async ([isDir, title]) => {
+      return ['li', {
+        style: 'list-style-image: url("' + await (getIconDataURLForFile(
+          path.join(basePath, title)
+        ).catch((err) => {
+          console.error(err);
+        })) + '")'
+      }, [isDir
         ? ['a', {
           href: '#path=' + basePath + encodeURIComponent(title)
         }, [
@@ -73,20 +103,20 @@ function addItems (result) {
         ]]
         : title
       ]];
-    })
+    })))
   ]);
 }
 
 window.addEventListener('hashchange', changePath);
-window.addEventListener('message', ({data: {webappfind}}) => {
+window.addEventListener('message', async ({data: {webappfind}}) => {
   if (webappfind.method) { // Don't echo items just posted below
     return;
   }
   if (webappfind.evalReady) {
-    changePath();
+    await changePath();
     return;
   }
-  addItems(webappfind.result);
+  await addItems(webappfind.result);
 });
 
 changePath();
