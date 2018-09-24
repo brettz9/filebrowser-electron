@@ -1,5 +1,5 @@
 import {jml, $} from 'es6://node_modules/jamilih/dist/jml-es.js';
-const {fromByteArray} = require('base64-js');
+import {fromByteArray} from 'es6://node_modules/base64-js/base64js-es.js';
 
 const path = require('path');
 const {
