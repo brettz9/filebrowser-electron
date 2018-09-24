@@ -52,27 +52,29 @@ function addItems (result) {
     ul.firstChild.remove();
   }
   // Todo: Do for WebAppFind
-  if (!isWebAppFind && basePath !== '/') {
-    console.log('basePath', basePath);
-    jml('li', [
-      ['a', {
-        href: '#path=' + path.normalize(path.join(basePath, '..'))
-      }, [
-        '..'
-      ]]
-    ], ul);
-  }
-
-  jml(ul, result.map(([isDir, title]) => {
-    return ['li', [isDir
-      ? ['a', {
-        href: '#path=' + basePath + encodeURIComponent(title)
-      }, [
-        title
-      ]]
-      : title
-    ]];
-  }));
+  jml(ul, [
+    !isWebAppFind && basePath !== '/'
+      ? [
+        'li', [
+          ['a', {
+            href: '#path=' + path.normalize(path.join(basePath, '..'))
+          }, [
+            '..'
+          ]]
+        ]
+      ]
+      : '',
+    ...result.map(([isDir, title]) => {
+      return ['li', [isDir
+        ? ['a', {
+          href: '#path=' + basePath + encodeURIComponent(title)
+        }, [
+          title
+        ]]
+        : title
+      ]];
+    })
+  ]);
 }
 
 window.addEventListener('hashchange', changePath);
