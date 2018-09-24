@@ -1,6 +1,6 @@
 # filebrowser-electron
 
-***NOT YET FUNCTIONAL***
+***ONLY VERY MINIMALLY FUNCTIONAL***
 
 This aims to be a cross-platform and enhanced substitute for the
 desktop file browser.
