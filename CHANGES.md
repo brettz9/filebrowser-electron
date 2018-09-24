@@ -1,3 +1,9 @@
+## 0.1.0
+
+- First working version
+- Linting: Remove "recommended"
+- Allow external script modules
+
 ## 0.0.2
 
 - npm: Update electron
