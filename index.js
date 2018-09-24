@@ -1,3 +1,5 @@
+import {jml, $} from 'es6://node_modules/jamilih/dist/jml-es.js';
+
 const path = require('path');
 
 function getBasePath () {
@@ -44,33 +46,32 @@ function changePath () {
 
 function addItems (result) {
   const basePath = getBasePath();
-  document.querySelector('i').hidden = true;
-  const ul = document.querySelector('ul');
+  $('i').hidden = true;
+  const ul = $('ul');
   while (ul.firstChild) {
     ul.firstChild.remove();
   }
   // Todo: Do for WebAppFind
   if (!isWebAppFind && basePath !== '/') {
     console.log('basePath', basePath);
-    const li = document.createElement('li');
-    const a = document.createElement('a');
-    a.href = '#path=' + path.normalize(path.join(basePath, '..'));
-    a.append('..');
-    li.append(a);
-    ul.append(li);
+    jml('li', [
+      ['a', {
+        href: '#path=' + path.normalize(path.join(basePath, '..'))
+      }, [
+        '..'
+      ]]
+    ], ul);
   }
 
-  ul.append(...result.map(([isDir, title]) => {
-    const li = document.createElement('li');
-    if (isDir) {
-      const a = document.createElement('a');
-      a.href = '#path=' + basePath + encodeURIComponent(title);
-      a.append(title);
-      li.append(a);
-    } else {
-      li.append(title);
-    }
-    return li;
+  jml(ul, result.map(([isDir, title]) => {
+    return ['li', [isDir
+      ? ['a', {
+        href: '#path=' + basePath + encodeURIComponent(title)
+      }, [
+        title
+      ]]
+      : title
+    ]];
   }));
 }
 
