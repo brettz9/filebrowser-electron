@@ -1,3 +1,8 @@
+# ?
+
+- npm: Use ES6 module version of base64-js
+- npm: Update dep and devDeps
+
 ## 0.2.0
 
 - Enhancement: Add system icons
