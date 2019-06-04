@@ -1,5 +1,9 @@
 # ?
 
+- Linting: ash-nazg/sauron-node
+- npm: Update electron (and make as dep.), jamilih; add core-js-bundle dep.,
+    electron-rebuild devDep; avoid updating electron (requires too high
+    of a version of Node for now)
 - npm: Use ES6 module version of base64-js
 - npm: Update dep and devDeps
 
