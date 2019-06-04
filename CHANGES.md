@@ -1,4 +1,6 @@
-# ?
+# CHANGES to filebrowser-electron
+
+## ?
 
 - Linting: ash-nazg/sauron-node
 - npm: Update electron (and make as dep.), jamilih; add core-js-bundle dep.,
