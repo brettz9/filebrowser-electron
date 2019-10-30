@@ -1,6 +1,6 @@
 # CHANGES to filebrowser-electron
 
-## ?
+## 0.3.0
 
 - Linting: Avoid `document.write`
 - Linting: ash-nazg/sauron-node
