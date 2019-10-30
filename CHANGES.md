@@ -1,5 +1,9 @@
 # CHANGES to filebrowser-electron
 
+## ?
+
+- npm: Bump jamilih dep., devDeps
+
 ## 0.3.0
 
 - Linting: Avoid `document.write`
