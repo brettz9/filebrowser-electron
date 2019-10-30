@@ -98,19 +98,17 @@ async function getIconDataURLForFile (filePath, size) {
 }
 
 /**
-* @typedef {Array} Result
+* @typedef {GenericArray} Result
 * @property {boolean} 0 isDir
 * @property {string} 1 title
 */
 
-/* eslint-disable jsdoc/check-types */
 /**
  *
  * @param {Result[]} result
  * @returns {Promise<void>}
  */
 async function addItems (result) {
-  /* eslint-enable jsdoc/check-types */
   const basePath = getBasePath();
   $('i').hidden = true;
   const ul = $('ul');

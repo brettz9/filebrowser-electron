@@ -5,7 +5,9 @@ const {app, protocol} = require('electron');
 
 const es6Path = __dirname;
 
-protocol.registerStandardSchemes(['es6']);
+protocol.registerSchemesAsPrivileged([{
+  scheme: 'es6'
+}]);
 
 app.on('ready', () => {
   // eslint-disable-next-line promise/prefer-await-to-callbacks

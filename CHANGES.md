@@ -2,7 +2,10 @@
 
 ## ?
 
+- Linting: Avoid `document.write`
 - Linting: ash-nazg/sauron-node
+- Maintenance: Add `.editorconfig`
+- npm: Update deps (core-js-bundle, electron)
 - npm: Update electron (and make as dep.), jamilih; add core-js-bundle dep.,
     electron-rebuild devDep; avoid updating electron (requires too high
     of a version of Node for now)

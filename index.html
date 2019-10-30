@@ -7,13 +7,17 @@
   <body>
     <h1>Hello World!</h1>
     <!-- All of the Node.js APIs are available in this renderer process. -->
-    We are using Node.js <script>document.write(process.versions.node)</script>,
-    Chromium <script>document.write(process.versions.chrome)</script>,
-    and Electron <script>document.write(process.versions.electron)</script>.
+    We are using Node.js <span id="version"></span>,
+    Chromium <span id="chromium"></span>,
+    and Electron <span id="electron"></span>.
 
     <script>
+      document.querySelector('#version').textContent = process.versions.node;
+      document.querySelector('#chromium').textContent = process.versions.chrome;
+      document.querySelector('#electron').textContent = process.versions.electron;
+
       // You can also require other files to run in this process
-      require('./renderer.js')
+      require('./renderer.js');
     </script>
     <script type="module" src="es6://index.js"></script>
   </body>
