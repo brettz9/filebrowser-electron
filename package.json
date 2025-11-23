@@ -15,7 +15,8 @@
     "lint": "npm run eslint --",
     "eslint": "eslint --ext=js,html,md .",
     "test": "npm run eslint --",
-    "rebuild": "electron-rebuild -f -w system-icon2 -v 39.2.3",
+    "postinstall": "cd node_modules/system-icon2 && npx node-gyp rebuild --target=39.2.3 --arch=arm64 --dist-url=https://electronjs.org/headers",
+    "rebuild": "cd node_modules/system-icon2 && npx node-gyp rebuild --target=39.2.3 --arch=arm64 --dist-url=https://electronjs.org/headers",
     "start": "electron ."
   },
   "repository": "https://github.com/brettz9/filebrowser-electron",
