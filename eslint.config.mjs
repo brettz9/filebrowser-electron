@@ -15,5 +15,11 @@ export default [
         sourceType: 'module'
       },
     };
-  })
+  }),
+  {
+    rules: {
+      // Thinks we're using Node globals despite browser reference above
+      'n/no-unsupported-features/node-builtins': 'off'
+    }
+  }
 ];

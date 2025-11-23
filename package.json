@@ -35,15 +35,18 @@
     "base64-js": "^1.5.1",
     "electron": "^39.2.3",
     "jamilih": "^0.63.1",
+    "jquery": "^3.7.1",
     "jsdom": "^27.2.0",
+    "load-stylesheets": "^0.13.0",
+    "miller-columns": "0.13.0",
     "system-icon2": "^0.5.0"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",
+    "@types/jquery": "^3.5.33",
     "@types/jsdom": "^27.0.0",
     "eslint": "^9.39.1",
     "eslint-config-ash-nazg": "^39.8.0",
-    "miller-columns": "0.10.3",
     "typescript": "^5.9.3"
   }
 }

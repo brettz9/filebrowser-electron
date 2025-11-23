@@ -11,13 +11,25 @@
       http-equiv="X-Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
     />
+    <link rel="stylesheet" href="index.css" />
     <title>Filebrowser</title>
   </head>
   <body>
     <h1 id="filebrowser">Filebrowser</h1>
+    <nav>
+      <button id="icon-view"><img src="images/icon-view.svg" /></button>
+      <!-- <button><img src="images/bulleted-list.svg" /></button> -->
+      <button id="three-columns"><img src="images/three-columns.svg" /></button>
+      <!-- <button><img src="images/gallery-view.svg" /></button> -->
+    </nav>
+    <h3>Files and folders:</h3>
+    <i>Waiting for activation...</i>
+    <div class="miller-breadcrumbs"></div>
+    <div class="miller-columns-container">
+      <div class="miller-columns" tabindex="1">
+        <ul></ul>
+      </div>
+    </div>
+    <script src="index.js"></script>
   </body>
-  <h3>Files and folders:</h3>
-  <i>Waiting for activation...</i>
-  <ul></ul>
-  <script src="index.js"></script>
 </html>

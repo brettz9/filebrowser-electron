@@ -1,17 +1,38 @@
 'use strict';
 
-const {readdir, lstat} = require('fs/promises');
-const path = require('path');
+const {readdir, lstat} = require('node:fs/promises');
+const path = require('node:path');
+// eslint-disable-next-line no-shadow -- Promise version
+const {setTimeout} = require('node:timers/promises');
 
 const {jml} = require('jamilih');
+const jQuery = require('jquery');
+const addMillerColumnPlugin = require('miller-columns');
 
 const getIconDataURLForFile = require('./utils/getIconDataURLForFile.js');
+
+/* eslint-disable jsdoc/reject-any-type -- Generic */
+/**
+ * @param {any[]} arr
+ * @param {number} n
+ */
+const chunk = (arr, n) => Array.from({
+  length: Math.ceil(arr.length / n)
+}, (_, i) => arr.slice(n * i, n + (n * i)));
+/* eslint-enable jsdoc/reject-any-type -- Generic */
 
 /**
  * @param {string} sel
  */
 const $ = (sel) => {
   return /** @type {HTMLElement} */ (document.querySelector(sel));
+};
+
+/**
+ * @param {string} sel
+ */
+const $$ = (sel) => {
+  return /** @type {HTMLElement[]} */ ([...document.querySelectorAll(sel)]);
 };
 
 // Ensure jamilih uses the browser's DOM instead of jsdom
@@ -22,10 +43,27 @@ jml.setWindow(globalThis);
  * @returns {string}
  */
 function getBasePath () {
-  const params = new URLSearchParams(globalThis.location.hash.slice(1));
+  const params = new URLSearchParams(location.hash.slice(1));
   return path.normalize(
     params.has('path') ? params.get('path') + '/' : '/'
   );
+}
+
+/**
+ * @param {string} basePath
+ * @returns {Promise<Result[]>}
+ */
+async function readDirectory (basePath) {
+  return (await Promise.all(
+    (await readdir(basePath)).map(async (fileOrDir) => {
+      const stat = await lstat(path.join(basePath, fileOrDir));
+      return /** @type {Result} */ (
+        [stat.isDirectory() || stat.isSymbolicLink(), basePath, fileOrDir]
+      );
+    })
+  )).toSorted(([, , a], [, , b]) => {
+    return a.localeCompare(b, undefined, {sensitivity: 'base'});
+  });
 }
 
 /**
@@ -34,7 +72,9 @@ function getBasePath () {
  */
 async function changePath () {
   // console.log('change path');
-  const basePath = getBasePath();
+  const view = localStorage.getItem('view') ?? 'icon-view';
+  const currentBasePath = getBasePath();
+  const basePath = view === 'icon-view' ? currentBasePath : '/';
   if (!(/^[\w.\/ \-]*$/v).test(basePath)) {
     // Todo: Refactor to allow non-ASCII and just escape single quotes, etc.
     // eslint-disable-next-line no-console -- Debugging
@@ -42,39 +82,94 @@ async function changePath () {
     return;
   }
 
-  const result = await Promise.all(
-    (await readdir(basePath)).map(async (fileOrDir) => {
-      const stat = await lstat(basePath + fileOrDir);
-      return /** @type {Result} */ (
-        [stat.isDirectory() || stat.isSymbolicLink(), fileOrDir]
-      );
-    })
-  );
-  await addItems(result);
+  const result = await readDirectory(basePath);
+  await addItems(result, basePath, currentBasePath);
 }
 
 /**
- * @typedef {[isDir: boolean, title: string]} Result
+ * @typedef {[isDir: boolean, childDir: string, title: string]} Result
  */
 
+/** @type {JQuery} */
+let $columns;
 /**
  *
  * @param {Result[]} result
+ * @param {string} basePath
+ * @param {string} currentBasePath
  * @returns {Promise<void>}
  */
-async function addItems (result) {
-  const basePath = getBasePath();
+async function addItems (result, basePath, currentBasePath) {
+  const view = localStorage.getItem('view') ?? 'icon-view';
+
   $('i').hidden = true;
   const ul = $('ul');
   while (ul.firstChild) {
     ul.firstChild.remove();
   }
 
+  const listItems = (await Promise.all(result.map(async ([
+    isDir,
+    // eslint-disable-next-line no-unused-vars -- Not in use
+    _childDir,
+    title
+  ]) => {
+    let url;
+    try {
+      url = await (getIconDataURLForFile(
+        path.join(basePath, title)
+      ));
+    } catch (err) {
+      // eslint-disable-next-line no-console -- Debugging
+      console.error(err);
+    }
+    const width = '25px';
+    const paddingTopBottom = '5px';
+    const paddingRightLeft = '30px';
+    const marginTopBottom = '18px';
+    return /** @type {import('jamilih').JamilihArray} */ ([
+      view === 'icon-view' ? 'td' : 'li',
+      {
+        class: 'list-item',
+        // style: url ? 'list-style-image: url("' + url + '")' : undefined
+        style: url
+          ? `margin-top: ${
+            marginTopBottom
+          }; margin-bottom: ${
+            marginTopBottom
+          }; padding: ${paddingTopBottom} ${
+            paddingRightLeft
+          } ${paddingTopBottom} ${
+            paddingRightLeft
+          }; background-image: url(${
+            url
+          }); background-size: ${width};`
+          : ''
+      }, [
+        isDir
+          ? ['a', {
+            title: basePath + encodeURIComponent(title),
+            ...(view === 'icon-view'
+              ? {
+                href: '#path=' + basePath + encodeURIComponent(title)
+              }
+              : {})
+          }, [
+            title
+          ]]
+          : title
+      ]
+    ]);
+  })));
+
+  const numIconColumns = 4;
+
   jml(ul, [
-    (basePath !== '/'
+    (view === 'icon-view' && basePath !== '/'
       ? [
         'li', [
           ['a', {
+            title: path.normalize(path.join(basePath, '..')),
             href: '#path=' + path.normalize(path.join(basePath, '..'))
           }, [
             '..'
@@ -82,49 +177,192 @@ async function addItems (result) {
         ]
       ]
       : ''),
-    ...(await Promise.all(result.map(async ([isDir, title]) => {
-      let url;
-      try {
-        url = await (getIconDataURLForFile(
-          path.join(basePath, title)
-        ));
-      } catch (err) {
-        // eslint-disable-next-line no-console -- Debugging
-        console.error(err);
-      }
-      const width = '25px';
-      const paddingRightLeft = '30px';
-      const marginTopBottom = '18px';
-      return /** @type {import('jamilih').JamilihArray} */ (['li', {
-        // style: url ? 'list-style-image: url("' + url + '")' : undefined
-        style: url
-          ? `margin-top: ${
-            marginTopBottom
-          }; margin-bottom: ${
-            marginTopBottom
-          }; padding: 0 ${
-            paddingRightLeft
-          } 0 ${
-            paddingRightLeft
-          }; list-style: none; background-image: url(${
-            url
-          }); background-repeat: no-repeat; ` +
-          `background-position: left center; background-size: ${width};`
-          : ''
-      }, [
-        isDir
-          ? ['a', {
-            href: '#path=' + basePath + encodeURIComponent(title)
-          }, [
-            title
-          ]]
-          : title
-      ]]);
-    })))
+    ...(view === 'icon-view'
+      ? /** @type {import('jamilih').JamilihArray[]} */ ([[
+        'table',
+        chunk(listItems, numIconColumns).map((innerArr) => {
+          return ['tr', innerArr];
+        })
+      ]])
+      : listItems)
   ]);
+
+  if ($columns?.destroy) {
+    $columns.destroy();
+    if (view === 'icon-view') {
+      await changePath();
+    }
+  }
+
+  if (view === 'icon-view') {
+    return;
+  }
+
+  const millerColumns = jQuery('div.miller-columns');
+  const parentMap = new WeakMap();
+  $columns = millerColumns.millerColumns({
+    // Options:
+    // @ts-ignore Bugginess
+    async current ($item /* , $cols */) {
+      if (parentMap.has($item[0])) {
+        history.replaceState(
+          null,
+          '',
+          location.pathname + '#path=' + encodeURIComponent(
+            parentMap.get($item[0])
+          )
+        );
+        return;
+      }
+
+      const a = $item.children('a[title]');
+      if (!a.length) {
+        return;
+      }
+
+      const parent = $item.parent();
+      const prev = parent.prevAll(
+        'ul.miller-column:not(.miller-collapse)'
+      ).first();
+      const parentLi = prev.children('li.miller-selected')[0];
+
+      const parentText = parentMap.get(parentLi) ?? '';
+      const currentPath = parentText + '/' + a.text();
+
+      parentMap.set($item[0], currentPath);
+
+      history.replaceState(
+        null,
+        '',
+        location.pathname + '#path=' + encodeURIComponent(currentPath)
+      );
+
+      const childResult = await readDirectory(currentPath);
+      console.log('childResult', childResult);
+
+      const childItems = (
+        await Promise.all(childResult.map(async ([
+          isDir, childDirectory, title
+        ]) => {
+          let url;
+          try {
+            url = await (getIconDataURLForFile(
+              path.join(childDirectory, title)
+            ));
+          } catch (err) {
+            // eslint-disable-next-line no-console -- Debugging
+            console.error(err);
+          }
+          const width = '25px';
+          const paddingRightLeft = '30px';
+          const marginTopBottom = '18px';
+          return jml('li', {
+            style: url
+              ? `margin-top: ${
+                marginTopBottom
+              }; margin-bottom: ${
+                marginTopBottom
+              }; padding: 0 ${
+                paddingRightLeft
+              } 0 ${
+                paddingRightLeft
+              }; list-style: none; background-image: url(${
+                url
+              }); background-repeat: no-repeat; ` +
+              `background-position: left center; background-size: ${width};`
+              : ''
+          }, [
+            isDir
+              ? ['a', {
+                title: childDirectory + '/' +
+                  encodeURIComponent(title)
+                // href: '#path=' + childDirectory + '/' +
+                //  encodeURIComponent(title)
+              }, [
+                title
+              ]]
+              : title
+          ]);
+        }))
+      );
+
+      childItems.forEach((childItem, idx) => {
+        if (!$columns.addItem) {
+          return;
+        }
+        const item = $columns.addItem(jQuery(childItem), $item);
+        if (idx === 0) {
+          globalThis.setTimeout(() => {
+            item[0].scrollIntoView({
+              block: 'nearest', inline: 'start'
+            });
+          }, 500);
+        }
+      });
+    }
+  });
+
+  if (currentBasePath !== '/') {
+    await currentBasePath.split('/').slice(1, -1).reduce(
+      (prom, pathSegment, idx) => {
+        // eslint-disable-next-line promise/prefer-await-to-then -- Ok
+        return prom.then(async () => {
+          await setTimeout(500);
+
+          const ulNth = jQuery(`ul.miller-column:nth-of-type(${
+            idx + 1
+          }):not(.miller-collapse)`);
+          // eslint-disable-next-line @stylistic/max-len -- Long
+          // console.log('ul idx:', idx + ', length:', ulNth.length, '::', pathSegment);
+          const anchors = ulNth.find('a[title]').filter(
+            function () {
+              return jQuery(this).text() === pathSegment;
+            }
+          );
+          // console.log('anchors', anchors.length);
+          anchors.trigger('click');
+          globalThis.setTimeout(() => {
+            anchors[0]?.scrollIntoView({
+              block: 'nearest', container: 'nearest', inline: 'start'
+            });
+          }, 200);
+          return undefined;
+        });
+      }, Promise.resolve()
+    );
+  }
 }
 
 globalThis.addEventListener('hashchange', changePath);
+
+$('#icon-view').addEventListener('click', async function () {
+  $$('nav button').forEach((button) => {
+    button.classList.remove('selected');
+  });
+  this.classList.add('selected');
+  localStorage.setItem('view', 'icon-view');
+  $('.miller-breadcrumbs').style.display = 'none';
+  await changePath();
+});
+$('#three-columns').addEventListener('click', async function () {
+  $$('nav button').forEach((button) => {
+    button.classList.remove('selected');
+  });
+  this.classList.add('selected');
+  localStorage.setItem('view', 'three-columns');
+  $('.miller-breadcrumbs').style.display = 'block';
+  await changePath();
+});
+
+const view = localStorage.getItem('view') ?? 'icon-view';
+switch (view) {
+case 'three-columns':
+case 'icon-view':
+  $('#' + view).classList.add('selected');
+  break;
+default:
+  throw new Error('Unrecognized view');
+}
 
 $('#filebrowser').title = `
     We are using Node.js ${process.versions.node},
@@ -133,4 +371,7 @@ $('#filebrowser').title = `
 `;
 
 // eslint-disable-next-line unicorn/prefer-top-level-await -- Not ESM
-changePath();
+(async () => {
+await addMillerColumnPlugin.default(jQuery, {stylesheets: ['@default']});
+await changePath();
+})();

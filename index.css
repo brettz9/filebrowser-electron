@@ -1,0 +1,23 @@
+nav img {
+  width: 25px;
+  height: 25px;
+}
+
+nav button.selected {
+  background-color: aqua;
+  color: white;
+}
+
+.miller-column {
+  overflow: scroll !important;
+  height: 350px;
+  width: 250px;
+}
+
+.list-item {
+  overflow: auto;
+  max-width: 150px;
+  list-style: none;
+  background-repeat: no-repeat;
+  background-position: left center;
+}

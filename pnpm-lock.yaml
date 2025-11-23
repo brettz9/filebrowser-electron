@@ -17,9 +17,18 @@ importers:
       jamilih:
         specifier: ^0.63.1
         version: 0.63.1
+      jquery:
+        specifier: ^3.7.1
+        version: 3.7.1
       jsdom:
         specifier: ^27.2.0
         version: 27.2.0
+      load-stylesheets:
+        specifier: ^0.13.0
+        version: 0.13.0
+      miller-columns:
+        specifier: 0.13.0
+        version: 0.13.0
       system-icon2:
         specifier: ^0.5.0
         version: 0.5.0
@@ -27,6 +36,9 @@ importers:
       '@electron/rebuild':
         specifier: ^4.0.1
         version: 4.0.1
+      '@types/jquery':
+        specifier: ^3.5.33
+        version: 3.5.33
       '@types/jsdom':
         specifier: ^27.0.0
         version: 27.0.0
@@ -36,9 +48,6 @@ importers:
       eslint-config-ash-nazg:
         specifier: ^39.8.0
         version: 39.8.0(@babel/core@7.28.5)(eslint@9.39.1)(typescript@5.9.3)
-      miller-columns:
-        specifier: 0.10.3
-        version: 0.10.3
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -401,6 +410,9 @@ packages:
   '@types/http-cache-semantics@4.0.4':
     resolution: {integrity: sha512-1m0bIFVc7eJWyve9S0RnuRgcQqF/Xd5QsUZAZeQFr1Q3/p9JWoQQEqmVy+DPTNpGXwhgIetAoYF8JSc33q29QA==}
 
+  '@types/jquery@3.5.33':
+    resolution: {integrity: sha512-SeyVJXlCZpEki5F0ghuYe+L+PprQta6nRZqhONt9F13dWBtR/ftoaIbdRQ7cis7womE+X2LKhsDdDtkkDhJS6g==}
+
   '@types/jsdom@27.0.0':
     resolution: {integrity: sha512-NZyFl/PViwKzdEkQg96gtnB8wm+1ljhdDay9ahn4hgb+SfVtPCbm3TlmDUFXTA+MGN3CijicnMhG18SI5H3rFw==}
 
@@ -427,6 +439,9 @@ packages:
 
   '@types/responselike@1.0.3':
     resolution: {integrity: sha512-H/+L+UkTV33uf49PH5pCAUBVPNj2nDBXTN+qS1dOwyyg24l3CcicicCA7ca+HMvJBZcFgl5r8e+RR6elsb4Lyw==}
+
+  '@types/sizzle@2.3.10':
+    resolution: {integrity: sha512-TC0dmN0K8YcWEAEfiPi5gJP14eJe30TTGjkvek3iM/1NdHHsdCA/Td6GvNndMOo/iSnIsZ4HuuhrYPDAmbxzww==}
 
   '@types/tough-cookie@4.0.5':
     resolution: {integrity: sha512-/Ad8+nIOV7Rl++6f1BdKxFSMgmoqEoYbHRpPcx3JEfv8VRsQe9Z4mCXeJBzxs7mbHY/XOZZuXlRNfhpVPbs6ZA==}
@@ -1757,6 +1772,9 @@ packages:
     resolution: {integrity: sha512-TLfBNjzLACIkOdn5h9tIe23gz+RZMKexhephNWroURkmBVOUPUxV//xPB6E297ZsUcw+N0ubw9GGoHCGp5pq+A==}
     engines: {node: '>=18.0.0'}
 
+  jquery@3.7.1:
+    resolution: {integrity: sha512-m4avr8yL8kmFN8psrbFFFmB/If14iN5o9nw/NgnnM+kybDJpRsAynV2BsfpTYrTRysYUdADVD7CkUUizgkpLfg==}
+
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
@@ -1828,6 +1846,9 @@ packages:
   levn@0.4.1:
     resolution: {integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==}
     engines: {node: '>= 0.8.0'}
+
+  load-stylesheets@0.13.0:
+    resolution: {integrity: sha512-k7e9SadCitGS1ljCLfh12wwiRLZE/RvBMoaRZVVmh5pVBMPveFx+0U3seshfdlv7t5LUfVqr3wCq8NOeEeoVOQ==}
 
   locate-path@6.0.0:
     resolution: {integrity: sha512-iPZK6eYjbxRu3uB4/WZ3EsEIMJFMqAoopl3R+zuq0UjcAm/MO6KCweDgPfP3elTztoKP3KtnVHxTn2NHBSDVUw==}
@@ -2016,8 +2037,8 @@ packages:
     resolution: {integrity: sha512-PXwfBhYu0hBCPw8Dn0E+WDYb7af3dSLVWKi3HGv84IdF4TyFoC0ysxFd0Goxw7nSv4T/PzEJQxsYsEiFCKo2BA==}
     engines: {node: '>=8.6'}
 
-  miller-columns@0.10.3:
-    resolution: {integrity: sha512-2ADOJnENY4GuavQYvPiMwkI85x/ihqyc+6t5ZVcODCM330WKeQnu6px4FV+w0IR1ciw5VPvUGJubP9KF9Y4jOg==}
+  miller-columns@0.13.0:
+    resolution: {integrity: sha512-fJmAlgnZ9iHt5xSuuGPnlgnvBDQqDgO6yGg6nPD4gQxfC+nJQB9ir3e7xrJ5BF67BikiiiRJ4hJRGknU0RW7MA==}
 
   mime-db@1.54.0:
     resolution: {integrity: sha512-aU5EJuIN2WDemCcAp2vFBfp/m4EAhWJnUNSSw0ixs7/kXbd6Pg64EmwJkNdFhB8aWt1sH2CTXrLxo/iAGV3oPQ==}
@@ -3353,6 +3374,10 @@ snapshots:
 
   '@types/http-cache-semantics@4.0.4': {}
 
+  '@types/jquery@3.5.33':
+    dependencies:
+      '@types/sizzle': 2.3.10
+
   '@types/jsdom@27.0.0':
     dependencies:
       '@types/node': 24.10.1
@@ -3384,6 +3409,8 @@ snapshots:
   '@types/responselike@1.0.3':
     dependencies:
       '@types/node': 24.10.1
+
+  '@types/sizzle@2.3.10': {}
 
   '@types/tough-cookie@4.0.5': {}
 
@@ -4889,6 +4916,8 @@ snapshots:
 
   jamilih@0.63.1: {}
 
+  jquery@3.7.1: {}
+
   js-tokens@4.0.0: {}
 
   js-types@4.0.0: {}
@@ -4963,6 +4992,8 @@ snapshots:
     dependencies:
       prelude-ls: 1.2.1
       type-check: 0.4.0
+
+  load-stylesheets@0.13.0: {}
 
   locate-path@6.0.0:
     dependencies:
@@ -5338,7 +5369,7 @@ snapshots:
       braces: 3.0.3
       picomatch: 2.3.1
 
-  miller-columns@0.10.3: {}
+  miller-columns@0.13.0: {}
 
   mime-db@1.54.0: {}
 
