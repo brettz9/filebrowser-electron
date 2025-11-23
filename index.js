@@ -138,9 +138,12 @@ async function addItems (result) {
 }
 
 globalThis.addEventListener('hashchange', changePath);
-$('#version').textContent = process.versions.node;
-$('#chromium').textContent = process.versions.chrome;
-$('#electron').textContent = process.versions.electron;
+
+$('#filebrowser').title = `
+    We are using Node.js ${process.versions.node},
+    Chromium ${process.versions.chrome},
+    and Electron ${process.versions.electron}.
+`;
 
 // eslint-disable-next-line unicorn/prefer-top-level-await -- Not ESM
 changePath();
