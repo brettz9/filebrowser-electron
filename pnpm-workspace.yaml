@@ -1,0 +1,6 @@
+onlyBuiltDependencies:
+  - electron
+  - lzma-native
+  - system-icon
+  - system-icon2
+  - unrs-resolver

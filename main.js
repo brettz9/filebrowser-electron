@@ -1,3 +1,4 @@
+'use strict';
 // Modules to control application life and create native browser window
 const {app, BrowserWindow} = require('electron');
 
@@ -14,9 +15,25 @@ function createWindow () {
   mainWindow = new BrowserWindow({
     width: 800, height: 600,
     webPreferences: {
-      nodeIntegration: true
+      nodeIntegration: true,
+      contextIsolation: false
     }
   });
+
+  // Set the headers for the main window's webContents
+  mainWindow.webContents.session.webRequest.onHeadersReceived(
+    // eslint-disable-next-line promise/prefer-await-to-callbacks -- API
+    (details, callback) => {
+      // eslint-disable-next-line promise/prefer-await-to-callbacks -- API
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Cross-Origin-Opener-Policy': ['same-origin'],
+          'Cross-Origin-Embedder-Policy': ['require-corp']
+        }
+      });
+    }
+  );
 
   // and load the index.html of the app.
   mainWindow.loadFile('index.html');
@@ -33,11 +50,6 @@ function createWindow () {
   });
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.on('ready', createWindow);
-
 // Quit when all windows are closed.
 app.on('window-all-closed', function () {
   // On OS X it is common for applications and their menu bar
@@ -47,6 +59,12 @@ app.on('window-all-closed', function () {
   }
 });
 
+// eslint-disable-next-line unicorn/prefer-top-level-await -- Not ESM
+(async () => {
+// Some APIs can only be used after this event occurs.
+await app.whenReady();
+createWindow();
+
 app.on('activate', function () {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
@@ -54,8 +72,7 @@ app.on('activate', function () {
     createWindow();
   }
 });
+})();
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.
-
-require('./es6');
