@@ -92,8 +92,25 @@ async function addItems (result) {
         // eslint-disable-next-line no-console -- Debugging
         console.error(err);
       }
+      const width = '25px';
+      const paddingRightLeft = '30px';
+      const marginTopBottom = '18px';
       return /** @type {import('jamilih').JamilihArray} */ (['li', {
-        style: url ? 'list-style-image: url("' + url + '")' : undefined
+        // style: url ? 'list-style-image: url("' + url + '")' : undefined
+        style: url
+          ? `margin-top: ${
+            marginTopBottom
+          }; margin-bottom: ${
+            marginTopBottom
+          }; padding: 0 ${
+            paddingRightLeft
+          } 0 ${
+            paddingRightLeft
+          }; list-style: none; background-image: url(${
+            url
+          }); background-repeat: no-repeat; ` +
+          `background-position: left center; background-size: ${width};`
+          : ''
       }, [
         isDir
           ? ['a', {
