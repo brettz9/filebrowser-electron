@@ -14,7 +14,7 @@
     "lint": "npm run eslint --",
     "eslint": "eslint --ext=js,html,md .",
     "test": "npm run eslint --",
-    "rebuild": "electron-rebuild -f -w system-icon2",
+    "rebuild": "electron-rebuild -f -w system-icon2 -v 39.2.3",
     "start": "electron ."
   },
   "repository": "https://github.com/brettz9/filebrowser-electron",
@@ -34,7 +34,7 @@
     "electron": "^39.2.3",
     "jamilih": "^0.63.0",
     "jsdom": "^27.2.0",
-    "system-icon2": "^0.3.0"
+    "system-icon2": "^0.4.0"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",

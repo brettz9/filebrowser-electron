@@ -55,30 +55,10 @@ async function changePath () {
  *
  * @param {string} filePath
  * @param {Integer} [size]
- * @returns {Promise<ByteArray>}
- */
-function getIconForFile (filePath, size = ICON_SIZE_EXTRA_SMALL) {
-  // eslint-disable-next-line promise/avoid-new -- API
-  return new Promise((resolve, reject) => {
-    // eslint-disable-next-line promise/prefer-await-to-callbacks -- API
-    getIconForPath(filePath, size, (err, result) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(result);
-      }
-    });
-  });
-}
-
-/**
- *
- * @param {string} filePath
- * @param {Integer} size
  * @returns {Promise<string>}
  */
-async function getIconDataURLForFile (filePath, size) {
-  const result = await getIconForFile(filePath, size);
+async function getIconDataURLForFile (filePath, size = ICON_SIZE_EXTRA_SMALL) {
+  const result = await getIconForPath(filePath, size);
   const encoded = fromByteArray(result);
   return 'data:image/png;base64,' + encoded;
 }
