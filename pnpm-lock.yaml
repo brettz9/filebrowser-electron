@@ -15,18 +15,21 @@ importers:
         specifier: ^39.2.3
         version: 39.2.3
       jamilih:
-        specifier: ^0.63.0
-        version: 0.63.0
+        specifier: ^0.63.1
+        version: 0.63.1
       jsdom:
         specifier: ^27.2.0
         version: 27.2.0
       system-icon2:
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: ^0.5.0
+        version: 0.5.0
     devDependencies:
       '@electron/rebuild':
         specifier: ^4.0.1
         version: 4.0.1
+      '@types/jsdom':
+        specifier: ^27.0.0
+        version: 27.0.0
       eslint:
         specifier: ^9.39.1
         version: 9.39.1
@@ -398,6 +401,9 @@ packages:
   '@types/http-cache-semantics@4.0.4':
     resolution: {integrity: sha512-1m0bIFVc7eJWyve9S0RnuRgcQqF/Xd5QsUZAZeQFr1Q3/p9JWoQQEqmVy+DPTNpGXwhgIetAoYF8JSc33q29QA==}
 
+  '@types/jsdom@27.0.0':
+    resolution: {integrity: sha512-NZyFl/PViwKzdEkQg96gtnB8wm+1ljhdDay9ahn4hgb+SfVtPCbm3TlmDUFXTA+MGN3CijicnMhG18SI5H3rFw==}
+
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
 
@@ -421,6 +427,9 @@ packages:
 
   '@types/responselike@1.0.3':
     resolution: {integrity: sha512-H/+L+UkTV33uf49PH5pCAUBVPNj2nDBXTN+qS1dOwyyg24l3CcicicCA7ca+HMvJBZcFgl5r8e+RR6elsb4Lyw==}
+
+  '@types/tough-cookie@4.0.5':
+    resolution: {integrity: sha512-/Ad8+nIOV7Rl++6f1BdKxFSMgmoqEoYbHRpPcx3JEfv8VRsQe9Z4mCXeJBzxs7mbHY/XOZZuXlRNfhpVPbs6ZA==}
 
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
@@ -1744,8 +1753,8 @@ packages:
   jackspeak@3.4.3:
     resolution: {integrity: sha512-OGlZQpz2yfahA/Rd1Y8Cd9SIEsqvXkLVoSw/cgwhnhFMDbsQFeZYoJJ7bIZBS9BcamUW96asq/npPWugM+RQBw==}
 
-  jamilih@0.63.0:
-    resolution: {integrity: sha512-43QDNiO8UfsjaKMPFe4fdAgQh/wBWkO1WOcbO2FA7aE1HYcw2XAI6J/wf28BT7aHWmDMwbE4asV9XvMamCZRoA==}
+  jamilih@0.63.1:
+    resolution: {integrity: sha512-TLfBNjzLACIkOdn5h9tIe23gz+RZMKexhephNWroURkmBVOUPUxV//xPB6E297ZsUcw+N0ubw9GGoHCGp5pq+A==}
     engines: {node: '>=18.0.0'}
 
   js-tokens@4.0.0:
@@ -2210,6 +2219,9 @@ packages:
   parse-statements@1.0.11:
     resolution: {integrity: sha512-HlsyYdMBnbPQ9Jr/VgJ1YF4scnldvJpJxCVx6KgqPL4dxppsWrJHCIIxQXMJrqGnsRkNPATbeMJ8Yxu7JMsYcA==}
 
+  parse5@7.3.0:
+    resolution: {integrity: sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw==}
+
   parse5@8.0.0:
     resolution: {integrity: sha512-9m4m5GSgXjL4AjumKzq1Fgfp3Z8rsvjRNbnkVwfu2ImRqE5D0LnY2QfDen18FSY9C573YU5XxSapdHZTZ2WolA==}
 
@@ -2612,8 +2624,8 @@ packages:
   symbol-tree@3.2.4:
     resolution: {integrity: sha512-9QNk5KwDF+Bvz+PyObkmSYjI5ksVUYtjW7AU22r2NKcfLJcXp96hkDWU3+XndOsUb+AQ9QhfzfCT2O+CNWT5Tw==}
 
-  system-icon2@0.4.0:
-    resolution: {integrity: sha512-cQnKOZ5BJwm58m2aze1MV6PUxiXwuXGJVO0HnfzpEHH7cxI8iTBozNVoISqSVXQhkkjLjr/M88BNr+7yYlj0Nw==}
+  system-icon2@0.5.0:
+    resolution: {integrity: sha512-buNfQOUF2qqKmraTxjZ9UySvSYRv7v5g1hp6z5ywJNedqjeMorVFCXNh1oj1sdcQMxO+8w4Huukl24bdtRY2rA==}
     os: [darwin, win32]
 
   table-layout@4.1.1:
@@ -3341,6 +3353,12 @@ snapshots:
 
   '@types/http-cache-semantics@4.0.4': {}
 
+  '@types/jsdom@27.0.0':
+    dependencies:
+      '@types/node': 24.10.1
+      '@types/tough-cookie': 4.0.5
+      parse5: 7.3.0
+
   '@types/json-schema@7.0.15': {}
 
   '@types/json5@0.0.29': {}
@@ -3366,6 +3384,8 @@ snapshots:
   '@types/responselike@1.0.3':
     dependencies:
       '@types/node': 24.10.1
+
+  '@types/tough-cookie@4.0.5': {}
 
   '@types/unist@3.0.3': {}
 
@@ -4867,7 +4887,7 @@ snapshots:
     optionalDependencies:
       '@pkgjs/parseargs': 0.11.0
 
-  jamilih@0.63.0: {}
+  jamilih@0.63.1: {}
 
   js-tokens@4.0.0: {}
 
@@ -5529,6 +5549,10 @@ snapshots:
 
   parse-statements@1.0.11: {}
 
+  parse5@7.3.0:
+    dependencies:
+      entities: 6.0.1
+
   parse5@8.0.0:
     dependencies:
       entities: 6.0.1
@@ -5944,7 +5968,7 @@ snapshots:
 
   symbol-tree@3.2.4: {}
 
-  system-icon2@0.4.0:
+  system-icon2@0.5.0:
     dependencies:
       bindings: 1.5.0
       nan: 2.23.1

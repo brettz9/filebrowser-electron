@@ -3,8 +3,15 @@
 const {readdir, lstat} = require('fs/promises');
 const path = require('path');
 
-const {jml, $} = require('jamilih');
+const {jml} = require('jamilih');
 const {fromByteArray} = require('base64-js');
+
+/**
+ * @param {string} sel
+ */
+const $ = (sel) => {
+  return /** @type {HTMLElement} */ (document.querySelector(sel));
+};
 
 const {
   getIconForPath,
@@ -45,12 +52,17 @@ async function changePath () {
   const result = await Promise.all(
     (await readdir(basePath)).map(async (fileOrDir) => {
       const stat = await lstat(basePath + fileOrDir);
-      return [stat.isDirectory() || stat.isSymbolicLink(), fileOrDir];
+      return /** @type {Result} */ (
+        [stat.isDirectory() || stat.isSymbolicLink(), fileOrDir]
+      );
     })
   );
   await addItems(result);
 }
 
+/**
+ * @typedef {number} Integer
+ */
 /**
  *
  * @param {string} filePath
@@ -102,7 +114,7 @@ async function addItems (result) {
         // eslint-disable-next-line no-console -- Debugging
         console.error(err);
       }
-      return ['li', {
+      return /** @type {import('jamilih').JamilihArray} */ (['li', {
         style: url ? 'list-style-image: url("' + url + '")' : undefined
       }, [
         isDir
@@ -112,7 +124,7 @@ async function addItems (result) {
             title
           ]]
           : title
-      ]];
+      ]]);
     })))
   ]);
 }

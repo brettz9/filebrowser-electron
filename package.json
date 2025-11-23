@@ -11,6 +11,7 @@
     "last 2 chrome versions"
   ],
   "scripts": {
+    "tsc": "tsc",
     "lint": "npm run eslint --",
     "eslint": "eslint --ext=js,html,md .",
     "test": "npm run eslint --",
@@ -32,12 +33,13 @@
   "dependencies": {
     "base64-js": "^1.5.1",
     "electron": "^39.2.3",
-    "jamilih": "^0.63.0",
+    "jamilih": "^0.63.1",
     "jsdom": "^27.2.0",
-    "system-icon2": "^0.4.0"
+    "system-icon2": "^0.5.0"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",
+    "@types/jsdom": "^27.0.0",
     "eslint": "^9.39.1",
     "eslint-config-ash-nazg": "^39.8.0",
     "miller-columns": "0.10.3",
