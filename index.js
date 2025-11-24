@@ -1,9 +1,10 @@
+/* eslint-disable n/no-sync,
+  promise/prefer-await-to-then,
+  promise/catch-or-return -- Needed for performance */
 'use strict';
 
-const {readdir, lstat} = require('node:fs/promises');
+const {readdirSync, lstatSync} = require('node:fs');
 const path = require('node:path');
-// eslint-disable-next-line no-shadow -- Promise version
-const {setTimeout} = require('node:timers/promises');
 
 const {jml} = require('jamilih');
 const jQuery = require('jquery');
@@ -51,26 +52,24 @@ function getBasePath () {
 
 /**
  * @param {string} basePath
- * @returns {Promise<Result[]>}
+ * @returns {Result[]}
  */
-async function readDirectory (basePath) {
-  return (await Promise.all(
-    (await readdir(basePath)).map(async (fileOrDir) => {
-      const stat = await lstat(path.join(basePath, fileOrDir));
-      return /** @type {Result} */ (
-        [stat.isDirectory() || stat.isSymbolicLink(), basePath, fileOrDir]
-      );
-    })
-  )).toSorted(([, , a], [, , b]) => {
+function readDirectory (basePath) {
+  return readdirSync(basePath).map((fileOrDir) => {
+    const stat = lstatSync(path.join(basePath, fileOrDir));
+    return /** @type {Result} */ (
+      [stat.isDirectory() || stat.isSymbolicLink(), basePath, fileOrDir]
+    );
+  }).toSorted(([, , a], [, , b]) => {
     return a.localeCompare(b, undefined, {sensitivity: 'base'});
   });
 }
 
 /**
  *
- * @returns {Promise<void>}
+ * @returns {void}
  */
-async function changePath () {
+function changePath () {
   // console.log('change path');
   const view = localStorage.getItem('view') ?? 'icon-view';
   const currentBasePath = getBasePath();
@@ -82,8 +81,8 @@ async function changePath () {
     return;
   }
 
-  const result = await readDirectory(basePath);
-  await addItems(result, basePath, currentBasePath);
+  const result = readDirectory(basePath);
+  addItems(result, basePath, currentBasePath);
 }
 
 /**
@@ -97,9 +96,9 @@ let $columns;
  * @param {Result[]} result
  * @param {string} basePath
  * @param {string} currentBasePath
- * @returns {Promise<void>}
+ * @returns {void}
  */
-async function addItems (result, basePath, currentBasePath) {
+function addItems (result, basePath, currentBasePath) {
   const view = localStorage.getItem('view') ?? 'icon-view';
 
   $('i').hidden = true;
@@ -108,43 +107,17 @@ async function addItems (result, basePath, currentBasePath) {
     ul.firstChild.remove();
   }
 
-  const listItems = (await Promise.all(result.map(async ([
+  const listItems = result.map(([
     isDir,
     // eslint-disable-next-line no-unused-vars -- Not in use
     _childDir,
     title
   ]) => {
-    let url;
-    try {
-      url = await (getIconDataURLForFile(
-        path.join(basePath, title)
-      ));
-    } catch (err) {
-      // eslint-disable-next-line no-console -- Debugging
-      console.error(err);
-    }
-    const width = '25px';
-    const paddingTopBottom = '5px';
-    const paddingRightLeft = '30px';
-    const marginTopBottom = '18px';
-    return /** @type {import('jamilih').JamilihArray} */ ([
+    const li = jml(
       view === 'icon-view' ? 'td' : 'li',
       {
-        class: 'list-item',
+        class: 'list-item'
         // style: url ? 'list-style-image: url("' + url + '")' : undefined
-        style: url
-          ? `margin-top: ${
-            marginTopBottom
-          }; margin-bottom: ${
-            marginTopBottom
-          }; padding: ${paddingTopBottom} ${
-            paddingRightLeft
-          } ${paddingTopBottom} ${
-            paddingRightLeft
-          }; background-image: url(${
-            url
-          }); background-size: ${width};`
-          : ''
       }, [
         isDir
           ? ['a', {
@@ -159,8 +132,36 @@ async function addItems (result, basePath, currentBasePath) {
           ]]
           : title
       ]
-    ]);
-  })));
+    );
+
+    getIconDataURLForFile(
+      path.join(basePath, title)
+    ).then((url) => {
+      const width = '25px';
+      const paddingTopBottom = '5px';
+      const paddingRightLeft = '30px';
+      const marginTopBottom = '18px';
+      li.setAttribute(
+        'style',
+        url
+          ? `margin-top: ${
+            marginTopBottom
+          }; margin-bottom: ${
+            marginTopBottom
+          }; padding: ${paddingTopBottom} ${
+            paddingRightLeft
+          } ${paddingTopBottom} ${
+            paddingRightLeft
+          }; background-image: url(${
+            url
+          }); background-size: ${width};`
+          : ''
+      );
+      return undefined;
+    });
+
+    return li;
+  });
 
   const numIconColumns = 4;
 
@@ -190,7 +191,7 @@ async function addItems (result, basePath, currentBasePath) {
   if ($columns?.destroy) {
     $columns.destroy();
     if (view === 'icon-view') {
-      await changePath();
+      changePath();
     }
   }
 
@@ -200,10 +201,19 @@ async function addItems (result, basePath, currentBasePath) {
 
   const millerColumns = jQuery('div.miller-columns');
   const parentMap = new WeakMap();
+  const childMap = new WeakMap();
   $columns = millerColumns.millerColumns({
     // Options:
+    // The animation delay necessitates our 250ms `setTimeout` later
+    // delay: 200, // Reduce animation delay from default 500ms
+    // preview () {
+    //   return 'preview placeholder';
+    // },
+    animation () {
+      // No-op to avoid need for timeouts
+    },
     // @ts-ignore Bugginess
-    async current ($item /* , $cols */) {
+    current ($item /* , $cols */) {
       if (parentMap.has($item[0])) {
         history.replaceState(
           null,
@@ -212,6 +222,13 @@ async function addItems (result, basePath, currentBasePath) {
             parentMap.get($item[0])
           )
         );
+        // setTimeout(() => {
+        childMap.get($item[0])?.scrollIntoView({
+          block: 'start',
+          container: 'nearest',
+          inline: 'start'
+        });
+        // }, 250);
         return;
       }
 
@@ -237,27 +254,33 @@ async function addItems (result, basePath, currentBasePath) {
         location.pathname + '#path=' + encodeURIComponent(currentPath)
       );
 
-      const childResult = await readDirectory(currentPath);
+      const childResult = readDirectory(currentPath);
       console.log('childResult', childResult);
 
-      const childItems = (
-        await Promise.all(childResult.map(async ([
-          isDir, childDirectory, title
-        ]) => {
-          let url;
-          try {
-            url = await (getIconDataURLForFile(
-              path.join(childDirectory, title)
-            ));
-          } catch (err) {
-            // eslint-disable-next-line no-console -- Debugging
-            console.error(err);
-          }
-          const width = '25px';
-          const paddingRightLeft = '30px';
-          const marginTopBottom = '18px';
-          return jml('li', {
-            style: url
+      const childItems = childResult.map(([
+        isDir, childDirectory, title
+      ]) => {
+        const width = '25px';
+        const paddingRightLeft = '30px';
+        const marginTopBottom = '18px';
+        const li = jml('li', [
+          isDir
+            ? ['a', {
+              title: childDirectory + '/' +
+                encodeURIComponent(title)
+              // href: '#path=' + childDirectory + '/' +
+              //  encodeURIComponent(title)
+            }, [
+              title
+            ]]
+            : title
+        ]);
+        getIconDataURLForFile(
+          path.join(childDirectory, title)
+        ).then((url) => {
+          li.setAttribute(
+            'style',
+            url
               ? `margin-top: ${
                 marginTopBottom
               }; margin-bottom: ${
@@ -271,20 +294,12 @@ async function addItems (result, basePath, currentBasePath) {
               }); background-repeat: no-repeat; ` +
               `background-position: left center; background-size: ${width};`
               : ''
-          }, [
-            isDir
-              ? ['a', {
-                title: childDirectory + '/' +
-                  encodeURIComponent(title)
-                // href: '#path=' + childDirectory + '/' +
-                //  encodeURIComponent(title)
-              }, [
-                title
-              ]]
-              : title
-          ]);
-        }))
-      );
+          );
+          return undefined;
+        });
+
+        return li;
+      });
 
       childItems.forEach((childItem, idx) => {
         if (!$columns.addItem) {
@@ -292,66 +307,71 @@ async function addItems (result, basePath, currentBasePath) {
         }
         const item = $columns.addItem(jQuery(childItem), $item);
         if (idx === 0) {
-          globalThis.setTimeout(() => {
-            item[0].scrollIntoView({
-              block: 'nearest', inline: 'start'
+          childMap.set($item[0], item[0]);
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              setTimeout(() => {
+                item[0].scrollIntoView({
+                  block: 'start', inline: 'start'
+                });
+              }, 250); // Slightly longer than delay setting (200ms)
             });
-          }, 500);
+          });
         }
       });
     }
   });
 
   if (currentBasePath !== '/') {
-    await currentBasePath.split('/').slice(1, -1).reduce(
-      (prom, pathSegment, idx) => {
-        // eslint-disable-next-line promise/prefer-await-to-then -- Ok
-        return prom.then(async () => {
-          await setTimeout(500);
-
-          const ulNth = jQuery(`ul.miller-column:nth-of-type(${
-            idx + 1
-          }):not(.miller-collapse)`);
-          // eslint-disable-next-line @stylistic/max-len -- Long
-          // console.log('ul idx:', idx + ', length:', ulNth.length, '::', pathSegment);
-          const anchors = ulNth.find('a[title]').filter(
-            function () {
-              return jQuery(this).text() === pathSegment;
-            }
-          );
-          // console.log('anchors', anchors.length);
-          anchors.trigger('click');
-          globalThis.setTimeout(() => {
+    currentBasePath.split('/').slice(1, -1).forEach(
+      (pathSegment, idx) => {
+        const ulNth = jQuery(`ul.miller-column:nth-of-type(${
+          idx + 1
+        }):not(.miller-collapse)`);
+        // eslint-disable-next-line @stylistic/max-len -- Long
+        // console.log('ul idx:', idx + ', length:', ulNth.length, '::', pathSegment);
+        const anchors = ulNth.find('a[title]').filter(
+          function () {
+            return jQuery(this).text() === pathSegment;
+          }
+        );
+        // console.log('anchors', anchors.length);
+        anchors.trigger('click');
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            // setTimeout(() => {
             anchors[0]?.scrollIntoView({
-              block: 'nearest', container: 'nearest', inline: 'start'
+              block: 'start',
+              inline: 'start'
             });
-          }, 200);
-          return undefined;
+            // }, 250);
+          });
         });
-      }, Promise.resolve()
+        return undefined;
+      }
     );
   }
 }
 
 globalThis.addEventListener('hashchange', changePath);
 
-$('#icon-view').addEventListener('click', async function () {
+$('#icon-view').addEventListener('click', function () {
   $$('nav button').forEach((button) => {
     button.classList.remove('selected');
   });
   this.classList.add('selected');
   localStorage.setItem('view', 'icon-view');
   $('.miller-breadcrumbs').style.display = 'none';
-  await changePath();
+  changePath();
 });
-$('#three-columns').addEventListener('click', async function () {
+$('#three-columns').addEventListener('click', function () {
   $$('nav button').forEach((button) => {
     button.classList.remove('selected');
   });
   this.classList.add('selected');
   localStorage.setItem('view', 'three-columns');
   $('.miller-breadcrumbs').style.display = 'block';
-  await changePath();
+  changePath();
 });
 
 const view = localStorage.getItem('view') ?? 'icon-view';
@@ -373,5 +393,5 @@ $('#filebrowser').title = `
 // eslint-disable-next-line unicorn/prefer-top-level-await -- Not ESM
 (async () => {
 await addMillerColumnPlugin.default(jQuery, {stylesheets: ['@default']});
-await changePath();
+changePath();
 })();
