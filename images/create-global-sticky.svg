@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- Sticky note body -->
+  <rect x="3" y="3" width="15" height="15" fill="#fff740" stroke="#333" stroke-width="1" rx="1"/>
+
+  <!-- Folded corner -->
+  <path d="M 18 14 L 18 18 L 14 18 Z" fill="#e6d830" stroke="#333" stroke-width="1"/>
+  <line x1="14" y1="18" x2="18" y2="14" stroke="#333" stroke-width="1"/>
+
+  <!-- Large "G" letter -->
+  <text x="10.5" y="13" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#333" text-anchor="middle">G</text>
+
+  <!-- Plus sign for "create" -->
+  <circle cx="19" cy="19" r="4.5" fill="#4CAF50" stroke="#fff" stroke-width="1"/>
+  <line x1="19" y1="16.5" x2="19" y2="21.5" stroke="#fff" stroke-width="2"/>
+  <line x1="16.5" y1="19" x2="21.5" y2="19" stroke="#fff" stroke-width="2"/>
+</svg>

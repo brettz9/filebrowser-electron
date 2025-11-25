@@ -9,11 +9,133 @@ const path = require('node:path');
 // eslint-disable-next-line n/no-unpublished-require -- electron-forge requires electron as devDep.
 const {shell} = require('electron');
 
+const {StickyNote} = require('stickynote');
 const {jml} = require('jamilih');
 const jQuery = require('jquery');
 const addMillerColumnPlugin = require('miller-columns');
 
 const getIconDataURLForFile = require('./utils/getIconDataURLForFile.js');
+
+const stickyNotes = new StickyNote({
+  colors: ['#fff740', '#ff7eb9', '#7afcff', '#feff9c', '#a7ffeb', '#c7ceea'],
+  onDelete (note) {
+    const notes = stickyNotes.getAllNotes(({metadata}) => {
+      return metadata.type === 'local' &&
+        metadata.path === note.metadata.path;
+    });
+    if (note.metadata.type === 'local') {
+      localStorage.setItem(
+        `stickyNotes-${note.metadata.path}`, JSON.stringify(notes)
+      );
+    } else {
+      localStorage.setItem(
+        `stickyNotes-global`, JSON.stringify(notes)
+      );
+    }
+  }
+});
+
+/**
+ * @param {import('stickynote').NoteData} note
+ * @param {string} pth
+ */
+const addStickyInputListeners = (note, pth) => {
+  const saveNotes = () => {
+    const notes = stickyNotes.getAllNotes(({metadata}) => {
+      return metadata.type === 'local' &&
+        metadata.path === note.metadata.path;
+    });
+    localStorage.setItem(
+      `stickyNotes-${pth}`, JSON.stringify(notes)
+    );
+  };
+  note.content.addEventListener('input', () => {
+    saveNotes();
+  });
+
+  const noteElement = note.element;
+  const noteObserver = new MutationObserver(function (mutationsList) {
+    for (const mutation of mutationsList) {
+      if (mutation.attributeName === 'class' || mutation.attributeName === 'data-color-index') {
+        // mutation.target.classList.contains('collapsed')
+        saveNotes();
+      }
+    }
+  });
+  if (noteElement) {
+    const config = {
+      attributes: true, attributeFilter: ['class', 'data-color-index']
+    };
+    noteObserver.observe(noteElement, config);
+  }
+
+  const titleObserver = new MutationObserver(function (mutationsList) {
+    for (const mutation of mutationsList) {
+      if (mutation.attributeName === 'class') {
+        // mutation.target.classList.contains('collapsed')
+        saveNotes();
+      }
+    }
+  });
+  const titleElement = note.title;
+  if (titleElement) {
+    const config = { attributes: true, attributeFilter: ['class'] };
+    titleObserver.observe(titleElement, config);
+  }
+
+  // To stop observing later:
+  // noteObserver.disconnect();
+};
+
+/**
+ * @param {import('stickynote').NoteData} note
+ */
+const addStickyInputListenersGlobal = (note) => {
+  const saveNotes = () => {
+    const notes = stickyNotes.getAllNotes(({metadata}) => {
+      return metadata.type === 'global';
+    });
+    localStorage.setItem(
+      `stickyNotes-global`, JSON.stringify(notes)
+    );
+  };
+  note.content.addEventListener('input', () => {
+    saveNotes();
+  });
+
+  const noteElement = note.element;
+  const noteObserver = new MutationObserver(function (mutationsList) {
+    for (const mutation of mutationsList) {
+      if (mutation.attributeName === 'class' || mutation.attributeName === 'data-color-index') {
+        // mutation.target.classList.contains('collapsed')
+        saveNotes();
+      }
+    }
+  });
+  if (noteElement) {
+    const config = {
+      attributes: true, attributeFilter: ['class', 'data-color-index']
+    };
+    noteObserver.observe(noteElement, config);
+  }
+
+  const titleObserver = new MutationObserver(function (mutationsList) {
+    for (const mutation of mutationsList) {
+      if (mutation.attributeName === 'class') {
+        // mutation.target.classList.contains('collapsed')
+        saveNotes();
+      }
+    }
+  });
+  const titleElement = note.title;
+  if (titleElement) {
+    const config = { attributes: true, attributeFilter: ['class'] };
+    titleObserver.observe(titleElement, config);
+  }
+
+  // To stop observing later:
+  // noteObserver.disconnect();
+};
 
 /* eslint-disable jsdoc/reject-any-type -- Generic */
 /**
@@ -132,6 +254,9 @@ function addItems (result, basePath, currentBasePath) {
         isDir
           ? ['a', {
             title: basePath + encodeURIComponent(title),
+            dataset: {
+              path: basePath + encodeURIComponent(title)
+            },
             ...(view === 'icon-view'
               ? {
                 href: '#path=' + basePath + encodeURIComponent(title)
@@ -229,14 +354,32 @@ function addItems (result, basePath, currentBasePath) {
     },
     // @ts-ignore Bugginess
     current ($item /* , $cols */) {
-      if (parentMap.has($item[0])) {
+      /**
+       * @param {string} path
+       */
+      const updateHistoryAndStickies = (path) => {
         history.replaceState(
           null,
           '',
           location.pathname + '#path=' + encodeURIComponent(
-            parentMap.get($item[0])
+            path
           )
         );
+        const saved = localStorage.getItem(`stickyNotes-${path}`);
+        stickyNotes.clear(({metadata}) => {
+          return metadata.type === 'local';
+        });
+        if (saved) {
+          stickyNotes.loadNotes(JSON.parse(saved));
+          stickyNotes.notes.forEach((note) => {
+            if (note.metadata.type === 'local') {
+              addStickyInputListeners(note, path);
+            }
+          });
+        }
+      };
+      if (parentMap.has($item[0])) {
+        updateHistoryAndStickies(parentMap.get($item[0]));
         // setTimeout(() => {
         childMap.get($item[0])?.scrollIntoView({
           block: 'start',
@@ -263,11 +406,7 @@ function addItems (result, basePath, currentBasePath) {
 
       parentMap.set($item[0], currentPath);
 
-      history.replaceState(
-        null,
-        '',
-        location.pathname + '#path=' + encodeURIComponent(currentPath)
-      );
+      updateHistoryAndStickies(currentPath);
 
       const childResult = readDirectory(currentPath);
       console.log('childResult', childResult);
@@ -282,7 +421,11 @@ function addItems (result, basePath, currentBasePath) {
           isDir
             ? ['a', {
               title: childDirectory + '/' +
-                encodeURIComponent(title)
+                encodeURIComponent(title),
+              dataset: {
+                path: childDirectory + '/' +
+                  encodeURIComponent(title)
+              }
               // href: '#path=' + childDirectory + '/' +
               //  encodeURIComponent(title)
             }, [
@@ -428,8 +571,63 @@ $('#filebrowser').title = `
     and Electron ${process.versions.electron}.
 `;
 
+$('#create-sticky').addEventListener('click', () => {
+  const pth = $columns.find(
+    'li.miller-selected a, li.miller-selected span'
+  ).last()[0]?.dataset?.path ?? '/';
+  const note = stickyNotes.createNote({
+    metadata: {type: 'local', path: pth},
+    html: `Welcome to Sticky Notes!<br /><br />
+
+This sticky will only appear when the currently selected file or folder is
+chosen.<br /><br />
+
+Click "Create sticky for current path" to create more notes.`,
+    x: 100,
+    y: 150
+  });
+
+  addStickyInputListeners(note, pth);
+});
+
+$('#create-global-sticky').addEventListener('click', () => {
+  const note = stickyNotes.createNote({
+    metadata: {type: 'global'},
+    html: `Welcome to Sticky Notes!<br /><br />
+
+This sticky will show regardless of whatever file or folder is selected.
+<br /><br />
+
+Click "Create global sticky" to create more notes.`,
+    x: 150,
+    y: 170
+  });
+
+  note.content.addEventListener('input', () => {
+    const notes = stickyNotes.getAllNotes(({metadata}) => {
+      return metadata.type === 'global';
+    });
+    localStorage.setItem(
+      `stickyNotes-global`, JSON.stringify(notes)
+    );
+  });
+});
+
 // eslint-disable-next-line unicorn/prefer-top-level-await -- Not ESM
 (async () => {
 await addMillerColumnPlugin.default(jQuery, {stylesheets: ['@default']});
 changePath();
+
+const saved = localStorage.getItem('stickyNotes-global');
+if (saved) {
+  stickyNotes.clear(({metadata}) => {
+    return metadata.type === 'global';
+  });
+  stickyNotes.loadNotes(JSON.parse(saved));
+  stickyNotes.notes.forEach((note) => {
+    if (note.metadata.type === 'global') {
+      addStickyInputListenersGlobal(note);
+    }
+  });
+}
 })();

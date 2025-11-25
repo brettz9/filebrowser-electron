@@ -21,3 +21,16 @@ nav button.selected {
   background-repeat: no-repeat;
   background-position: left center;
 }
+
+#filebrowser {
+  float: left;
+  width: 85%;
+}
+
+#stickyButtons {
+  float: right;
+  width: 10%;
+}
+.clear {
+  clear: both;
+}

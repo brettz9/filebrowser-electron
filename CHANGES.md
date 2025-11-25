@@ -1,7 +1,8 @@
 # CHANGES to filebrowser-electron
 
-## ?
+## 0.5.0
 
+- feat: add stickies
 - feat: allow path CLI argument
 
 ## 0.4.0
