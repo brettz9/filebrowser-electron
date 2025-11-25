@@ -130,7 +130,9 @@ function addItems (result, basePath, currentBasePath) {
           }, [
             title
           ]]
-          : title
+          : ['span', {
+            title: basePath + encodeURIComponent(title)
+          }, [title]]
       ]
     );
 
@@ -273,7 +275,10 @@ function addItems (result, basePath, currentBasePath) {
             }, [
               title
             ]]
-            : title
+            : ['span', {
+              title: childDirectory + '/' +
+                encodeURIComponent(title)
+            }, [title]]
         ]);
         getIconDataURLForFile(
           path.join(childDirectory, title)
@@ -320,6 +325,10 @@ function addItems (result, basePath, currentBasePath) {
         }
       });
     }
+  });
+
+  $columns.on('dblclick', (e) => {
+    console.log('111112', e.target);
   });
 
   if (currentBasePath !== '/') {
