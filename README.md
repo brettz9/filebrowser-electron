@@ -12,6 +12,22 @@ npm i filebrowser-electron
 cd filebrowser-electron && npm install && npm start
 ```
 
+## Create your own Mac Quick Action
+
+1. Open Automator
+1. Create a new Quick Action
+1. Set "Workflow receives current" to "files or folders"
+1. Find the action "Run Shell Script" and drag it into the Quick Action
+1. Paste the following, adapting the filebrowser-electron path to your own
+```shell
+for f in "$@"
+do
+	open -a "/Users/brett/filebrowser/out/filebrowser-electron-darwin-arm64/filebrowser-electron.app" --args --path "$f"
+done
+```
+1. Save (e.g., as "Open in Filebrowser")
+1. Go to the Finder, choose a folder or file, and right-click it and select "Quick Actions" and your name created in the previous step.
+
 ## To-dos
 
 1. Proper publishing: <https://www.electronjs.org/docs/latest/tutorial/tutorial-publishing-updating>
