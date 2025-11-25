@@ -1,5 +1,7 @@
 'use strict';
 // Modules to control application life and create native browser window
+// eslint-disable-next-line @stylistic/max-len -- Long
+// eslint-disable-next-line n/no-unpublished-require -- electron-forge requires electron as devDep.
 const {app, BrowserWindow} = require('electron');
 
 // Keep a global reference of the window object, if you don't, the window will
@@ -18,7 +20,8 @@ function createWindow () {
     width: 800, height: 600,
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false
+      contextIsolation: false,
+      additionalArguments: process.argv
     }
   });
 

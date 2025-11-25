@@ -5,6 +5,8 @@
 
 const {readdirSync, lstatSync} = require('node:fs');
 const path = require('node:path');
+// eslint-disable-next-line @stylistic/max-len -- Long
+// eslint-disable-next-line n/no-unpublished-require -- electron-forge requires electron as devDep.
 const {shell} = require('electron');
 
 const {jml} = require('jamilih');
@@ -45,6 +47,13 @@ jml.setWindow(globalThis);
  * @returns {string}
  */
 function getBasePath () {
+  if (!location.hash.length && process.argv.length) {
+    const idx = process.argv.findIndex((arg) => {
+      return arg === '--path' || arg === 'p';
+    });
+    return idx === -1 ? '/' : process.argv[idx + 1];
+  }
+
   const params = new URLSearchParams(location.hash.slice(1));
   return path.normalize(
     params.has('path') ? params.get('path') + '/' : '/'
@@ -348,8 +357,12 @@ function addItems (result, basePath, currentBasePath) {
   });
 
   if (currentBasePath !== '/') {
-    currentBasePath.split('/').slice(1, -1).forEach(
+    currentBasePath.split('/').slice(1).forEach(
       (pathSegment, idx) => {
+        if (pathSegment === '/') {
+          return undefined;
+        }
+
         const ulNth = jQuery(`ul.miller-column:nth-of-type(${
           idx + 1
         }):not(.miller-collapse)`);

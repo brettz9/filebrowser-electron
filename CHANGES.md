@@ -1,5 +1,9 @@
 # CHANGES to filebrowser-electron
 
+## ?
+
+- feat: allow path CLI argument
+
 ## 0.4.0
 
 - feat: supporting file opening by double-click or cmd-o
