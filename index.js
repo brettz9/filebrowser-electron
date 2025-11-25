@@ -1,3 +1,4 @@
+/* globals MarkdownWYSIWYG -- Not available as ESM */
 /* eslint-disable n/no-sync,
   promise/prefer-await-to-then,
   promise/catch-or-return -- Needed for performance */
@@ -433,3 +434,10 @@ $('#filebrowser').title = `
 await addMillerColumnPlugin.default(jQuery, {stylesheets: ['@default']});
 changePath();
 })();
+
+const editor = new MarkdownWYSIWYG('markdownEditor', {
+  initialValue: '## Hello World!\n\nThis is **Markdown** content.',
+  onUpdate (markdownContent) {
+    console.log('Updated content:', markdownContent);
+  }
+});

@@ -12,9 +12,16 @@
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
     />
     <link rel="stylesheet" href="index.css" />
+
+    <link rel="stylesheet" href="node_modules/@celsowm/markdown-wysiwyg/dist/editor.css" />
+    <script src="node_modules/marked/lib/marked.umd.js"></script>
+    <script src="node_modules/@celsowm/markdown-wysiwyg/dist/editor.js"></script>
+
     <title>Filebrowser</title>
   </head>
   <body>
+    <div id="markdownEditor"></div>
+
     <h1 id="filebrowser">Filebrowser</h1>
     <nav>
       <button id="icon-view"><img src="images/icon-view.svg" /></button>
