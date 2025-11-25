@@ -5,6 +5,8 @@
 This aims to be a cross-platform and enhanced substitute for the
 desktop file browser.
 
+![screenshot](images/screenshot.png)
+
 ## Install
 
 ```bash
