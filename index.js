@@ -5,6 +5,7 @@
 
 const {readdirSync, lstatSync} = require('node:fs');
 const path = require('node:path');
+const {shell} = require('electron');
 
 const {jml} = require('jamilih');
 const jQuery = require('jquery');
@@ -131,7 +132,10 @@ function addItems (result, basePath, currentBasePath) {
             title
           ]]
           : ['span', {
-            title: basePath + encodeURIComponent(title)
+            title: basePath + encodeURIComponent(title),
+            dataset: {
+              path: basePath + encodeURIComponent(title)
+            }
           }, [title]]
       ]
     );
@@ -277,7 +281,11 @@ function addItems (result, basePath, currentBasePath) {
             ]]
             : ['span', {
               title: childDirectory + '/' +
-                encodeURIComponent(title)
+                encodeURIComponent(title),
+              dataset: {
+                path: childDirectory + '/' +
+                  encodeURIComponent(title)
+              }
             }, [title]]
         ]);
         getIconDataURLForFile(
@@ -328,7 +336,15 @@ function addItems (result, basePath, currentBasePath) {
   });
 
   $columns.on('dblclick', (e) => {
-    console.log('111112', e.target);
+    if (e.target.dataset.path) {
+      shell.openPath(e.target.dataset.path);
+    }
+  });
+  $columns.on('keydown', (e) => {
+    const pth = $columns.find('li.miller-selected span')[0]?.dataset?.path;
+    if (e.metaKey && e.key === 'o' && pth) {
+      shell.openPath(pth);
+    }
   });
 
   if (currentBasePath !== '/') {

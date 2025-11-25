@@ -1,7 +1,9 @@
 # CHANGES to filebrowser-electron
 
-## ?
+## 0.4.0
 
+- feat: supporting file opening by double-click or cmd-o
+- feat: column browser as well as icon view
 - npm: Bump jamilih dep., devDeps
 
 ## 0.3.0
