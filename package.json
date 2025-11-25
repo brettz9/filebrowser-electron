@@ -15,9 +15,11 @@
     "lint": "npm run eslint --",
     "eslint": "eslint --ext=js,html,md .",
     "test": "npm run eslint --",
-    "postinstall": "cd node_modules/system-icon2 && npx node-gyp rebuild --target=39.2.3 --arch=arm64 --dist-url=https://electronjs.org/headers",
-    "rebuild": "cd node_modules/system-icon2 && npx node-gyp rebuild --target=39.2.3 --arch=arm64 --dist-url=https://electronjs.org/headers",
-    "start": "electron ."
+    "postinstall": "./rebuild.sh",
+    "rebuild": "./rebuild.sh",
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make"
   },
   "repository": "https://github.com/brettz9/filebrowser-electron",
   "homepage": "https://github.com/brettz9/filebrowser-electron",
@@ -33,7 +35,7 @@
   },
   "dependencies": {
     "base64-js": "^1.5.1",
-    "electron": "^39.2.3",
+    "electron-squirrel-startup": "^1.0.1",
     "jamilih": "^0.63.1",
     "jquery": "^3.7.1",
     "jsdom": "^27.2.0",
@@ -42,9 +44,18 @@
     "system-icon2": "^0.5.0"
   },
   "devDependencies": {
+    "@electron-forge/cli": "^7.10.2",
+    "@electron-forge/maker-deb": "^7.10.2",
+    "@electron-forge/maker-rpm": "^7.10.2",
+    "@electron-forge/maker-squirrel": "^7.10.2",
+    "@electron-forge/maker-zip": "^7.10.2",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.10.2",
+    "@electron-forge/plugin-fuses": "^7.10.2",
+    "@electron/fuses": "^1.8.0",
     "@electron/rebuild": "^4.0.1",
     "@types/jquery": "^3.5.33",
     "@types/jsdom": "^27.0.0",
+    "electron": "^39.2.3",
     "eslint": "^9.39.1",
     "eslint-config-ash-nazg": "^39.8.0",
     "typescript": "^5.9.3"
