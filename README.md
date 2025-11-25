@@ -14,6 +14,7 @@ cd filebrowser-electron && npm install && npm start
 
 ## To-dos
 
+1. Proper publishing: <https://www.electronjs.org/docs/latest/tutorial/tutorial-publishing-updating>
 1. Build/set icon:
     <https://stackoverflow.com/questions/31529772/how-to-set-app-icon-for-electron-atom-shell-app>
 1. Allow integration with Open-with (and thus file handler web apps)
