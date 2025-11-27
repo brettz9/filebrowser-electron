@@ -1,6 +1,6 @@
 {
   "name": "filebrowser-electron",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "A file browser",
   "author": "Brett Zamir",
   "contributors": [],
@@ -40,9 +40,9 @@
     "jquery": "^3.7.1",
     "jsdom": "^27.2.0",
     "load-stylesheets": "^0.13.0",
-    "miller-columns": "0.13.1",
+    "miller-columns": "0.13.2",
     "stickynote": "^0.6.2",
-    "system-icon2": "^0.5.0"
+    "system-icon2": "^0.5.1"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.10.2",
