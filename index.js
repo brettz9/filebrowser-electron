@@ -1,10 +1,13 @@
 /* eslint-disable n/no-sync,
   promise/prefer-await-to-then,
   promise/catch-or-return -- Needed for performance */
+/* eslint-disable sonarjs/no-os-command-from-path -- Needed */
 'use strict';
 
 const {readdirSync, lstatSync} = require('node:fs');
 const path = require('node:path');
+const {spawnSync} = require('node:child_process');
+
 // eslint-disable-next-line @stylistic/max-len -- Long
 // eslint-disable-next-line n/no-unpublished-require -- electron-forge requires electron as devDep.
 const {shell} = require('electron');
@@ -13,6 +16,7 @@ const {StickyNote} = require('stickynote');
 const {jml} = require('jamilih');
 const jQuery = require('jquery');
 const addMillerColumnPlugin = require('miller-columns');
+const {getOpenWithApps, getAppIcons} = require('open-with-me');
 
 const getIconDataURLForFile = require('./utils/getIconDataURLForFile.js');
 
@@ -56,7 +60,9 @@ const addStickyInputListeners = (note, pth) => {
   const noteElement = note.element;
   const noteObserver = new MutationObserver(function (mutationsList) {
     for (const mutation of mutationsList) {
-      if (mutation.attributeName === 'class' || mutation.attributeName === 'data-color-index') {
+      if (mutation.attributeName === 'class' ||
+        mutation.attributeName === 'data-color-index'
+      ) {
         // mutation.target.classList.contains('collapsed')
         saveNotes();
       }
@@ -79,7 +85,7 @@ const addStickyInputListeners = (note, pth) => {
   });
   const titleElement = note.title;
   if (titleElement) {
-    const config = { attributes: true, attributeFilter: ['class'] };
+    const config = {attributes: true, attributeFilter: ['class']};
     titleObserver.observe(titleElement, config);
   }
 
@@ -106,7 +112,9 @@ const addStickyInputListenersGlobal = (note) => {
   const noteElement = note.element;
   const noteObserver = new MutationObserver(function (mutationsList) {
     for (const mutation of mutationsList) {
-      if (mutation.attributeName === 'class' || mutation.attributeName === 'data-color-index') {
+      if (mutation.attributeName === 'class' ||
+        mutation.attributeName === 'data-color-index'
+      ) {
         // mutation.target.classList.contains('collapsed')
         saveNotes();
       }
@@ -129,7 +137,7 @@ const addStickyInputListenersGlobal = (note) => {
   });
   const titleElement = note.title;
   if (titleElement) {
-    const config = { attributes: true, attributeFilter: ['class'] };
+    const config = {attributes: true, attributeFilter: ['class']};
     titleObserver.observe(titleElement, config);
   }
 
@@ -239,6 +247,108 @@ function addItems (result, basePath, currentBasePath) {
     ul.firstChild.remove();
   }
 
+  /**
+   * @param {Event} e
+   */
+  const contextmenu = async (e) => {
+    e.preventDefault();
+    const {path: pth} = /** @type {HTMLElement} */ (e.target).dataset;
+    if (!pth) {
+      return;
+    }
+    /** @type {import('open-with-me').OpenWithApp & {image?: string}} */
+    let defaultApp = {name: '', path: '', rank: '', image: ''};
+    const appsOrig = await getOpenWithApps(pth);
+    const icons = await getAppIcons(appsOrig);
+    const apps = appsOrig.filter((app, idx) => {
+      // @ts-expect-error Add it ourselves
+      app.image = icons[idx];
+      if (app.isDefault) {
+        defaultApp = app;
+      }
+      return !app.isDefault;
+    }).toSorted((a, b) => {
+      return a.name.localeCompare(b.name);
+    });
+
+    const customContextMenu = jml('ul', {
+      class: 'context-menu',
+      style: {
+        left: /** @type {MouseEvent} */ (e).pageX + 'px',
+        top: /** @type {MouseEvent} */ (e).pageY + 'px'
+      }
+    }, [
+      ['li', {
+        class: 'context-menu-item', dataset: {
+          apppath: defaultApp.path
+        }}, [
+        defaultApp.name
+      ]],
+      ['li', {class: 'context-menu-separator'}],
+      ...apps.map((app) => {
+        return /** @type {import('jamilih').JamilihArray} */ (['li', {
+          class: 'context-menu-item', dataset: {
+            apppath: app.path
+          }}, [
+          app.name
+        ]]);
+      })
+    ], document.body);
+
+    const pseudoElementRule = `.context-menu-item::before { content: ; }`;
+
+    const stylesheet = document.styleSheets[0];
+    try {
+      stylesheet.insertRule(pseudoElementRule, stylesheet.cssRules.length);
+    } catch (err) {
+      // eslint-disable-next-line no-console -- Debugging
+      console.error('Error inserting CSS rule:', err);
+    }
+
+    const targetElement = e.target;
+
+    // Hide the custom context menu when clicking anywhere else
+    /**
+     * @param {MouseEvent} ev
+     */
+    const hideCustomContextMenu = (ev) => {
+      // eslint-disable-next-line @stylistic/max-len -- Long
+      if (!customContextMenu.contains(/** @type {MouseEvent & {target: Node}} */ (ev).target) &&
+        ev.target !== targetElement
+      ) {
+        customContextMenu.style.display = 'none';
+        document.removeEventListener('click', hideCustomContextMenu);
+      }
+    };
+    document.addEventListener('click', hideCustomContextMenu);
+
+    // Add functionality to menu items
+    customContextMenu.querySelectorAll('.context-menu-item').forEach((
+      item, idx
+    ) => {
+      /** @type {HTMLElement} */
+      (item).style.setProperty(
+        '--background',
+        idx === 0
+          ? `url(${defaultApp.image})`
+          // @ts-expect-error We added it above
+          : `url(${apps[idx - 1].image})`
+      );
+      item.addEventListener('click', () => {
+        customContextMenu.style.display = 'none'; // Hide after clicking an item
+        const {apppath} = /** @type {HTMLElement} */ (item).dataset;
+        if (!apppath) {
+          return;
+        }
+        spawnSync('open', [
+          '-a',
+          apppath,
+          pth
+        ]);
+      });
+    });
+  };
+
   const listItems = result.map(([
     isDir,
     // eslint-disable-next-line no-unused-vars -- Not in use
@@ -267,6 +377,9 @@ function addItems (result, basePath, currentBasePath) {
           ]]
           : ['span', {
             title: basePath + encodeURIComponent(title),
+            $on: {
+              contextmenu
+            },
             dataset: {
               path: basePath + encodeURIComponent(title)
             }
@@ -355,17 +468,17 @@ function addItems (result, basePath, currentBasePath) {
     // @ts-ignore Bugginess
     current ($item /* , $cols */) {
       /**
-       * @param {string} path
+       * @param {string} pth
        */
-      const updateHistoryAndStickies = (path) => {
+      const updateHistoryAndStickies = (pth) => {
         history.replaceState(
           null,
           '',
           location.pathname + '#path=' + encodeURIComponent(
-            path
+            pth
           )
         );
-        const saved = localStorage.getItem(`stickyNotes-${path}`);
+        const saved = localStorage.getItem(`stickyNotes-${pth}`);
         stickyNotes.clear(({metadata}) => {
           return metadata.type === 'local';
         });
@@ -373,7 +486,7 @@ function addItems (result, basePath, currentBasePath) {
           stickyNotes.loadNotes(JSON.parse(saved));
           stickyNotes.notes.forEach((note) => {
             if (note.metadata.type === 'local') {
-              addStickyInputListeners(note, path);
+              addStickyInputListeners(note, pth);
             }
           });
         }
@@ -409,7 +522,7 @@ function addItems (result, basePath, currentBasePath) {
       updateHistoryAndStickies(currentPath);
 
       const childResult = readDirectory(currentPath);
-      console.log('childResult', childResult);
+      // console.log('childResult', childResult);
 
       const childItems = childResult.map(([
         isDir, childDirectory, title
@@ -432,6 +545,9 @@ function addItems (result, basePath, currentBasePath) {
               title
             ]]
             : ['span', {
+              $on: {
+                contextmenu
+              },
               title: childDirectory + '/' +
                 encodeURIComponent(title),
               dataset: {

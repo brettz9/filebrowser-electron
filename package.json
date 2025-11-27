@@ -41,6 +41,7 @@
     "jsdom": "^27.2.0",
     "load-stylesheets": "^0.13.0",
     "miller-columns": "0.13.2",
+    "open-with-me": "^0.3.0",
     "stickynote": "^0.6.2",
     "system-icon2": "^0.5.1"
   },
@@ -52,11 +53,11 @@
     "@electron-forge/maker-zip": "^7.10.2",
     "@electron-forge/plugin-auto-unpack-natives": "^7.10.2",
     "@electron-forge/plugin-fuses": "^7.10.2",
-    "@electron/fuses": "^2.0.0",
+    "@electron/fuses": "^1.8.0",
     "@electron/rebuild": "^4.0.1",
     "@types/jquery": "^3.5.33",
     "@types/jsdom": "^27.0.0",
-    "electron": "^39.2.3",
+    "electron": "^39.2.4",
     "eslint": "^9.39.1",
     "eslint-config-ash-nazg": "^39.8.0",
     "typescript": "^5.9.3"
