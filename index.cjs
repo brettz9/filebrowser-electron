@@ -258,9 +258,7 @@ function addItems (result, basePath, currentBasePath) {
     }
     /** @type {import('open-with-me').OpenWithApp & {image?: string}} */
     let defaultApp = {name: '', path: '', rank: '', image: ''};
-    const appsOrig = await getOpenWithApps(pth, {
-      maxResults: 10
-    });
+    const appsOrig = await getOpenWithApps(pth);
     const icons = await getAppIcons(appsOrig);
 
     // Add icons to apps before filtering
@@ -416,6 +414,7 @@ function addItems (result, basePath, currentBasePath) {
             // Check if submenu actually overflows (is already visible but cut off)
             const actuallyOverflowsRight = submenuRect.right > viewportWidth;
             const actuallyOverflowsBottom = submenuRect.bottom > viewportHeight;
+            const actuallyOverflowsTop = submenuRect.top < 0;
 
             // Handle horizontal overflow - only reposition submenu, never main menu
             if (actuallyOverflowsRight) {
@@ -434,7 +433,13 @@ function addItems (result, basePath, currentBasePath) {
             }
 
             // Handle vertical overflow - only reposition submenu, never main menu
-            if (actuallyOverflowsBottom) {
+            if (actuallyOverflowsTop) {
+              // Submenu is cut off at the top, position it at viewport top
+              submenu.style.position = 'fixed';
+              submenu.style.top = '10px';
+              submenu.style.bottom = 'auto';
+              submenu.style.left = submenuRect.left + 'px';
+            } else if (actuallyOverflowsBottom) {
               const parentRect = parentLi.getBoundingClientRect();
               const wouldFitOnTop = parentRect.top - submenuRect.height >= 0;
 
@@ -444,8 +449,10 @@ function addItems (result, basePath, currentBasePath) {
                 submenu.style.bottom = '0';
               } else {
                 // Can't fit on top either, pin to bottom edge of viewport
+                submenu.style.position = 'fixed';
                 submenu.style.top = 'auto';
                 submenu.style.bottom = '10px';
+                submenu.style.left = submenuRect.left + 'px';
               }
             }
           });
