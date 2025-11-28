@@ -6,7 +6,7 @@
   "contributors": [],
   "license": "MIT",
   "main": "main.js",
-  "type": "commonjs",
+  "type": "module",
   "browserslist": [
     "last 2 chrome versions"
   ],

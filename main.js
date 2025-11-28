@@ -1,8 +1,7 @@
-'use strict';
 // Modules to control application life and create native browser window
 // eslint-disable-next-line @stylistic/max-len -- Long
 // eslint-disable-next-line n/no-unpublished-require -- electron-forge requires electron as devDep.
-const {app, BrowserWindow} = require('electron');
+import {app, BrowserWindow} from 'electron';
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
