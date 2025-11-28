@@ -1,6 +1,6 @@
 # CHANGES to filebrowser-electron
 
-## 0.7.0 (unreleased)
+## 0.7.0
 
 - feat: create new folder
 - feat: delete file or folder
