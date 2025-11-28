@@ -2,16 +2,26 @@
 
 const {FusesPlugin} = require('@electron-forge/plugin-fuses');
 const {FuseV1Options, FuseVersion} = require('@electron/fuses');
+const {execSync} = require('child_process');
 
 module.exports = {
   packagerConfig: {
     asar: true
   },
-  // AI-suggested entry to deal with our `npm run rebuild` script
   rebuildConfig: {
-    // Skip automatic rebuild since we handle it manually with npm run rebuild
-    force: false,
-    onlyModules: []
+    // Explicitly set to empty array to prevent automatic rebuilding
+    onlyModules: [],
+    force: true
+  },
+  hooks: {
+    // Run our custom rebuild script before Electron Forge starts
+    preStart () {
+      // eslint-disable-next-line no-console -- Logging
+      console.log('Running custom rebuild script...');
+      // eslint-disable-next-line n/no-sync -- For rebuilding
+      execSync('./rebuild.sh', {stdio: 'inherit', cwd: __dirname});
+      return Promise.resolve();
+    }
   },
   makers: [
     {
@@ -32,10 +42,12 @@ module.exports = {
     }
   ],
   plugins: [
-    {
-      name: '@electron-forge/plugin-auto-unpack-natives',
-      config: {}
-    },
+    // Disabled auto-unpack-natives plugin since we handle native module
+    //   rebuilding manually
+    // {
+    //   name: '@electron-forge/plugin-auto-unpack-natives',
+    //   config: {}
+    // },
     // Fuses are used to enable/disable various Electron functionality
     // at package time, before code signing the application
     new FusesPlugin({

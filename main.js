@@ -64,7 +64,8 @@ app.on('window-all-closed', function () {
   }
 });
 
-// eslint-disable-next-line unicorn/prefer-top-level-await -- Not ESM
+// eslint-disable-next-line @stylistic/max-len -- Long
+// eslint-disable-next-line unicorn/prefer-top-level-await -- Electron main process requires IIFE wrapper
 (async () => {
 // Some APIs can only be used after this event occurs.
 await app.whenReady();
