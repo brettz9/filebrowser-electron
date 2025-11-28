@@ -596,13 +596,21 @@ function addItems (result, basePath, currentBasePath) {
       };
       if (parentMap.has($item[0])) {
         updateHistoryAndStickies(parentMap.get($item[0]));
-        // setTimeout(() => {
-        childMap.get($item[0])?.scrollIntoView({
-          block: 'start',
-          container: 'nearest',
-          inline: 'start'
-        });
-        // }, 250);
+        const childElement = childMap.get($item[0]);
+        if (childElement) {
+          // Scroll the child item's parent column into view
+          const column = childElement.closest('.miller-column');
+          if (column) {
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                column.scrollIntoView({
+                  block: 'nearest',
+                  inline: 'start'
+                });
+              });
+            });
+          }
+        }
         return;
       }
 
