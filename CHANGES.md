@@ -2,6 +2,7 @@
 
 ## ?
 
+- feat: context menu regular Open
 - fix: position fixes for context menu
 - fix: disable context menu more actively
 - fix: ensure context menu visible

@@ -81,7 +81,7 @@ nav button.selected {
   position: relative;
 }
 
-.context-menu-item.has-submenu::before {
+.context-menu > .context-menu-item::before {
   content: none;
 }
 

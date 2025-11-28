@@ -286,6 +286,16 @@ function addItems (result, basePath, currentBasePath) {
       }
     }, [
       ['li', {
+        class: 'context-menu-item',
+        $on: {
+          click () {
+            shell.openPath(pth);
+          }
+        }
+      }, [
+        'Open'
+      ]],
+      ['li', {
         class: 'context-menu-item has-submenu'
       }, [
         'Open with...',
