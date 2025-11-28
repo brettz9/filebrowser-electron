@@ -319,6 +319,29 @@ function addItems (result, basePath, currentBasePath) {
       ]]
     ], document.body);
 
+    // Ensure main context menu is visible within viewport
+    requestAnimationFrame(() => {
+      const menuRect = customContextMenu.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      // Adjust horizontal position if needed
+      if (menuRect.right > viewportWidth) {
+        customContextMenu.style.left = (viewportWidth - menuRect.width - 10) + 'px';
+      }
+      if (menuRect.left < 0) {
+        customContextMenu.style.left = '10px';
+      }
+
+      // Adjust vertical position if needed
+      if (menuRect.bottom > viewportHeight) {
+        customContextMenu.style.top = (viewportHeight - menuRect.height - 10) + 'px';
+      }
+      if (menuRect.top < 0) {
+        customContextMenu.style.top = '10px';
+      }
+    });
+
     // const targetElement = e.target;
 
     // Hide the custom context menu when clicking anywhere else
@@ -383,27 +406,45 @@ function addItems (result, basePath, currentBasePath) {
       if (parentLi) {
         parentLi.addEventListener('mouseenter', () => {
           requestAnimationFrame(() => {
+            // Get measurements BEFORE any adjustments
             const submenuRect = submenu.getBoundingClientRect();
-            const parentRect = parentLi.getBoundingClientRect();
             const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
 
-            // Reset any previous adjustments
-            submenu.style.left = '';
-            submenu.style.right = '';
+            // Check if submenu actually overflows (is already visible but cut off)
+            const actuallyOverflowsRight = submenuRect.right > viewportWidth;
+            const actuallyOverflowsBottom = submenuRect.bottom > viewportHeight;
 
-            // Check if submenu (opening to the right) would go off screen
-            const wouldOverflowRight = parentRect.right + submenuRect.width > viewportWidth;
-            const wouldOverflowLeft = parentRect.left - submenuRect.width < 0;
+            // Handle horizontal overflow - only reposition submenu, never main menu
+            if (actuallyOverflowsRight) {
+              const parentRect = parentLi.getBoundingClientRect();
+              const wouldFitOnLeft = parentRect.left - submenuRect.width >= 0;
 
-            if (wouldOverflowRight && !wouldOverflowLeft) {
-              // Open to the left instead
-              submenu.style.left = 'auto';
-              submenu.style.right = '100%';
-            } else if (wouldOverflowRight && wouldOverflowLeft) {
-              // Can't fit either way, keep right but adjust parent menu
-              const mainMenuRect = customContextMenu.getBoundingClientRect();
-              const shift = submenuRect.right - viewportWidth + 20; // 20px padding
-              customContextMenu.style.left = (mainMenuRect.left - shift) + 'px';
+              if (wouldFitOnLeft) {
+                // Open to the left instead
+                submenu.style.left = 'auto';
+                submenu.style.right = '100%';
+              } else {
+                // Can't fit on left either, pin to right edge of viewport
+                submenu.style.left = 'auto';
+                submenu.style.right = '10px';
+              }
+            }
+
+            // Handle vertical overflow - only reposition submenu, never main menu
+            if (actuallyOverflowsBottom) {
+              const parentRect = parentLi.getBoundingClientRect();
+              const wouldFitOnTop = parentRect.top - submenuRect.height >= 0;
+
+              if (wouldFitOnTop) {
+                // Align to bottom of parent instead
+                submenu.style.top = 'auto';
+                submenu.style.bottom = '0';
+              } else {
+                // Can't fit on top either, pin to bottom edge of viewport
+                submenu.style.top = 'auto';
+                submenu.style.bottom = '10px';
+              }
             }
           });
         });
