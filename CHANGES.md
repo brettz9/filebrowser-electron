@@ -1,5 +1,9 @@
 # CHANGES to filebrowser-electron
 
+## ?
+
+- fix: position fixes for context menu
+
 ## 0.6.0
 
 - feat: Open-With

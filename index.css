@@ -81,11 +81,18 @@ nav button.selected {
   position: relative;
 }
 
+.context-menu-item.has-submenu::before {
+  content: none;
+}
+
 .context-menu-item.has-submenu::after {
   content: '▶';
   position: absolute;
   right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
   font-size: 10px;
+  line-height: 1;
 }
 
 .context-submenu {
