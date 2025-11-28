@@ -3,6 +3,7 @@
 ## 0.7.0 (unreleased)
 
 - feat: create new folder
+- feat: delete file or folder
 - feat: create text file within a folder
 - feat: "Open in Finder" for folders
 - feat: context menu regular Open

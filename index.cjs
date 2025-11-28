@@ -5,7 +5,7 @@
 'use strict';
 
 const {
-  mkdirSync, readdirSync, writeFileSync, existsSync, renameSync, lstatSync
+  mkdirSync, readdirSync, writeFileSync, existsSync, renameSync, lstatSync, rmSync
 } = require('node:fs');
 const path = require('node:path');
 const {spawnSync} = require('node:child_process');
@@ -233,6 +233,8 @@ function changePath () {
 
 /** @type {JQuery} */
 let $columns;
+let isDeleting = false;
+
 /**
  *
  * @param {Result[]} result
@@ -248,6 +250,46 @@ function addItems (result, basePath, currentBasePath) {
   while (ul.firstChild) {
     ul.firstChild.remove();
   }
+
+  /**
+   * @param {string} itemPath
+   */
+  const deleteItem = (itemPath) => {
+    // Prevent multiple simultaneous deletions
+    if (isDeleting) {
+      return;
+    }
+
+    isDeleting = true;
+
+    const decodedPath = decodeURIComponent(itemPath);
+    const itemName = path.basename(decodedPath);
+
+    // eslint-disable-next-line no-alert -- User confirmation
+    const confirmed = confirm(`Are you sure you want to delete "${itemName}"?`);
+
+    if (!confirmed) {
+      isDeleting = false;
+      return;
+    }
+
+    try {
+      // rmSync with recursive and force options to handle both files and directories
+      rmSync(decodedPath, {recursive: true, force: true});
+
+      // Refresh the view to reflect deletion
+      changePath();
+
+      // Reset flag after a delay to allow view to update
+      setTimeout(() => {
+        isDeleting = false;
+      }, 100);
+    } catch (err) {
+      // eslint-disable-next-line no-console, no-alert -- User feedback
+      alert('Failed to delete: ' + (/** @type {Error} */ (err)).message);
+      isDeleting = false;
+    }
+  };
 
   /**
    * @param {string} folderPath
@@ -386,6 +428,7 @@ function addItems (result, basePath, currentBasePath) {
    */
   const folderContextmenu = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     const {path: pth} = /** @type {HTMLElement} */ (e.target).dataset;
     if (!pth) {
       return;
@@ -416,7 +459,18 @@ function addItems (result, basePath, currentBasePath) {
 
             // Create a temporary new file in the folder
             const folderPath = decodeURIComponent(pth);
-            const tempFileName = 'untitled.txt';
+
+            // Find an available "untitled.txt" name
+            let baseName = 'untitled';
+            let extension = '.txt';
+            let tempFileName = baseName + extension;
+            let counter = 2;
+
+            while (existsSync(path.join(folderPath, tempFileName))) {
+              tempFileName = baseName + counter + extension;
+              counter++;
+            }
+
             const tempFilePath = path.join(folderPath, tempFileName);
 
             try {
@@ -426,17 +480,70 @@ function addItems (result, basePath, currentBasePath) {
               // Refresh the view to show the new file
               changePath();
 
-              // Wait for the view to refresh, then find and start renaming the new file
+              // Wait for the view to refresh, then find the folder and trigger it to load children
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                  requestAnimationFrame(() => {
-                    const newFileElement = $(
-                      `[data-path="${CSS.escape(path.join(folderPath, tempFileName))}"]`
-                    );
-                    if (newFileElement) {
-                      startRename(newFileElement);
-                    }
-                  });
+                  // Find the folder element (anchor tag with this path)
+                  const folderElement = Array.from(document.querySelectorAll('a[data-path]')).find(
+                    /** @type {(el: Element) => boolean} */ (el) =>
+                      /** @type {HTMLElement} */ (el).dataset.path === pth
+                  );
+
+                  if (folderElement && folderElement.parentElement) {
+                    // Trigger the folder to be selected so miller-columns builds its children
+                    jQuery(folderElement.parentElement).trigger('click');
+
+                    // Now wait for children to be built and find our file
+                    const tryFindElement = (attempts = 0) => {
+                      if (attempts > 20) {
+                        // eslint-disable-next-line no-console -- Debugging
+                        console.log('Final attempt - all paths in DOM:',
+                          [...Array.from(document.querySelectorAll('span[data-path]')),
+                           ...Array.from(document.querySelectorAll('a[data-path]'))].map(
+                            /** @type {(el: Element) => string | undefined} */ (el) =>
+                              /** @type {HTMLElement} */ (el).dataset.path
+                          )
+                        );
+                        // eslint-disable-next-line no-console, no-alert -- Debugging
+                        alert('Could not find newly created file element after multiple attempts');
+                        return;
+                      }
+
+                      requestAnimationFrame(() => {
+                        // The data-path attribute uses: childDirectory + '/' + encodeURIComponent(title)
+                        // where childDirectory is the decoded path, so we need to decode pth first
+                        const decodedFolderPath = decodeURIComponent(pth);
+                        const encodedPath = decodedFolderPath + '/' + encodeURIComponent(tempFileName);
+
+                        if (attempts === 0) {
+                          // eslint-disable-next-line no-console -- Debugging
+                          console.log('Searching for path:', encodedPath);
+                        }                        // Check both span and a tags (files are span, folders are a)
+                        const allElements = [
+                          ...Array.from(document.querySelectorAll('span[data-path]')),
+                          ...Array.from(document.querySelectorAll('a[data-path]'))
+                        ];
+
+                        // Find by matching the data-path attribute directly
+                        const newFileElement = allElements.find(
+                          /** @type {(el: Element) => boolean} */ (el) =>
+                            /** @type {HTMLElement} */ (el).dataset.path === encodedPath
+                        );
+
+                        if (newFileElement) {
+                          // eslint-disable-next-line no-console -- Debugging
+                          console.log('Found element on attempt', attempts + 1);
+                          startRename(/** @type {HTMLElement} */ (newFileElement));
+                        } else {
+                          // Try again
+                          tryFindElement(attempts + 1);
+                        }
+                      });
+                    };                    tryFindElement();
+                  } else {
+                    // eslint-disable-next-line no-console, no-alert -- Debugging
+                    alert('Could not find folder element to trigger');
+                  }
                 });
               });
             } catch (err) {
@@ -464,6 +571,18 @@ function addItems (result, basePath, currentBasePath) {
         }
       }, [
         'Rename'
+      ]],
+      ['li', {
+        class: 'context-menu-item',
+        $on: {
+          click (ev) {
+            ev.stopPropagation();
+            customContextMenu.style.display = 'none';
+            deleteItem(pth);
+          }
+        }
+      }, [
+        'Delete'
       ]]
     ], document.body);
 
@@ -509,6 +628,7 @@ function addItems (result, basePath, currentBasePath) {
    */
   const contextmenu = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
     const {path: pth} = /** @type {HTMLElement} */ (e.target).dataset;
     if (!pth) {
       return;
@@ -590,6 +710,18 @@ function addItems (result, basePath, currentBasePath) {
         }
       }, [
         'Rename'
+      ]],
+      ['li', {
+        class: 'context-menu-item',
+        $on: {
+          click (ev) {
+            ev.stopPropagation();
+            customContextMenu.style.display = 'none';
+            deleteItem(pth);
+          }
+        }
+      }, [
+        'Delete'
       ]]
     ], document.body);
 
@@ -1010,6 +1142,12 @@ function addItems (result, basePath, currentBasePath) {
 
     if (e.metaKey && e.key === 'o' && pth) {
       shell.openPath(pth);
+    }
+
+    // Cmd+Delete to delete selected item
+    if (e.metaKey && e.key === 'Backspace' && pth) {
+      e.preventDefault();
+      deleteItem(pth);
     }
 
     // Cmd+Shift+N to create new folder
