@@ -562,15 +562,13 @@ function addItems (result, basePath, currentBasePath) {
   const childMap = new WeakMap();
   $columns = millerColumns.millerColumns({
     // Options:
-    // The animation delay necessitates our 250ms `setTimeout` later
-    // delay: 200, // Reduce animation delay from default 500ms
     // preview () {
     //   return 'preview placeholder';
     // },
     animation () {
-      // No-op to avoid need for timeouts
+      // No-op to avoid need for timeouts and jarring redraws
     },
-    // @ts-ignore Bugginess
+    // @ts-ignore Sometime bugginess
     current ($item /* , $cols */) {
       /**
        * @param {string} pth
@@ -696,11 +694,9 @@ function addItems (result, basePath, currentBasePath) {
           childMap.set($item[0], item[0]);
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-              // setTimeout(() => {
               item[0].scrollIntoView({
                 block: 'start', inline: 'start'
               });
-              // }, 250); // Slightly longer than delay setting (200ms)
             });
           });
         }
@@ -741,12 +737,10 @@ function addItems (result, basePath, currentBasePath) {
         anchors.trigger('click');
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            // setTimeout(() => {
             anchors[0]?.scrollIntoView({
               block: 'start',
               inline: 'start'
             });
-            // }, 250);
           });
         });
         return undefined;
