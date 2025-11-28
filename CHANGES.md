@@ -1,6 +1,6 @@
 # CHANGES to filebrowser-electron
 
-## ?
+## 0.7.0 (unreleased)
 
 - feat: context menu regular Open
 - fix: position fixes for context menu
