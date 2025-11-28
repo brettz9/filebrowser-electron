@@ -256,8 +256,13 @@ function setupFileWatcher (dirPath) {
         '**/.DS_Store',
         '**/Thumbs.db',
         '**/.git',
-        '**/node_modules'
-      ]
+        '**/node_modules',
+        '**/.Trash',
+        '**/.Trash-*',
+        '**/.pm2',
+        '**/.*' // Ignore all hidden files/folders
+      ],
+      ignorePermissionErrors: true
     });
 
     const handleChange = (/** @type {string} */ eventPath) => {
@@ -431,6 +436,21 @@ function setupFileWatcher (dirPath) {
         console.log('Watcher ready');
       }).
       on('error', (/** @type {unknown} */ error) => {
+        const err = /** @type {Error & {code?: string, path?: string}} */ (
+          error
+        );
+        // Silently ignore permission and socket errors for system files
+        if (err.code === 'EPERM' || err.code === 'EACCES' ||
+            err.code === 'UNKNOWN') {
+          // Check if it's a system file/directory we should ignore
+          if (err.path &&
+              (err.path.includes('.Trash') ||
+               err.path.includes('.pm2') ||
+               err.path.includes('/.') ||
+               err.path.endsWith('.sock'))) {
+            return; // Silently ignore
+          }
+        }
         // eslint-disable-next-line no-console -- Debugging
         console.error('Watcher error:', error);
       });
