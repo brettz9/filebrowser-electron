@@ -76,3 +76,31 @@ nav button.selected {
   background-color: #ddd;
   margin: 5px 0;
 }
+
+.context-menu-item.has-submenu {
+  position: relative;
+}
+
+.context-menu-item.has-submenu::after {
+  content: '▶';
+  position: absolute;
+  right: 8px;
+  font-size: 10px;
+}
+
+.context-submenu {
+  display: none;
+  position: absolute;
+  left: 100%;
+  top: 0;
+  background-color: #f9f9f9;
+  min-width: 160px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 1001;
+  padding: 5px 0;
+  border-radius: 4px;
+}
+
+.context-menu-item.has-submenu:hover .context-submenu {
+  display: block;
+}

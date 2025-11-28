@@ -286,20 +286,27 @@ function addItems (result, basePath, currentBasePath) {
       }
     }, [
       ['li', {
-        class: 'context-menu-item', dataset: {
-          apppath: defaultApp.path
-        }}, [
-        defaultApp.name
-      ]],
-      ['li', {class: 'context-menu-separator'}],
-      ...apps.map((app) => {
-        return /** @type {import('jamilih').JamilihArray} */ (['li', {
-          class: 'context-menu-item', dataset: {
-            apppath: app.path
-          }}, [
-          app.name
-        ]]);
-      })
+        class: 'context-menu-item has-submenu'
+      }, [
+        'Open with...',
+        ['ul', {class: 'context-submenu'}, [
+          ['li', {
+            class: 'context-menu-item', dataset: {
+              apppath: defaultApp.path
+            }}, [
+            defaultApp.name + ' (default)'
+          ]],
+          ['li', {class: 'context-menu-separator'}],
+          ...apps.map((app) => {
+            return /** @type {import('jamilih').JamilihArray} */ (['li', {
+              class: 'context-menu-item', dataset: {
+                apppath: app.path
+              }}, [
+              app.name
+            ]]);
+          })
+        ]]
+      ]]
     ], document.body);
 
     const targetElement = e.target;
@@ -319,38 +326,42 @@ function addItems (result, basePath, currentBasePath) {
     };
     document.addEventListener('click', hideCustomContextMenu);
 
-    // Add functionality to menu items
-    customContextMenu.querySelectorAll('.context-menu-item').forEach((
-      item, idx
-    ) => {
-      /** @type {HTMLElement} */
-      const htmlItem = /** @type {HTMLElement} */ (item);
-      const iconUrl = idx === 0
-        ? defaultApp.image
-        // @ts-expect-error We added it above
-        : apps[idx - 1]?.image;
+    // Add functionality to submenu items
+    const submenu = customContextMenu.querySelector('.context-submenu');
+    if (submenu) {
+      submenu.querySelectorAll('.context-menu-item').forEach((
+        item, idx
+      ) => {
+        /** @type {HTMLElement} */
+        const htmlItem = /** @type {HTMLElement} */ (item);
+        const iconUrl = idx === 0
+          ? defaultApp.image
+          // @ts-expect-error We added it above
+          : apps[idx - 1]?.image;
 
-      // Only set background if we have a valid icon URL
-      if (iconUrl && iconUrl.trim()) {
-        htmlItem.style.setProperty(
-          '--background',
-          `url("${iconUrl}")`
-        );
-      }
-
-      item.addEventListener('click', () => {
-        customContextMenu.style.display = 'none'; // Hide after clicking an item
-        const {apppath} = /** @type {HTMLElement} */ (item).dataset;
-        if (!apppath) {
-          return;
+        // Only set background if we have a valid icon URL
+        if (iconUrl && iconUrl.trim()) {
+          htmlItem.style.setProperty(
+            '--background',
+            `url("${iconUrl}")`
+          );
         }
-        spawnSync('open', [
-          '-a',
-          apppath,
-          pth
-        ]);
+
+        item.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          customContextMenu.style.display = 'none';
+          const {apppath} = /** @type {HTMLElement} */ (item).dataset;
+          if (!apppath) {
+            return;
+          }
+          spawnSync('open', [
+            '-a',
+            apppath,
+            pth
+          ]);
+        });
       });
-    });
+    }
   };
 
   const listItems = result.map(([
