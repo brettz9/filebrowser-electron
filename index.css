@@ -55,13 +55,16 @@ nav button.selected {
 }
 
 .context-menu-item::before {
-  background: var(--background);
+  background: var(--background, transparent);
   background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
   content: '';
   display: inline-block;
-  padding-right: 10px;
-  width: 30px;
-  height: 30px;
+  margin-right: 8px;
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
 }
 
 .context-menu-item:hover {

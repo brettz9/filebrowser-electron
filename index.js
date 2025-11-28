@@ -260,13 +260,20 @@ function addItems (result, basePath, currentBasePath) {
     let defaultApp = {name: '', path: '', rank: '', image: ''};
     const appsOrig = await getOpenWithApps(pth);
     const icons = await getAppIcons(appsOrig);
-    const apps = appsOrig.filter((app, idx) => {
+
+    // Add icons to apps before filtering
+    const appsWithIcons = appsOrig.map((app, idx) => {
       // @ts-expect-error Add it ourselves
       app.image = icons[idx];
-      if (app.isDefault) {
+      return app;
+    });
+
+    // Find default app and filter
+    const apps = appsWithIcons.filter((app) => {
+      if (app.isSystemDefault) {
         defaultApp = app;
       }
-      return !app.isDefault;
+      return !app.isSystemDefault;
     }).toSorted((a, b) => {
       return a.name.localeCompare(b.name);
     });
@@ -295,16 +302,6 @@ function addItems (result, basePath, currentBasePath) {
       })
     ], document.body);
 
-    const pseudoElementRule = `.context-menu-item::before { content: ; }`;
-
-    const stylesheet = document.styleSheets[0];
-    try {
-      stylesheet.insertRule(pseudoElementRule, stylesheet.cssRules.length);
-    } catch (err) {
-      // eslint-disable-next-line no-console -- Debugging
-      console.error('Error inserting CSS rule:', err);
-    }
-
     const targetElement = e.target;
 
     // Hide the custom context menu when clicking anywhere else
@@ -327,13 +324,20 @@ function addItems (result, basePath, currentBasePath) {
       item, idx
     ) => {
       /** @type {HTMLElement} */
-      (item).style.setProperty(
-        '--background',
-        idx === 0
-          ? `url(${defaultApp.image})`
-          // @ts-expect-error We added it above
-          : `url(${apps[idx - 1].image})`
-      );
+      const htmlItem = /** @type {HTMLElement} */ (item);
+      const iconUrl = idx === 0
+        ? defaultApp.image
+        // @ts-expect-error We added it above
+        : apps[idx - 1]?.image;
+
+      // Only set background if we have a valid icon URL
+      if (iconUrl && iconUrl.trim()) {
+        htmlItem.style.setProperty(
+          '--background',
+          `url("${iconUrl}")`
+        );
+      }
+
       item.addEventListener('click', () => {
         customContextMenu.style.display = 'none'; // Hide after clicking an item
         const {apppath} = /** @type {HTMLElement} */ (item).dataset;
