@@ -362,6 +362,45 @@ function addItems (result, basePath, currentBasePath) {
         $on: {
           click () {
             customContextMenu.style.display = 'none';
+
+            // Create a temporary new file in the folder
+            const fs = require('node:fs');
+            const folderPath = decodeURIComponent(pth);
+            const tempFileName = 'untitled.txt';
+            const tempFilePath = path.join(folderPath, tempFileName);
+
+            try {
+              // Create empty file
+              fs.writeFileSync(tempFilePath, '');
+
+              // Refresh the view to show the new file
+              changePath();
+
+              // Wait for the view to refresh, then find and start renaming the new file
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  const newFileElement = document.querySelector(
+                    `[data-path="${CSS.escape(path.join(folderPath, tempFileName))}"]`
+                  );
+                  if (newFileElement instanceof HTMLElement) {
+                    startRename(newFileElement);
+                  }
+                });
+              });
+            } catch (err) {
+              // eslint-disable-next-line no-console, no-alert -- User feedback
+              alert('Failed to create file: ' + (/** @type {Error} */ (err)).message);
+            }
+          }
+        }
+      }, [
+        'Create text file'
+      ]],
+      ['li', {
+        class: 'context-menu-item',
+        $on: {
+          click () {
+            customContextMenu.style.display = 'none';
             // Find the element with this path
             const targetElement = document.querySelector(
               `[data-path="${CSS.escape(pth)}"]`

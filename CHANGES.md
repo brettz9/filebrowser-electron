@@ -3,6 +3,7 @@
 ## 0.7.0 (unreleased)
 
 - feat: context menu regular Open
+- feat: create text file within a folder
 - feat: "Open in Finder" for folders
 - feat: hit Enter or use context menu to rename files or folders
 - fix: allow keyboard navigation on columns upon load
