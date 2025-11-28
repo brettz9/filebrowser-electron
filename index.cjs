@@ -696,11 +696,11 @@ function addItems (result, basePath, currentBasePath) {
           childMap.set($item[0], item[0]);
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-              setTimeout(() => {
-                item[0].scrollIntoView({
-                  block: 'start', inline: 'start'
-                });
-              }, 250); // Slightly longer than delay setting (200ms)
+              // setTimeout(() => {
+              item[0].scrollIntoView({
+                block: 'start', inline: 'start'
+              });
+              // }, 250); // Slightly longer than delay setting (200ms)
             });
           });
         }
