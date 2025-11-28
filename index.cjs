@@ -248,6 +248,162 @@ function addItems (result, basePath, currentBasePath) {
   }
 
   /**
+   * @param {HTMLElement} textElement
+   */
+  const startRename = (textElement) => {
+    if (!textElement || !textElement.dataset.path) {
+      return;
+    }
+
+    // Check if already in rename mode (input exists)
+    if (textElement.querySelector('input')) {
+      return;
+    }
+
+    const oldPath = textElement.dataset.path;
+    const oldName = textElement.textContent.trim();
+    const parentPath = path.dirname(oldPath);
+
+    // Create input element for renaming
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = oldName;
+    input.style.width = '100%';
+    input.style.boxSizing = 'border-box';
+
+    // Replace text with input
+    const originalContent = textElement.textContent;
+    textElement.textContent = '';
+    textElement.appendChild(input);
+    input.focus();
+    input.select();
+
+    let isFinishing = false;
+
+    const finishRename = () => {
+      if (isFinishing) return;
+      isFinishing = true;
+
+      const newName = input.value.trim();
+
+      if (newName && newName !== oldName) {
+        const newPath = path.join(parentPath, newName);
+        const fs = require('node:fs');
+
+        try {
+          fs.renameSync(decodeURIComponent(oldPath), newPath);
+          // Refresh the view - this will rebuild the DOM with new names
+          changePath();
+        } catch (err) {
+          // eslint-disable-next-line no-console, no-alert -- User feedback
+          alert('Failed to rename: ' + (/** @type {Error} */ (err)).message);
+          input.remove();
+          textElement.textContent = originalContent;
+        }
+      } else {
+        input.remove();
+        textElement.textContent = originalContent;
+      }
+    };
+
+    input.addEventListener('blur', finishRename);
+    input.addEventListener('keydown', (ev) => {
+      // Stop propagation to prevent miller-columns from handling these events
+      ev.stopPropagation();
+
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        input.blur();
+      } else if (ev.key === 'Escape') {
+        ev.preventDefault();
+        input.remove();
+        textElement.textContent = originalContent;
+      }
+    });
+
+    // Also stop propagation for keypress and keyup to prevent interference
+    input.addEventListener('keypress', (ev) => {
+      ev.stopPropagation();
+    });
+    input.addEventListener('keyup', (ev) => {
+      ev.stopPropagation();
+    });
+  };
+
+  /**
+   * @param {Event} e
+   */
+  const folderContextmenu = (e) => {
+    e.preventDefault();
+    const {path: pth} = /** @type {HTMLElement} */ (e.target).dataset;
+    if (!pth) {
+      return;
+    }
+
+    const customContextMenu = jml('ul', {
+      class: 'context-menu',
+      style: {
+        left: /** @type {MouseEvent} */ (e).pageX + 'px',
+        top: /** @type {MouseEvent} */ (e).pageY + 'px'
+      }
+    }, [
+      ['li', {
+        class: 'context-menu-item',
+        $on: {
+          click () {
+            customContextMenu.style.display = 'none';
+            // Find the element with this path
+            const targetElement = document.querySelector(
+              `[data-path="${CSS.escape(pth)}"]`
+            );
+            if (targetElement instanceof HTMLElement) {
+              startRename(targetElement);
+            }
+          }
+        }
+      }, [
+        'Rename'
+      ]]
+    ], document.body);
+
+    // Ensure main context menu is visible within viewport
+    requestAnimationFrame(() => {
+      const menuRect = customContextMenu.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      // Adjust horizontal position if needed
+      if (menuRect.right > viewportWidth) {
+        customContextMenu.style.left = (viewportWidth - menuRect.width - 10) + 'px';
+      }
+      if (menuRect.left < 0) {
+        customContextMenu.style.left = '10px';
+      }
+
+      // Adjust vertical position if needed
+      if (menuRect.bottom > viewportHeight) {
+        customContextMenu.style.top = (viewportHeight - menuRect.height - 10) + 'px';
+      }
+      if (menuRect.top < 0) {
+        customContextMenu.style.top = '10px';
+      }
+    });
+
+    // Hide the custom context menu when clicking anywhere else
+    const hideCustomContextMenu = () => {
+      customContextMenu.style.display = 'none';
+      document.removeEventListener('click', hideCustomContextMenu);
+      document.removeEventListener('contextmenu', hideCustomContextMenu);
+    };
+    document.addEventListener('click', hideCustomContextMenu, {
+      capture: true
+    });
+    document.addEventListener('contextmenu', hideCustomContextMenu, {
+      capture: true
+    });
+  };
+
+  /**
    * @param {Event} e
    */
   const contextmenu = async (e) => {
@@ -316,6 +472,23 @@ function addItems (result, basePath, currentBasePath) {
             ]]);
           })
         ]]
+      ]],
+      ['li', {
+        class: 'context-menu-item',
+        $on: {
+          click () {
+            customContextMenu.style.display = 'none';
+            // Find the element with this path
+            const targetElement = $(
+              `[data-path="${CSS.escape(pth)}"]`
+            );
+            if (targetElement) {
+              startRename(targetElement);
+            }
+          }
+        }
+      }, [
+        'Rename'
       ]]
     ], document.body);
 
@@ -476,6 +649,9 @@ function addItems (result, basePath, currentBasePath) {
         isDir
           ? ['a', {
             title: basePath + encodeURIComponent(title),
+            $on: {
+              contextmenu: folderContextmenu
+            },
             dataset: {
               path: basePath + encodeURIComponent(title)
             },
@@ -648,11 +824,14 @@ function addItems (result, basePath, currentBasePath) {
         const width = '25px';
         const paddingRightLeft = '30px';
         const marginTopBottom = '18px';
-        const li = jml('li', [
+        const li = jml('li', {class: 'list-item'}, [
           isDir
             ? ['a', {
               title: childDirectory + '/' +
                 encodeURIComponent(title),
+              $on: {
+                contextmenu: folderContextmenu
+              },
               dataset: {
                 path: childDirectory + '/' +
                   encodeURIComponent(title)
@@ -725,9 +904,20 @@ function addItems (result, basePath, currentBasePath) {
     }
   });
   $columns.on('keydown', (e) => {
-    const pth = $columns.find('li.miller-selected span')[0]?.dataset?.path;
+    const selectedLi = $columns.find('li.miller-selected').last();
+    const pth = selectedLi.find('span, a')[0]?.dataset?.path;
+
     if (e.metaKey && e.key === 'o' && pth) {
       shell.openPath(pth);
+    }
+
+    // Enter key to rename
+    if (e.key === 'Enter' && selectedLi.length) {
+      e.preventDefault();
+      const textElement = selectedLi.find('span, a')[0];
+      if (textElement) {
+        startRename(textElement);
+      }
     }
   });
 
@@ -761,6 +951,17 @@ function addItems (result, basePath, currentBasePath) {
         return undefined;
       }
     );
+  }
+
+  // Ensure the miller-columns container is focusable and focused for keyboard navigation
+  if (view === 'three-columns') {
+    requestAnimationFrame(() => {
+      const millerColumnsDiv = $('div.miller-columns');
+      if (millerColumnsDiv) {
+        millerColumnsDiv.setAttribute('tabindex', '0');
+        millerColumnsDiv.focus();
+      }
+    });
   }
 }
 
