@@ -20,6 +20,7 @@ const {jml} = require('jamilih');
 const jQuery = require('jquery');
 const addMillerColumnPlugin = require('miller-columns');
 const {getOpenWithApps, getAppIcons} = require('open-with-me');
+const chokidar = require('chokidar');
 
 const getIconDataURLForFile =
   require('./src/renderer/utils/getIconDataURLForFile.cjs');
@@ -210,6 +211,236 @@ function readDirectory (basePath) {
 }
 
 /**
+ * Setup file system watcher for a directory.
+ *
+ * @param {string} dirPath
+ * @returns {void}
+ */
+function setupFileWatcher (dirPath) {
+  // Don't recreate watcher during external refresh
+  if (isRefreshing) {
+    return;
+  }
+
+  // Don't watch root directory
+  if (dirPath === '/') {
+    return;
+  }
+
+  // Don't recreate watcher if already watching this path
+  if (currentWatcher && currentWatchedPath === dirPath) {
+    return;
+  }
+
+  // Close existing watcher
+  if (currentWatcher) {
+    currentWatcher.close();
+    currentWatcher = null;
+    currentWatchedPath = null;
+  }
+
+  // Clear any pending timeout
+  if (watcherTimeout) {
+    clearTimeout(watcherTimeout);
+    watcherTimeout = null;
+  }
+
+  currentWatchedPath = dirPath;
+
+  try {
+    currentWatcher = chokidar.watch(dirPath, {
+      persistent: false,
+      ignoreInitial: true,
+      depth: 1, // Watch direct children and one level deep
+      ignored: [
+        '**/.DS_Store',
+        '**/Thumbs.db',
+        '**/.git',
+        '**/node_modules'
+      ]
+    });
+
+    const handleChange = (/** @type {string} */ eventPath) => {
+      // eslint-disable-next-line no-console -- Debugging
+      console.log('File change detected:', eventPath);
+
+      // Debounce multiple rapid changes
+      if (watcherTimeout) {
+        clearTimeout(watcherTimeout);
+      }
+
+      watcherTimeout = setTimeout(() => {
+        // eslint-disable-next-line no-console -- Debugging
+        console.log('Watcher timeout fired. isDeleting:', isDeleting,
+          'isCreating:', isCreating);
+
+        // Only refresh if not currently deleting or creating
+        if (!isDeleting && !isCreating) {
+          const currentBasePath = getBasePath();
+
+          // eslint-disable-next-line no-console -- Debugging
+          console.log('Comparing paths - current:', currentBasePath,
+            'watched:', currentWatchedPath);
+
+          // Normalize paths by removing trailing slashes for comparison
+          const normalizedCurrent = currentBasePath.replace(/\/+$/v, '');
+          const normalizedWatched =
+            currentWatchedPath?.replace(/\/+$/v, '') ?? '';
+
+          // Refresh if we're viewing the watched directory or any of its
+          // children (in case a parent folder was deleted)
+          if (normalizedCurrent === normalizedWatched ||
+              normalizedCurrent.startsWith(normalizedWatched + '/')) {
+            // eslint-disable-next-line no-console -- Debugging
+            console.log('Refreshing view for:', currentBasePath);
+
+            // If we're in a subdirectory of the watched path, navigate back
+            // to the watched directory
+            if (normalizedCurrent.startsWith(normalizedWatched + '/')) {
+              // Save the folder we were viewing so we can select it after
+              // navigating back
+              const childFolderName = normalizedCurrent.slice(
+                normalizedWatched.length + 1
+              ).split('/')[0];
+              const childFolderPath = normalizedWatched + '/' +
+                childFolderName;
+
+              // Navigate back to the parent directory
+              location.hash = '#path=' + encodeURIComponent(
+                currentWatchedPath ?? normalizedWatched
+              );
+
+              // After navigation, select and expand the folder we were in
+              setTimeout(() => {
+                const folderElement = $(
+                  `[data-path="${CSS.escape(childFolderPath)}"]`
+                );
+                if (folderElement) {
+                  const li = folderElement.closest('li');
+                  if (li) {
+                    // Remove selection from all items
+                    $$('.miller-selected').
+                      forEach((el) => {
+                        el.classList.remove('miller-selected');
+                      });
+                    // Select the folder
+                    li.classList.add('miller-selected');
+
+                    // Trigger it to load children
+                    jQuery(li).trigger('click');
+
+                    // Focus for keyboard navigation
+                    const parentUl = li.closest('ul');
+                    if (parentUl) {
+                      parentUl.setAttribute('tabindex', '0');
+                      parentUl.focus();
+                    }
+                  }
+                }
+              }, 100);
+
+              // Don't continue with refresh here - hashchange event will
+              // trigger changePath()
+              return;
+            }
+
+            // Save the currently selected item before refresh
+            const selectedItem = $('li.miller-selected a');
+            const selectedPath = selectedItem
+              ? /** @type {HTMLElement} */ (selectedItem).dataset.path
+              : null;
+
+            // Set flag to prevent watcher recreation
+            isRefreshing = true;
+
+            // Refresh the view
+            changePath();
+
+            // Clear flag after refresh
+            isRefreshing = false;
+
+            // Restore selection after refresh
+            if (selectedPath) {
+              setTimeout(() => {
+                const itemElement = $(
+                  `[data-path="${CSS.escape(selectedPath)}"]`
+                );
+                if (itemElement) {
+                  const li = itemElement.closest('li');
+                  if (li) {
+                    // Remove selection from all items
+                    $$('.miller-selected').
+                      forEach((el) => {
+                        el.classList.remove('miller-selected');
+                      });
+                    // Select the item
+                    li.classList.add('miller-selected');
+
+                    // If this is a folder (has an <a> tag), trigger it to
+                    // reload its children
+                    const anchor = li.querySelector('a');
+                    if (anchor) {
+                      // Trigger miller-columns to reload children
+                      jQuery(li).trigger('click');
+                    }
+
+                    // Focus the parent ul to enable keyboard navigation
+                    const parentUl = li.closest('ul');
+                    if (parentUl) {
+                      parentUl.setAttribute('tabindex', '0');
+                      parentUl.focus();
+                    }
+                  }
+                }
+              }, 100);
+            }
+          } else {
+            // eslint-disable-next-line no-console -- Debugging
+            console.log('Not refreshing - path mismatch');
+          }
+        } else {
+          // eslint-disable-next-line no-console -- Debugging
+          console.log('Skipping refresh due to isDeleting or isCreating');
+        }
+      }, 300);
+    };
+
+    currentWatcher.
+      on('add', (filePath) => {
+        // eslint-disable-next-line no-console -- Debugging
+        console.log('add event:', filePath);
+        handleChange(filePath);
+      }).
+      on('unlink', (filePath) => {
+        // eslint-disable-next-line no-console -- Debugging
+        console.log('unlink event:', filePath);
+        handleChange(filePath);
+      }).
+      on('addDir', (dir) => {
+        // eslint-disable-next-line no-console -- Debugging
+        console.log('addDir event:', dir);
+        handleChange(dir);
+      }).
+      on('unlinkDir', (dir) => {
+        // eslint-disable-next-line no-console -- Debugging
+        console.log('unlinkDir event:', dir);
+        handleChange(dir);
+      }).
+      on('ready', () => {
+        // eslint-disable-next-line no-console -- Debugging
+        console.log('Watcher ready');
+      }).
+      on('error', (/** @type {unknown} */ error) => {
+        // eslint-disable-next-line no-console -- Debugging
+        console.error('Watcher error:', error);
+      });
+  } catch (err) {
+    // eslint-disable-next-line no-console -- Debugging
+    console.warn('Could not watch directory:', dirPath, err);
+  }
+}
+
+/**
  *
  * @returns {void}
  */
@@ -227,6 +458,10 @@ function changePath () {
 
   const result = readDirectory(basePath);
   addItems(result, basePath, currentBasePath);
+
+  // Setup watcher for the current directory being viewed
+  // (not basePath which could be / in list view)
+  setupFileWatcher(currentBasePath);
 }
 
 /**
@@ -236,6 +471,15 @@ function changePath () {
 /** @type {JQuery} */
 let $columns;
 let isDeleting = false;
+let isCreating = false;
+let isRefreshing = false;
+// eslint-disable-next-line jsdoc/imports-as-dependencies -- Bug
+/** @type {import('chokidar').FSWatcher|null} */
+let currentWatcher = null;
+/** @type {NodeJS.Timeout|null} */
+let watcherTimeout = null;
+/** @type {string|null} */
+let currentWatchedPath = null;
 
 /**
  *
@@ -298,6 +542,14 @@ function addItems (result, basePath, currentBasePath) {
    * @param {string} folderPath
    */
   const createNewFolder = (folderPath) => {
+    // Prevent double-creation if already in progress
+    if (isCreating) {
+      return;
+    }
+
+    // Set flag to prevent watcher from interfering
+    isCreating = true;
+
     // Find an available "untitled folder" name
     const baseName = 'untitled folder';
     let newFolderName = baseName;
@@ -328,11 +580,19 @@ function addItems (result, basePath, currentBasePath) {
             `[data-path="${CSS.escape(encodedPath)}"]`
           );
           if (newFolderElement) {
-            startRename(newFolderElement);
+            startRename(newFolderElement, () => {
+              // Clear flag after rename completes
+              isCreating = false;
+            });
+          } else {
+            // eslint-disable-next-line no-console -- Debugging
+            console.warn('Could not find new folder element');
+            isCreating = false;
           }
         });
       });
     } catch (err) {
+      isCreating = false;
       // eslint-disable-next-line no-alert -- User feedback
       alert('Failed to create folder: ' + (/** @type {Error} */ (err)).message);
     }
@@ -340,14 +600,23 @@ function addItems (result, basePath, currentBasePath) {
 
   /**
    * @param {HTMLElement} textElement
+   * @param {(() => void)} [onComplete] - Callback when rename completes
    */
-  const startRename = (textElement) => {
+  const startRename = (textElement, onComplete) => {
     if (!textElement || !textElement.dataset.path) {
+      // Call callback even if we exit early
+      if (onComplete) {
+        onComplete();
+      }
       return;
     }
 
     // Check if already in rename mode (input exists)
     if (textElement.querySelector('input')) {
+      // Call callback even if we exit early
+      if (onComplete) {
+        onComplete();
+      }
       return;
     }
 
@@ -391,18 +660,123 @@ function addItems (result, basePath, currentBasePath) {
         const newPath = path.join(parentPath, newName);
 
         try {
+          // Set flag to prevent watcher from interfering during rename
+          isCreating = true;
+
           renameSync(decodeURIComponent(oldPath), newPath);
           // Refresh the view - this will rebuild the DOM with new names
           changePath();
+
+          // Re-select the renamed item after view refresh
+          setTimeout(() => {
+            const encodedNewPath = parentPath + '/' +
+              encodeURIComponent(newName);
+            // eslint-disable-next-line no-console -- Debugging
+            console.log(
+              'Looking for renamed element with path:', encodedNewPath
+            );
+            const renamedElement = $(
+              `[data-path="${CSS.escape(encodedNewPath)}"]`
+            );
+            // eslint-disable-next-line no-console -- Debugging
+            console.log('Found renamed element:', renamedElement);
+            if (renamedElement) {
+              const li = renamedElement.closest('li');
+              if (li) {
+                // Remove selection from all items
+                $$('.miller-selected').
+                  forEach((el) => {
+                    el.classList.remove('miller-selected');
+                  });
+                // Select the renamed item
+                li.classList.add('miller-selected');
+
+                // Focus the parent ul to enable keyboard navigation
+                // without triggering folder navigation
+                const parentUl = li.closest('ul');
+                if (parentUl) {
+                  parentUl.setAttribute('tabindex', '0');
+                  parentUl.focus();
+                }
+
+                // Scroll into view
+                li.scrollIntoView({
+                  block: 'nearest',
+                  inline: 'nearest'
+                });
+              }
+            }
+
+            // Call completion callback after everything is done
+            if (onComplete) {
+              // Delay clearing the flag to ensure watcher timeout has passed
+              setTimeout(onComplete, 250);
+            }
+          }, 100);
         } catch (err) {
           // eslint-disable-next-line no-alert -- User feedback
           alert('Failed to rename: ' + (/** @type {Error} */ (err)).message);
           input.remove();
           textElement.textContent = originalContent;
+
+          // Call completion callback on error too
+          if (onComplete) {
+            onComplete();
+          }
         }
       } else {
+        // No rename needed, but still need to refresh to ensure proper state
         input.remove();
         textElement.textContent = originalContent;
+
+        // Get the path before refresh
+        const itemPath = oldPath;
+
+        // Refresh the view to ensure miller-columns state is correct
+        changePath();
+
+        // Re-select the item after view refresh
+        setTimeout(() => {
+          const itemElement = $(
+            `[data-path="${CSS.escape(itemPath)}"]`
+          );
+          // eslint-disable-next-line no-console -- Debugging
+          console.log('Looking for item with path:', itemPath);
+          // eslint-disable-next-line no-console -- Debugging
+          console.log('Found item element:', itemElement);
+          if (itemElement) {
+            const li = itemElement.closest('li');
+            if (li) {
+              // Remove selection from all items
+              $$('.miller-selected').
+                forEach((el) => {
+                  el.classList.remove('miller-selected');
+                });
+              // Select the item
+              li.classList.add('miller-selected');
+
+              // Focus the parent ul to enable keyboard navigation
+              // without triggering folder navigation
+              const parentUl = li.closest('ul');
+              if (parentUl) {
+                parentUl.setAttribute('tabindex', '0');
+                parentUl.focus();
+              }
+
+              // Scroll into view
+              li.scrollIntoView({
+                block: 'nearest',
+                inline: 'nearest'
+              });
+            }
+          }
+
+          // Call completion callback after everything is done
+          if (onComplete) {
+            // Delay clearing the flag to ensure watcher timeout has passed
+            setTimeout(onComplete, 250);
+          }
+        }, 100);
       }
     };
 

@@ -8,6 +8,7 @@
 - feat: "Open in Finder" for folders
 - feat: context menu regular Open
 - feat: hit Enter or use context menu to rename files or folders
+- feat: listen for external file/folder changes to trigger refreshes
 - fix: allow keyboard navigation on columns upon load
 - fix: position fixes for context menu
 - fix: disable context menu more actively

@@ -14,6 +14,11 @@ nav button.selected {
   width: 250px;
 }
 
+.miller-selected {
+  background-color: #0078d4 !important;
+  color: white !important;
+}
+
 .list-item {
   overflow: auto;
   max-width: 150px;
