@@ -4,7 +4,9 @@
 /* eslint-disable sonarjs/no-os-command-from-path -- Needed */
 'use strict';
 
-const {readdirSync, lstatSync} = require('node:fs');
+const {
+  mkdirSync, readdirSync, writeFileSync, existsSync, renameSync, lstatSync
+} = require('node:fs');
 const path = require('node:path');
 const {spawnSync} = require('node:child_process');
 
@@ -248,6 +250,48 @@ function addItems (result, basePath, currentBasePath) {
   }
 
   /**
+   * @param {string} folderPath
+   */
+  const createNewFolder = (folderPath) => {
+    // Find an available "untitled folder" name
+    let baseName = 'untitled folder';
+    let newFolderName = baseName;
+    let counter = 2;
+
+    while (existsSync(path.join(folderPath, newFolderName))) {
+      newFolderName = baseName + counter;
+      counter++;
+    }
+
+    const newFolderPath = path.join(folderPath, newFolderName);
+
+    try {
+      // Create the directory
+      mkdirSync(newFolderPath);
+
+      // Refresh the view to show the new folder
+      changePath();
+
+      // Wait for the view to refresh, then find and start renaming the new folder
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          // The data-path attribute uses encodeURIComponent for the folder name
+          const encodedPath = folderPath + '/' + encodeURIComponent(newFolderName);
+          const newFolderElement = $(
+            `[data-path="${CSS.escape(encodedPath)}"]`
+          );
+          if (newFolderElement) {
+            startRename(newFolderElement);
+          }
+        });
+      });
+    } catch (err) {
+      // eslint-disable-next-line no-console, no-alert -- User feedback
+      alert('Failed to create folder: ' + (/** @type {Error} */ (err)).message);
+    }
+  };
+
+  /**
    * @param {HTMLElement} textElement
    */
   const startRename = (textElement) => {
@@ -278,6 +322,14 @@ function addItems (result, basePath, currentBasePath) {
     input.focus();
     input.select();
 
+    // Scroll the input into view
+    requestAnimationFrame(() => {
+      textElement.scrollIntoView({
+        block: 'nearest',
+        inline: 'nearest'
+      });
+    });
+
     let isFinishing = false;
 
     const finishRename = () => {
@@ -288,10 +340,9 @@ function addItems (result, basePath, currentBasePath) {
 
       if (newName && newName !== oldName) {
         const newPath = path.join(parentPath, newName);
-        const fs = require('node:fs');
 
         try {
-          fs.renameSync(decodeURIComponent(oldPath), newPath);
+          renameSync(decodeURIComponent(oldPath), newPath);
           // Refresh the view - this will rebuild the DOM with new names
           changePath();
         } catch (err) {
@@ -364,14 +415,13 @@ function addItems (result, basePath, currentBasePath) {
             customContextMenu.style.display = 'none';
 
             // Create a temporary new file in the folder
-            const fs = require('node:fs');
             const folderPath = decodeURIComponent(pth);
             const tempFileName = 'untitled.txt';
             const tempFilePath = path.join(folderPath, tempFileName);
 
             try {
               // Create empty file
-              fs.writeFileSync(tempFilePath, '');
+              writeFileSync(tempFilePath, '');
 
               // Refresh the view to show the new file
               changePath();
@@ -379,12 +429,14 @@ function addItems (result, basePath, currentBasePath) {
               // Wait for the view to refresh, then find and start renaming the new file
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                  const newFileElement = document.querySelector(
-                    `[data-path="${CSS.escape(path.join(folderPath, tempFileName))}"]`
-                  );
-                  if (newFileElement instanceof HTMLElement) {
-                    startRename(newFileElement);
-                  }
+                  requestAnimationFrame(() => {
+                    const newFileElement = $(
+                      `[data-path="${CSS.escape(path.join(folderPath, tempFileName))}"]`
+                    );
+                    if (newFileElement) {
+                      startRename(newFileElement);
+                    }
+                  });
                 });
               });
             } catch (err) {
@@ -402,10 +454,10 @@ function addItems (result, basePath, currentBasePath) {
           click () {
             customContextMenu.style.display = 'none';
             // Find the element with this path
-            const targetElement = document.querySelector(
+            const targetElement = $(
               `[data-path="${CSS.escape(pth)}"]`
             );
-            if (targetElement instanceof HTMLElement) {
+            if (targetElement) {
               startRename(targetElement);
             }
           }
@@ -960,6 +1012,29 @@ function addItems (result, basePath, currentBasePath) {
       shell.openPath(pth);
     }
 
+    // Cmd+Shift+N to create new folder
+    if (e.metaKey && e.shiftKey && e.key === 'n') {
+      e.preventDefault();
+
+      // Determine the folder path based on current selection
+      let folderPath = '/';
+      if (selectedLi.length) {
+        const anchor = selectedLi.find('a[title]');
+        if (anchor.length && anchor[0].dataset.path) {
+          // If selected item is a folder, create inside it
+          folderPath = decodeURIComponent(anchor[0].dataset.path);
+        } else {
+          // If selected item is a file, create in its parent folder
+          const span = selectedLi.find('span[title]');
+          if (span.length && span[0].dataset.path) {
+            folderPath = path.dirname(decodeURIComponent(span[0].dataset.path));
+          }
+        }
+      }
+
+      createNewFolder(folderPath);
+    }
+
     // Enter key to rename
     if (e.key === 'Enter' && selectedLi.length) {
       e.preventDefault();
@@ -968,6 +1043,87 @@ function addItems (result, basePath, currentBasePath) {
         startRename(textElement);
       }
     }
+  });
+
+  // Context menu for empty areas in column panes
+  $columns.on('contextmenu', (e) => {
+    const target = /** @type {HTMLElement} */ (e.target);
+
+    // Only show context menu if clicking on the ul.miller-column itself, not on items
+    if (!target.classList.contains('miller-column')) {
+      return;
+    }
+
+    e.preventDefault();
+
+    // Find which column was clicked and get its path
+    const columnElement = target;
+    const prevColumn = jQuery(columnElement).prevAll('ul.miller-column:not(.miller-collapse)').first();
+    const selectedInPrev = prevColumn.find('li.miller-selected');
+
+    let folderPath = '/';
+    if (selectedInPrev.length) {
+      const anchor = selectedInPrev.find('a[title]');
+      if (anchor.length && anchor[0].dataset.path) {
+        folderPath = decodeURIComponent(anchor[0].dataset.path);
+      }
+    }
+
+    const customContextMenu = jml('ul', {
+      class: 'context-menu',
+      style: {
+        left: e.pageX + 'px',
+        top: e.pageY + 'px'
+      }
+    }, [
+      ['li', {
+        class: 'context-menu-item',
+        $on: {
+          click () {
+            customContextMenu.style.display = 'none';
+            createNewFolder(folderPath);
+          }
+        }
+      }, [
+        'Create new folder'
+      ]]
+    ], document.body);
+
+    // Ensure main context menu is visible within viewport
+    requestAnimationFrame(() => {
+      const menuRect = customContextMenu.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      // Adjust horizontal position if needed
+      if (menuRect.right > viewportWidth) {
+        customContextMenu.style.left = (viewportWidth - menuRect.width - 10) + 'px';
+      }
+      if (menuRect.left < 0) {
+        customContextMenu.style.left = '10px';
+      }
+
+      // Adjust vertical position if needed
+      if (menuRect.bottom > viewportHeight) {
+        customContextMenu.style.top = (viewportHeight - menuRect.height - 10) + 'px';
+      }
+      if (menuRect.top < 0) {
+        customContextMenu.style.top = '10px';
+      }
+    });
+
+    // Hide the custom context menu when clicking anywhere else
+    const hideCustomContextMenu = () => {
+      customContextMenu.style.display = 'none';
+      document.removeEventListener('click', hideCustomContextMenu);
+      document.removeEventListener('contextmenu', hideCustomContextMenu);
+    };
+    document.addEventListener('click', hideCustomContextMenu, {
+      capture: true
+    });
+    document.addEventListener('contextmenu', hideCustomContextMenu, {
+      capture: true
+    });
   });
 
   if (currentBasePath !== '/') {
