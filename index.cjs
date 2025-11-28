@@ -319,22 +319,23 @@ function addItems (result, basePath, currentBasePath) {
       ]]
     ], document.body);
 
-    const targetElement = e.target;
+    // const targetElement = e.target;
 
     // Hide the custom context menu when clicking anywhere else
-    /**
-     * @param {MouseEvent} ev
-     */
-    const hideCustomContextMenu = (ev) => {
+    const hideCustomContextMenu = () => {
       // eslint-disable-next-line @stylistic/max-len -- Long
-      if (!customContextMenu.contains(/** @type {MouseEvent & {target: Node}} */ (ev).target) &&
-        ev.target !== targetElement
-      ) {
-        customContextMenu.style.display = 'none';
-        document.removeEventListener('click', hideCustomContextMenu);
-      }
+      // if (!customContextMenu.contains(/** @type {MouseEvent & {target: Node}} */ (ev).target) &&
+      //   ev.target !== targetElement
+      // ) {
+      customContextMenu.style.display = 'none';
+      document.removeEventListener('click', hideCustomContextMenu);
+      document.removeEventListener('contextmenu', hideCustomContextMenu);
+      // }
     };
     document.addEventListener('click', hideCustomContextMenu, {
+      capture: true
+    });
+    document.addEventListener('contextmenu', hideCustomContextMenu, {
       capture: true
     });
 
