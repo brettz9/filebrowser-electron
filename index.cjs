@@ -18,7 +18,7 @@ const jQuery = require('jquery');
 const addMillerColumnPlugin = require('miller-columns');
 const {getOpenWithApps, getAppIcons} = require('open-with-me');
 
-const getIconDataURLForFile = require('./utils/getIconDataURLForFile.cjs');
+const getIconDataURLForFile = require('./src/renderer/utils/getIconDataURLForFile.cjs');
 
 const stickyNotes = new StickyNote({
   colors: ['#fff740', '#ff7eb9', '#7afcff', '#feff9c', '#a7ffeb', '#c7ceea'],
