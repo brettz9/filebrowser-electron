@@ -1,5 +1,9 @@
 # CHANGES to filebrowser-electron
 
+## 0.6.0
+
+- feat: Open-With
+
 ## 0.5.1
 
 - fix: update miller-columns to avoid keyboard navigation issue; update system-icon2
