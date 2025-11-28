@@ -327,7 +327,9 @@ function addItems (result, basePath, currentBasePath) {
     document.addEventListener('click', hideCustomContextMenu);
 
     // Add functionality to submenu items
-    const submenu = customContextMenu.querySelector('.context-submenu');
+    const submenu = /** @type {HTMLElement|null} */ (
+      customContextMenu.querySelector('.context-submenu')
+    );
     if (submenu) {
       submenu.querySelectorAll('.context-menu-item').forEach((
         item, idx
@@ -361,6 +363,38 @@ function addItems (result, basePath, currentBasePath) {
           ]);
         });
       });
+
+      // Ensure submenu is visible horizontally by adjusting its position
+      // Use mouseenter to check when submenu becomes visible
+      const parentLi = submenu.parentElement;
+      if (parentLi) {
+        parentLi.addEventListener('mouseenter', () => {
+          requestAnimationFrame(() => {
+            const submenuRect = submenu.getBoundingClientRect();
+            const parentRect = parentLi.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+
+            // Reset any previous adjustments
+            submenu.style.left = '';
+            submenu.style.right = '';
+
+            // Check if submenu (opening to the right) would go off screen
+            const wouldOverflowRight = parentRect.right + submenuRect.width > viewportWidth;
+            const wouldOverflowLeft = parentRect.left - submenuRect.width < 0;
+
+            if (wouldOverflowRight && !wouldOverflowLeft) {
+              // Open to the left instead
+              submenu.style.left = 'auto';
+              submenu.style.right = '100%';
+            } else if (wouldOverflowRight && wouldOverflowLeft) {
+              // Can't fit either way, keep right but adjust parent menu
+              const mainMenuRect = customContextMenu.getBoundingClientRect();
+              const shift = submenuRect.right - viewportWidth + 20; // 20px padding
+              customContextMenu.style.left = (mainMenuRect.left - shift) + 'px';
+            }
+          });
+        });
+      }
     }
   };
 

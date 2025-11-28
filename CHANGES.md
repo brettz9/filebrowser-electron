@@ -3,6 +3,9 @@
 ## ?
 
 - fix: position fixes for context menu
+- fix: ensure context menu visible
+- fix: build issues
+- refactor: use ESM in main
 
 ## 0.6.0
 
