@@ -324,7 +324,9 @@ function addItems (result, basePath, currentBasePath) {
         document.removeEventListener('click', hideCustomContextMenu);
       }
     };
-    document.addEventListener('click', hideCustomContextMenu);
+    document.addEventListener('click', hideCustomContextMenu, {
+      capture: true
+    });
 
     // Add functionality to submenu items
     const submenu = /** @type {HTMLElement|null} */ (
