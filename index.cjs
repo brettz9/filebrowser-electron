@@ -5,7 +5,8 @@
 'use strict';
 
 const {
-  mkdirSync, readdirSync, writeFileSync, existsSync, renameSync, lstatSync, rmSync
+  mkdirSync, readdirSync, writeFileSync, existsSync, renameSync,
+  lstatSync, rmSync
 } = require('node:fs');
 const path = require('node:path');
 const {spawnSync} = require('node:child_process');
@@ -20,7 +21,8 @@ const jQuery = require('jquery');
 const addMillerColumnPlugin = require('miller-columns');
 const {getOpenWithApps, getAppIcons} = require('open-with-me');
 
-const getIconDataURLForFile = require('./src/renderer/utils/getIconDataURLForFile.cjs');
+const getIconDataURLForFile =
+  require('./src/renderer/utils/getIconDataURLForFile.cjs');
 
 const stickyNotes = new StickyNote({
   colors: ['#fff740', '#ff7eb9', '#7afcff', '#feff9c', '#a7ffeb', '#c7ceea'],
@@ -274,7 +276,8 @@ function addItems (result, basePath, currentBasePath) {
     }
 
     try {
-      // rmSync with recursive and force options to handle both files and directories
+      // rmSync with recursive and force options to handle both files
+      //   and directories
       rmSync(decodedPath, {recursive: true, force: true});
 
       // Refresh the view to reflect deletion
@@ -285,7 +288,7 @@ function addItems (result, basePath, currentBasePath) {
         isDeleting = false;
       }, 100);
     } catch (err) {
-      // eslint-disable-next-line no-console, no-alert -- User feedback
+      // eslint-disable-next-line no-alert -- User feedback
       alert('Failed to delete: ' + (/** @type {Error} */ (err)).message);
       isDeleting = false;
     }
@@ -296,7 +299,7 @@ function addItems (result, basePath, currentBasePath) {
    */
   const createNewFolder = (folderPath) => {
     // Find an available "untitled folder" name
-    let baseName = 'untitled folder';
+    const baseName = 'untitled folder';
     let newFolderName = baseName;
     let counter = 2;
 
@@ -314,11 +317,13 @@ function addItems (result, basePath, currentBasePath) {
       // Refresh the view to show the new folder
       changePath();
 
-      // Wait for the view to refresh, then find and start renaming the new folder
+      // Wait for the view to refresh, then find and start renaming
+      //   the new folder
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           // The data-path attribute uses encodeURIComponent for the folder name
-          const encodedPath = folderPath + '/' + encodeURIComponent(newFolderName);
+          const encodedPath = folderPath + '/' +
+            encodeURIComponent(newFolderName);
           const newFolderElement = $(
             `[data-path="${CSS.escape(encodedPath)}"]`
           );
@@ -328,7 +333,7 @@ function addItems (result, basePath, currentBasePath) {
         });
       });
     } catch (err) {
-      // eslint-disable-next-line no-console, no-alert -- User feedback
+      // eslint-disable-next-line no-alert -- User feedback
       alert('Failed to create folder: ' + (/** @type {Error} */ (err)).message);
     }
   };
@@ -360,7 +365,7 @@ function addItems (result, basePath, currentBasePath) {
     // Replace text with input
     const originalContent = textElement.textContent;
     textElement.textContent = '';
-    textElement.appendChild(input);
+    textElement.append(input);
     input.focus();
     input.select();
 
@@ -375,7 +380,9 @@ function addItems (result, basePath, currentBasePath) {
     let isFinishing = false;
 
     const finishRename = () => {
-      if (isFinishing) return;
+      if (isFinishing) {
+        return;
+      }
       isFinishing = true;
 
       const newName = input.value.trim();
@@ -388,7 +395,7 @@ function addItems (result, basePath, currentBasePath) {
           // Refresh the view - this will rebuild the DOM with new names
           changePath();
         } catch (err) {
-          // eslint-disable-next-line no-console, no-alert -- User feedback
+          // eslint-disable-next-line no-alert -- User feedback
           alert('Failed to rename: ' + (/** @type {Error} */ (err)).message);
           input.remove();
           textElement.textContent = originalContent;
@@ -461,8 +468,8 @@ function addItems (result, basePath, currentBasePath) {
             const folderPath = decodeURIComponent(pth);
 
             // Find an available "untitled.txt" name
-            let baseName = 'untitled';
-            let extension = '.txt';
+            const baseName = 'untitled';
+            const extension = '.txt';
             let tempFileName = baseName + extension;
             let counter = 2;
 
@@ -480,75 +487,86 @@ function addItems (result, basePath, currentBasePath) {
               // Refresh the view to show the new file
               changePath();
 
-              // Wait for the view to refresh, then find the folder and trigger it to load children
+              // Wait for the view to refresh, then find the folder and trigger
+              //   it to load children
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                   // Find the folder element (anchor tag with this path)
-                  const folderElement = Array.from(document.querySelectorAll('a[data-path]')).find(
-                    /** @type {(el: Element) => boolean} */ (el) =>
-                      /** @type {HTMLElement} */ (el).dataset.path === pth
+                  const folderElement = $$('a[data-path]').find(
+                    /** @type {(el: Element) => boolean} */ (
+                      el
+                    ) => /** @type {HTMLElement} */ (el).dataset.path === pth
                   );
 
                   if (folderElement && folderElement.parentElement) {
-                    // Trigger the folder to be selected so miller-columns builds its children
+                    // Trigger the folder to be selected so miller-columns
+                    //   builds its children
                     jQuery(folderElement.parentElement).trigger('click');
 
                     // Now wait for children to be built and find our file
                     const tryFindElement = (attempts = 0) => {
                       if (attempts > 20) {
                         // eslint-disable-next-line no-console -- Debugging
-                        console.log('Final attempt - all paths in DOM:',
-                          [...Array.from(document.querySelectorAll('span[data-path]')),
-                           ...Array.from(document.querySelectorAll('a[data-path]'))].map(
-                            /** @type {(el: Element) => string | undefined} */ (el) =>
-                              /** @type {HTMLElement} */ (el).dataset.path
-                          )
+                        console.log(
+                          'Could not find newly created file ' +
+                          'element after multiple attempts'
                         );
-                        // eslint-disable-next-line no-console, no-alert -- Debugging
-                        alert('Could not find newly created file element after multiple attempts');
                         return;
                       }
 
                       requestAnimationFrame(() => {
-                        // The data-path attribute uses: childDirectory + '/' + encodeURIComponent(title)
-                        // where childDirectory is the decoded path, so we need to decode pth first
+                        // The data-path attribute uses:
+                        //   childDirectory + '/' + encodeURIComponent(title)
+                        // where childDirectory is the decoded path, so we
+                        //   need to decode pth first
                         const decodedFolderPath = decodeURIComponent(pth);
-                        const encodedPath = decodedFolderPath + '/' + encodeURIComponent(tempFileName);
+                        const encodedPath = decodedFolderPath +
+                          '/' + encodeURIComponent(tempFileName);
 
                         if (attempts === 0) {
                           // eslint-disable-next-line no-console -- Debugging
                           console.log('Searching for path:', encodedPath);
-                        }                        // Check both span and a tags (files are span, folders are a)
+                        }
+                        // Check both span and a tags (files are span,
+                        //   folders are a)
                         const allElements = [
-                          ...Array.from(document.querySelectorAll('span[data-path]')),
-                          ...Array.from(document.querySelectorAll('a[data-path]'))
+                          ...$$('span[data-path]'),
+                          ...$$('a[data-path]')
                         ];
 
                         // Find by matching the data-path attribute directly
                         const newFileElement = allElements.find(
-                          /** @type {(el: Element) => boolean} */ (el) =>
-                            /** @type {HTMLElement} */ (el).dataset.path === encodedPath
+                          /** @type {(el: Element) => boolean} */ (
+                            el
+                          ) => /** @type {HTMLElement} */ (
+                            el
+                          ).dataset.path === encodedPath
                         );
 
                         if (newFileElement) {
                           // eslint-disable-next-line no-console -- Debugging
                           console.log('Found element on attempt', attempts + 1);
-                          startRename(/** @type {HTMLElement} */ (newFileElement));
+                          startRename(/** @type {HTMLElement} */ (
+                            newFileElement
+                          ));
                         } else {
                           // Try again
                           tryFindElement(attempts + 1);
                         }
                       });
-                    };                    tryFindElement();
+                    };
+                    tryFindElement();
                   } else {
-                    // eslint-disable-next-line no-console, no-alert -- Debugging
-                    alert('Could not find folder element to trigger');
+                    // eslint-disable-next-line no-console -- Debugging
+                    console.log('Could not find folder element to trigger');
                   }
                 });
               });
             } catch (err) {
-              // eslint-disable-next-line no-console, no-alert -- User feedback
-              alert('Failed to create file: ' + (/** @type {Error} */ (err)).message);
+              // eslint-disable-next-line no-alert -- User feedback
+              alert(
+                'Failed to create file: ' + (/** @type {Error} */ (err)).message
+              );
             }
           }
         }
@@ -594,7 +612,8 @@ function addItems (result, basePath, currentBasePath) {
 
       // Adjust horizontal position if needed
       if (menuRect.right > viewportWidth) {
-        customContextMenu.style.left = (viewportWidth - menuRect.width - 10) + 'px';
+        customContextMenu.style.left =
+          (viewportWidth - menuRect.width - 10) + 'px';
       }
       if (menuRect.left < 0) {
         customContextMenu.style.left = '10px';
@@ -602,7 +621,8 @@ function addItems (result, basePath, currentBasePath) {
 
       // Adjust vertical position if needed
       if (menuRect.bottom > viewportHeight) {
-        customContextMenu.style.top = (viewportHeight - menuRect.height - 10) + 'px';
+        customContextMenu.style.top =
+          (viewportHeight - menuRect.height - 10) + 'px';
       }
       if (menuRect.top < 0) {
         customContextMenu.style.top = '10px';
@@ -733,7 +753,8 @@ function addItems (result, basePath, currentBasePath) {
 
       // Adjust horizontal position if needed
       if (menuRect.right > viewportWidth) {
-        customContextMenu.style.left = (viewportWidth - menuRect.width - 10) + 'px';
+        customContextMenu.style.left =
+          (viewportWidth - menuRect.width - 10) + 'px';
       }
       if (menuRect.left < 0) {
         customContextMenu.style.left = '10px';
@@ -741,7 +762,8 @@ function addItems (result, basePath, currentBasePath) {
 
       // Adjust vertical position if needed
       if (menuRect.bottom > viewportHeight) {
-        customContextMenu.style.top = (viewportHeight - menuRect.height - 10) + 'px';
+        customContextMenu.style.top =
+          (viewportHeight - menuRect.height - 10) + 'px';
       }
       if (menuRect.top < 0) {
         customContextMenu.style.top = '10px';
@@ -817,12 +839,14 @@ function addItems (result, basePath, currentBasePath) {
             const viewportWidth = window.innerWidth;
             const viewportHeight = window.innerHeight;
 
-            // Check if submenu actually overflows (is already visible but cut off)
+            // Check if submenu actually overflows (is already
+            //   visible but cut off)
             const actuallyOverflowsRight = submenuRect.right > viewportWidth;
             const actuallyOverflowsBottom = submenuRect.bottom > viewportHeight;
             const actuallyOverflowsTop = submenuRect.top < 0;
 
-            // Handle horizontal overflow - only reposition submenu, never main menu
+            // Handle horizontal overflow - only reposition submenu,
+            //   never main menu
             if (actuallyOverflowsRight) {
               const parentRect = parentLi.getBoundingClientRect();
               const wouldFitOnLeft = parentRect.left - submenuRect.width >= 0;
@@ -838,7 +862,8 @@ function addItems (result, basePath, currentBasePath) {
               }
             }
 
-            // Handle vertical overflow - only reposition submenu, never main menu
+            // Handle vertical overflow - only reposition submenu,
+            //   never main menu
             if (actuallyOverflowsTop) {
               // Submenu is cut off at the top, position it at viewport top
               submenu.style.position = 'fixed';
@@ -1185,9 +1210,11 @@ function addItems (result, basePath, currentBasePath) {
 
   // Context menu for empty areas in column panes
   $columns.on('contextmenu', (e) => {
+    // eslint-disable-next-line prefer-destructuring -- TS
     const target = /** @type {HTMLElement} */ (e.target);
 
-    // Only show context menu if clicking on the ul.miller-column itself, not on items
+    // Only show context menu if clicking on the ul.miller-column
+    //   itself, not on items
     if (!target.classList.contains('miller-column')) {
       return;
     }
@@ -1196,7 +1223,9 @@ function addItems (result, basePath, currentBasePath) {
 
     // Find which column was clicked and get its path
     const columnElement = target;
-    const prevColumn = jQuery(columnElement).prevAll('ul.miller-column:not(.miller-collapse)').first();
+    const prevColumn = jQuery(columnElement).prevAll(
+      'ul.miller-column:not(.miller-collapse)'
+    ).first();
     const selectedInPrev = prevColumn.find('li.miller-selected');
 
     let folderPath = '/';
@@ -1235,7 +1264,8 @@ function addItems (result, basePath, currentBasePath) {
 
       // Adjust horizontal position if needed
       if (menuRect.right > viewportWidth) {
-        customContextMenu.style.left = (viewportWidth - menuRect.width - 10) + 'px';
+        customContextMenu.style.left =
+          (viewportWidth - menuRect.width - 10) + 'px';
       }
       if (menuRect.left < 0) {
         customContextMenu.style.left = '10px';
@@ -1243,7 +1273,8 @@ function addItems (result, basePath, currentBasePath) {
 
       // Adjust vertical position if needed
       if (menuRect.bottom > viewportHeight) {
-        customContextMenu.style.top = (viewportHeight - menuRect.height - 10) + 'px';
+        customContextMenu.style.top =
+          (viewportHeight - menuRect.height - 10) + 'px';
       }
       if (menuRect.top < 0) {
         customContextMenu.style.top = '10px';
@@ -1296,7 +1327,8 @@ function addItems (result, basePath, currentBasePath) {
     );
   }
 
-  // Ensure the miller-columns container is focusable and focused for keyboard navigation
+  // Ensure the miller-columns container is focusable and
+  //   focused for keyboard navigation
   if (view === 'three-columns') {
     requestAnimationFrame(() => {
       const millerColumnsDiv = $('div.miller-columns');
@@ -1387,7 +1419,6 @@ Click "Create global sticky" to create more notes.`,
   });
 });
 
-// eslint-disable-next-line unicorn/prefer-top-level-await -- Not ESM
 (async () => {
 await addMillerColumnPlugin.default(jQuery, {stylesheets: ['@default']});
 changePath();
