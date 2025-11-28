@@ -3,7 +3,8 @@
 ## 0.7.0 (unreleased)
 
 - feat: context menu regular Open
-- feat: hit Enter to rename files or folders
+- feat: "Open in Finder" for folders
+- feat: hit Enter or use context menu to rename files or folders
 - fix: allow keyboard navigation on columns upon load
 - fix: position fixes for context menu
 - fix: disable context menu more actively

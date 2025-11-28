@@ -351,6 +351,16 @@ function addItems (result, basePath, currentBasePath) {
         class: 'context-menu-item',
         $on: {
           click () {
+            shell.openPath(pth);
+          }
+        }
+      }, [
+        'Open in Finder'
+      ]],
+      ['li', {
+        class: 'context-menu-item',
+        $on: {
+          click () {
             customContextMenu.style.display = 'none';
             // Find the element with this path
             const targetElement = document.querySelector(
