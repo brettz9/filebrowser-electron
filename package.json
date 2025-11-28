@@ -41,7 +41,7 @@
     "jsdom": "^27.2.0",
     "load-stylesheets": "^0.13.0",
     "miller-columns": "0.13.2",
-    "open-with-me": "^0.4.0",
+    "open-with-me": "^0.4.1",
     "stickynote": "^0.6.2",
     "system-icon2": "^0.5.1"
   },

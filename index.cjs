@@ -258,7 +258,9 @@ function addItems (result, basePath, currentBasePath) {
     }
     /** @type {import('open-with-me').OpenWithApp & {image?: string}} */
     let defaultApp = {name: '', path: '', rank: '', image: ''};
-    const appsOrig = await getOpenWithApps(pth);
+    const appsOrig = await getOpenWithApps(pth, {
+      maxResults: 10
+    });
     const icons = await getAppIcons(appsOrig);
 
     // Add icons to apps before filtering

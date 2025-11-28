@@ -7,6 +7,7 @@
 - fix: disable context menu more actively
 - fix: ensure context menu visible
 - fix: build issues
+- fix: max results
 - refactor: use ESM in main
 
 ## 0.6.0
