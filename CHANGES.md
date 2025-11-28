@@ -3,8 +3,8 @@
 ## 0.7.0
 
 - feat: create new folder
-- feat: delete file or folder
 - feat: create text file within a folder
+- feat: delete file or folder
 - feat: "Open in Finder" for folders
 - feat: context menu regular Open
 - feat: hit Enter or use context menu to rename files or folders
