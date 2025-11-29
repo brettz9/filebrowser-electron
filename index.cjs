@@ -6,7 +6,7 @@
 
 const {
   mkdirSync, readdirSync, writeFileSync, existsSync, renameSync,
-  lstatSync, rmSync
+  lstatSync, rmSync, watch
 } = require('node:fs');
 const path = require('node:path');
 const {spawnSync} = require('node:child_process');
@@ -225,9 +225,7 @@ function setupFileWatcher (dirPath) {
   // Don't watch root directory
   if (dirPath === '/') {
     return;
-  }
-
-  // Don't recreate watcher if already watching this path
+  }  // Don't recreate watcher if already watching this path
   if (currentWatcher && currentWatchedPath === dirPath) {
     return;
   }
@@ -249,7 +247,7 @@ function setupFileWatcher (dirPath) {
 
   try {
     currentWatcher = chokidar.watch(dirPath, {
-      persistent: false,
+      persistent: true, // Keep watcher alive
       ignoreInitial: true,
       depth: 1, // Watch direct children and one level deep
       ignored: [
@@ -461,11 +459,108 @@ function setupFileWatcher (dirPath) {
 }
 
 /**
+ * Setup a simple native fs.watch watcher as fallback.
+ * Used after folder operations to avoid chokidar freeze.
+ *
+ * @param {string} dirPath
+ * @returns {void}
+ */
+function setupNativeWatcher (dirPath) {
+  if (dirPath === '/') {
+    return;
+  }
+
+  try {
+    // Close existing chokidar watcher if any
+    if (currentWatcher) {
+      currentWatcher.close();
+      currentWatcher = null;
+    }
+
+    let debounceTimer = /** @type {NodeJS.Timeout | null} */ (null);
+
+    // Use native fs.watch which doesn't freeze
+    // Only watch the directory itself, not subdirectories (recursive: false)
+    const nativeWatcher = watch(dirPath, {recursive: false}, () => {
+      // Debounce to avoid multiple rapid refreshes
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+
+      debounceTimer = setTimeout(() => {
+        // On any change, refresh the view
+        if (!isDeleting && !isCreating) {
+          // Save the currently selected item before refresh
+          const selectedItem = $('li.miller-selected a');
+          const selectedPath = selectedItem
+            ? /** @type {HTMLElement} */ (selectedItem).dataset.path
+            : null;
+
+          // Set flag to prevent watcher recreation
+          isRefreshing = true;
+
+          // Refresh the view
+          changePath();
+
+          // Clear flag after refresh
+          isRefreshing = false;
+
+          // Restore selection after refresh
+          if (selectedPath) {
+            setTimeout(() => {
+              const itemElement = $(
+                `[data-path="${CSS.escape(selectedPath)}"]`
+              );
+              if (itemElement) {
+                const li = itemElement.closest('li');
+                if (li) {
+                // Remove selection from all items
+                  $$('.miller-selected').
+                    forEach((el) => {
+                      el.classList.remove('miller-selected');
+                    });
+                  // Select the item
+                  li.classList.add('miller-selected');
+
+                  // Scroll into view - need to scroll the parent ul container
+                  // eslint-disable-next-line no-console -- Debugging
+                  console.log('Scrolling selected item into view');
+                  const parentUl = li.closest('ul');
+                  if (parentUl) {
+                  // Scroll the li within its parent container
+                    // Scroll into view
+                    li.scrollIntoView({
+                      block: 'center',
+                      inline: 'nearest'
+                    });
+
+                    // Also set focus for keyboard navigation
+                    parentUl.setAttribute('tabindex', '0');
+                    parentUl.focus();
+                  }
+                }
+              }
+            }, 150);
+          }
+        }
+      }, 100); // Debounce delay
+    });
+
+    // Store reference (though it's not a chokidar watcher)
+    // @ts-ignore - Store native watcher temporarily
+    currentWatcher = nativeWatcher;
+    currentWatchedPath = dirPath;
+  } catch (err) {
+    // eslint-disable-next-line no-console -- Debugging
+    console.warn('Could not set up native watcher:', err);
+  }
+}
+
+/**
  *
  * @returns {void}
  */
 function changePath () {
-  // console.log('change path');
   const view = localStorage.getItem('view') ?? 'icon-view';
   const currentBasePath = getBasePath();
   const basePath = view === 'icon-view' ? currentBasePath : '/';
@@ -481,6 +576,12 @@ function changePath () {
 
   // Setup watcher for the current directory being viewed
   // (not basePath which could be / in list view)
+  // During folder creation, skip entirely - the watcher stays alive
+  // and will detect changes after isCreating becomes false
+  if (isCreating) {
+    return;
+  }
+
   setupFileWatcher(currentBasePath);
 }
 
@@ -583,34 +684,57 @@ function addItems (result, basePath, currentBasePath) {
     const newFolderPath = path.join(folderPath, newFolderName);
 
     try {
+      // Don't close the watcher - just let it detect the change
+      // The isCreating flag will prevent it from refreshing the view
+
       // Create the directory
       mkdirSync(newFolderPath);
 
       // Refresh the view to show the new folder
+      // Watcher setup will be skipped due to isCreating flag
       changePath();
 
       // Wait for the view to refresh, then find and start renaming
-      //   the new folder
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          // The data-path attribute uses encodeURIComponent for the folder name
-          const encodedPath = folderPath + '/' +
-            encodeURIComponent(newFolderName);
-          const newFolderElement = $(
-            `[data-path="${CSS.escape(encodedPath)}"]`
-          );
-          if (newFolderElement) {
-            startRename(newFolderElement, () => {
-              // Clear flag after rename completes
-              isCreating = false;
-            });
-          } else {
-            // eslint-disable-next-line no-console -- Debugging
-            console.warn('Could not find new folder element');
+      // Use setTimeout instead of nested requestAnimationFrame to avoid freeze
+      setTimeout(() => {
+        // The data-path attribute uses encodeURIComponent for the folder name
+        const encodedPath = folderPath + '/' +
+          encodeURIComponent(newFolderName);
+        const newFolderElement = $(
+          `[data-path="${CSS.escape(encodedPath)}"]`
+        );
+        if (newFolderElement) {
+          startRename(newFolderElement, () => {
+            // Clear flag after rename completes
             isCreating = false;
-          }
-        });
-      });
+
+            // Use native fs.watch instead of chokidar to avoid freeze
+            const currentDir = getBasePath();
+            if (currentDir !== '/') {
+              setupNativeWatcher(currentDir);
+            }
+          });
+
+          // Scroll the folder into view after a delay to avoid freeze
+          setTimeout(() => {
+            const inputElement = newFolderElement.querySelector('input');
+            if (inputElement) {
+              inputElement.scrollIntoView({
+                behavior: 'instant',
+                block: 'center'
+              });
+
+              // Focus immediately after instant scroll
+              inputElement.focus();
+              inputElement.select();
+            }
+          }, 100);
+        } else {
+          // eslint-disable-next-line no-console -- Debugging
+          console.warn('Could not find new folder element');
+          isCreating = false;
+        }
+      }, 50);
     } catch (err) {
       isCreating = false;
       // eslint-disable-next-line no-alert -- User feedback
@@ -650,21 +774,18 @@ function addItems (result, basePath, currentBasePath) {
     input.value = oldName;
     input.style.width = '100%';
     input.style.boxSizing = 'border-box';
+    input.style.position = 'relative';
+    input.style.zIndex = '9999'; // Above sticky headers
+    input.style.padding = '2px 4px';
+    input.style.border = '1px solid #ccc';
+    input.style.borderRadius = '2px';
+    input.style.backgroundColor = 'white';
+    input.style.color = 'black';
 
     // Replace text with input
     const originalContent = textElement.textContent;
     textElement.textContent = '';
     textElement.append(input);
-    input.focus();
-    input.select();
-
-    // Scroll the input into view
-    requestAnimationFrame(() => {
-      textElement.scrollIntoView({
-        block: 'nearest',
-        inline: 'nearest'
-      });
-    });
 
     let isFinishing = false;
 
@@ -729,8 +850,12 @@ function addItems (result, basePath, currentBasePath) {
 
             // Call completion callback after everything is done
             if (onComplete) {
-              // Delay clearing the flag to ensure watcher timeout has passed
               setTimeout(onComplete, 250);
+            } else {
+              // If no callback, just clear the flag after a delay
+              setTimeout(() => {
+                isCreating = false;
+              }, 250);
             }
           }, 100);
         } catch (err) {
@@ -801,6 +926,7 @@ function addItems (result, basePath, currentBasePath) {
     };
 
     input.addEventListener('blur', finishRename);
+
     input.addEventListener('keydown', (ev) => {
       // Stop propagation to prevent miller-columns from handling these events
       ev.stopPropagation();
