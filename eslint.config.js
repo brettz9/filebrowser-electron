@@ -6,14 +6,14 @@ export default [
       'dist'
     ]
   },
-  ...ashNazg(['sauron', 'browser', 'node', 'script']),
-  ...ashNazg(['sauron', 'node']).map((cfg) => {
+  ...ashNazg(['sauron', 'browser', 'node']),
+  ...ashNazg(['sauron', 'node', 'script']).map((cfg) => {
     return {
       ...cfg,
-      files: ['*.mjs'],
+      files: ['**/*.cjs'],
       languageOptions: {
-        sourceType: 'module'
-      },
+        sourceType: 'script'
+      }
     };
   }),
   {

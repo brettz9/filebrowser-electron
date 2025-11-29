@@ -13,7 +13,7 @@
   "scripts": {
     "tsc": "tsc",
     "lint": "npm run eslint --",
-    "eslint": "eslint --ext=js,html,md .",
+    "eslint": "eslint --ext=js,cjs,html,md .",
     "test": "npm run eslint --",
     "postinstall": "./rebuild.sh",
     "rebuild": "./rebuild.sh",

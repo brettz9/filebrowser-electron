@@ -1,6 +1,6 @@
 // Modules to control application life and create native browser window
 // eslint-disable-next-line @stylistic/max-len -- Long
-// eslint-disable-next-line n/no-unpublished-require -- electron-forge requires electron as devDep.
+// eslint-disable-next-line n/no-unpublished-import -- electron-forge requires electron as devDep.
 import {app, BrowserWindow} from 'electron';
 
 // Keep a global reference of the window object, if you don't, the window will
