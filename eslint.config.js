@@ -3,7 +3,9 @@ import ashNazg from 'eslint-config-ash-nazg';
 export default [
   {
     ignores: [
-      'dist'
+      'dist',
+      'instrumented',
+      'coverage'
     ]
   },
   ...ashNazg(['sauron', 'browser', 'node']),

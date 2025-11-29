@@ -12,9 +12,14 @@
   ],
   "scripts": {
     "tsc": "tsc",
+    "instrument:src": "NODE_ENV=test babel ./src --out-dir ./instrumented/src --source-maps",
+    "instrument:index": "NODE_ENV=test babel index.cjs --out-dir ./instrumented --source-maps",
+    "instrument": "npm run instrument:src && npm run instrument:index",
     "lint": "npm run eslint --",
     "eslint": "eslint --ext=js,cjs,html,md .",
-    "test": "npm run eslint --",
+    "report": "c8 report",
+    "c8": "c8 playwright test --config test/playwright.config.js",
+    "test": "npm run instrument && npm run c8",
     "postinstall": "./rebuild.sh",
     "rebuild": "./rebuild.sh",
     "start": "electron-forge start --",
@@ -47,6 +52,8 @@
     "system-icon2": "^0.5.1"
   },
   "devDependencies": {
+    "@babel/cli": "^7.28.3",
+    "@babel/core": "^7.28.5",
     "@electron-forge/cli": "^7.10.2",
     "@electron-forge/maker-deb": "^7.10.2",
     "@electron-forge/maker-rpm": "^7.10.2",
@@ -56,11 +63,16 @@
     "@electron-forge/plugin-fuses": "^7.10.2",
     "@electron/fuses": "^1.8.0",
     "@electron/rebuild": "^4.0.1",
+    "@playwright/test": "^1.57.0",
     "@types/jquery": "^3.5.33",
     "@types/jsdom": "^27.0.0",
+    "babel-plugin-istanbul": "^7.0.1",
+    "c8": "^10.1.3",
     "electron": "^39.2.4",
     "eslint": "^9.39.1",
     "eslint-config-ash-nazg": "^39.8.0",
+    "playwright": "^1.57.0",
+    "playwright-test-coverage": "^1.2.12",
     "typescript": "^5.9.3"
   }
 }

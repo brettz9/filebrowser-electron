@@ -1,4 +1,7 @@
 ignore
 forge.config.js
 out
+instrumented
+coverage
 eslint.config.js
+test
