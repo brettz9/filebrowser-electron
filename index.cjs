@@ -6,7 +6,7 @@
 
 const {
   mkdirSync, readdirSync, writeFileSync, existsSync, renameSync,
-  lstatSync, rmSync, watch
+  lstatSync, rmSync
 } = require('node:fs');
 const path = require('node:path');
 const {spawnSync} = require('node:child_process');
@@ -20,7 +20,7 @@ const {jml} = require('jamilih');
 const jQuery = require('jquery');
 const addMillerColumnPlugin = require('miller-columns');
 const {getOpenWithApps, getAppIcons} = require('open-with-me');
-const chokidar = require('chokidar');
+const parcelWatcher = require('@parcel/watcher');
 
 const getIconDataURLForFile =
   require('./src/renderer/utils/getIconDataURLForFile.cjs');
@@ -212,6 +212,7 @@ function readDirectory (basePath) {
 
 /**
  * Setup file system watcher for a directory.
+ * Now uses parcel watcher exclusively.
  *
  * @param {string} dirPath
  * @returns {void}
@@ -225,134 +226,107 @@ function setupFileWatcher (dirPath) {
   // Don't watch root directory
   if (dirPath === '/') {
     return;
-  }  // Don't recreate watcher if already watching this path
+  }
+
+  // Don't recreate watcher if already watching this path
   if (currentWatcher && currentWatchedPath === dirPath) {
     return;
   }
 
-  // Close existing watcher
+  // Use parcel watcher for all cases
+  setupNativeWatcher(dirPath);
+}
+
+/**
+ * Setup a parcel/watcher as fallback.
+ * Used after folder operations to avoid chokidar freeze.
+ *
+ * @param {string} dirPath
+ * @returns {Promise<void>}
+ */
+async function setupNativeWatcher (dirPath) {
+  if (dirPath === '/') {
+    return;
+  }
+
+  // Close existing watcher if any
   if (currentWatcher) {
-    currentWatcher.close();
+    await currentWatcher.unsubscribe();
     currentWatcher = null;
-    currentWatchedPath = null;
   }
 
-  // Clear any pending timeout
-  if (watcherTimeout) {
-    clearTimeout(watcherTimeout);
-    watcherTimeout = null;
-  }
-
-  currentWatchedPath = dirPath;
+  let debounceTimer = /** @type {NodeJS.Timeout | null} */ (null);
 
   try {
-    currentWatcher = chokidar.watch(dirPath, {
-      persistent: true, // Keep watcher alive
-      ignoreInitial: true,
-      depth: 1, // Watch direct children and one level deep
-      ignored: [
-        '**/.DS_Store',
-        '**/Thumbs.db',
-        '**/.git',
-        '**/node_modules',
-        '**/.Trash',
-        '**/.Trash-*',
-        '**/.pm2',
-        '**/.*' // Ignore all hidden files/folders
-      ],
-      ignorePermissionErrors: true
-    });
-
-    const handleChange = (/** @type {string} */ eventPath) => {
-      // eslint-disable-next-line no-console -- Debugging
-      console.log('File change detected:', eventPath);
-
-      // Debounce multiple rapid changes
-      if (watcherTimeout) {
-        clearTimeout(watcherTimeout);
-      }
-
-      watcherTimeout = setTimeout(() => {
-        // eslint-disable-next-line no-console -- Debugging
-        console.log('Watcher timeout fired. isDeleting:', isDeleting,
-          'isCreating:', isCreating);
-
-        // Only refresh if not currently deleting or creating
-        if (!isDeleting && !isCreating) {
-          const currentBasePath = getBasePath();
-
+    // Use @parcel/watcher which is more efficient and tracks subdirectories
+    const subscription = await parcelWatcher.subscribe(
+      dirPath,
+      (err, events) => {
+        if (err) {
           // eslint-disable-next-line no-console -- Debugging
-          console.log('Comparing paths - current:', currentBasePath,
-            'watched:', currentWatchedPath);
+          console.error('Parcel watcher error:', err);
+          return;
+        }
 
-          // Normalize paths by removing trailing slashes for comparison
-          const normalizedCurrent = currentBasePath.replace(/\/+$/v, '');
-          const normalizedWatched =
-            currentWatchedPath?.replace(/\/+$/v, '') ?? '';
+        // Filter events to include direct children and first-level
+        // subdirectories (depth 0 and depth 1 only)
+        const relevantEvents = events.filter((evt) => {
+          const relativePath = evt.path.slice(dirPath.length + 1);
+          // Count slashes to determine depth
+          const slashCount = (relativePath.match(/\//gv) || []).length;
+          // Include depth 0 (direct children) and depth 1
+          // (files in direct child folders)
+          return slashCount <= 1;
+        });
 
-          // Refresh if we're viewing the watched directory or any of its
-          // children (in case a parent folder was deleted)
-          if (normalizedCurrent === normalizedWatched ||
-              normalizedCurrent.startsWith(normalizedWatched + '/')) {
-            // eslint-disable-next-line no-console -- Debugging
-            console.log('Refreshing view for:', currentBasePath);
+        // Skip if no relevant events
+        if (relevantEvents.length === 0) {
+          return;
+        }
 
-            // If we're in a subdirectory of the watched path, navigate back
-            // to the watched directory
-            if (normalizedCurrent.startsWith(normalizedWatched + '/')) {
-              // Save the folder we were viewing so we can select it after
-              // navigating back
-              const childFolderName = normalizedCurrent.slice(
-                normalizedWatched.length + 1
-              ).split('/')[0];
-              const childFolderPath = normalizedWatched + '/' +
-                childFolderName;
 
-              // Navigate back to the parent directory
-              location.hash = '#path=' + encodeURIComponent(
-                currentWatchedPath ?? normalizedWatched
-              );
+        // Check if any event is in a selected folder (depth 1 change)
+        const selectedItem = $('li.miller-selected a');
+        const selectedPath = selectedItem
+          ? /** @type {HTMLElement} */ (selectedItem).dataset.path
+          : null;
 
-              // After navigation, select and expand the folder we were in
-              setTimeout(() => {
-                const folderElement = $(
-                  `[data-path="${CSS.escape(childFolderPath)}"]`
-                );
-                if (folderElement) {
-                  const li = folderElement.closest('li');
-                  if (li) {
-                    // Remove selection from all items
-                    $$('.miller-selected').
-                      forEach((el) => {
-                        el.classList.remove('miller-selected');
-                      });
-                    // Select the folder
-                    li.classList.add('miller-selected');
 
-                    // Trigger it to load children
-                    jQuery(li).trigger('click');
-
-                    // Focus for keyboard navigation
-                    const parentUl = li.closest('ul');
-                    if (parentUl) {
-                      parentUl.setAttribute('tabindex', '0');
-                      parentUl.focus();
-                    }
-                  }
-                }
-              }, 100);
-
-              // Don't continue with refresh here - hashchange event will
-              // trigger changePath()
-              return;
+        const changeInSelectedFolder = selectedPath &&
+          relevantEvents.some((evt) => {
+            // Remove the dirPath prefix properly
+            let relativePath = evt.path;
+            if (relativePath.startsWith(dirPath)) {
+              relativePath = relativePath.slice(dirPath.length);
+              // Remove leading slash if present
+              if (relativePath.startsWith('/')) {
+                relativePath = relativePath.slice(1);
+              }
             }
 
-            // Save the currently selected item before refresh
-            const selectedItem = $('li.miller-selected a');
-            const selectedPath = selectedItem
-              ? /** @type {HTMLElement} */ (selectedItem).dataset.path
-              : null;
 
+            const slashCount = (relativePath.match(/\//gv) || []).length;
+            // Check if this is a depth-1 change (file in a subfolder)
+            if (slashCount === 1) {
+              // Get the folder name from the path
+              const folderName = relativePath.split('/')[0];
+              const folderPath = path.join(dirPath, folderName);
+
+              // Check if this matches the selected folder
+              return decodeURIComponent(selectedPath) === folderPath;
+            }
+            return false;
+          });
+
+
+        // Debounce to avoid multiple rapid refreshes
+        if (debounceTimer) {
+          clearTimeout(debounceTimer);
+        }
+
+        debounceTimer = setTimeout(() => {
+          // On any change, refresh the view
+          if (!isDeleting && !isCreating) {
             // Set flag to prevent watcher recreation
             isRefreshing = true;
 
@@ -379,15 +353,19 @@ function setupFileWatcher (dirPath) {
                     // Select the item
                     li.classList.add('miller-selected');
 
-                    // If this is a folder (has an <a> tag), trigger it to
-                    // reload its children
-                    const anchor = li.querySelector('a');
-                    if (anchor) {
-                      // Trigger miller-columns to reload children
+                    // Scroll into view
+                    li.scrollIntoView({
+                      block: 'center',
+                      inline: 'nearest'
+                    });
+
+                    // If change was in the selected folder, trigger click
+                    // to reload its contents
+                    if (changeInSelectedFolder) {
                       jQuery(li).trigger('click');
                     }
 
-                    // Focus the parent ul to enable keyboard navigation
+                    // Also set focus for keyboard navigation
                     const parentUl = li.closest('ul');
                     if (parentUl) {
                       parentUl.setAttribute('tabindex', '0');
@@ -395,164 +373,20 @@ function setupFileWatcher (dirPath) {
                     }
                   }
                 }
-              }, 100);
+              }, 150);
             }
-          } else {
-            // eslint-disable-next-line no-console -- Debugging
-            console.log('Not refreshing - path mismatch');
           }
-        } else {
-          // eslint-disable-next-line no-console -- Debugging
-          console.log('Skipping refresh due to isDeleting or isCreating');
-        }
-      }, 300);
-    };
-
-    currentWatcher.
-      on('add', (filePath) => {
-        // eslint-disable-next-line no-console -- Debugging
-        console.log('add event:', filePath);
-        handleChange(filePath);
-      }).
-      on('unlink', (filePath) => {
-        // eslint-disable-next-line no-console -- Debugging
-        console.log('unlink event:', filePath);
-        handleChange(filePath);
-      }).
-      on('addDir', (dir) => {
-        // eslint-disable-next-line no-console -- Debugging
-        console.log('addDir event:', dir);
-        handleChange(dir);
-      }).
-      on('unlinkDir', (dir) => {
-        // eslint-disable-next-line no-console -- Debugging
-        console.log('unlinkDir event:', dir);
-        handleChange(dir);
-      }).
-      on('ready', () => {
-        // eslint-disable-next-line no-console -- Debugging
-        console.log('Watcher ready');
-      }).
-      on('error', (/** @type {unknown} */ error) => {
-        const err = /** @type {Error & {code?: string, path?: string}} */ (
-          error
-        );
-        // Silently ignore permission and socket errors for system files
-        if (err.code === 'EPERM' || err.code === 'EACCES' ||
-            err.code === 'UNKNOWN') {
-          // Check if it's a system file/directory we should ignore
-          if (err.path &&
-              (err.path.includes('.Trash') ||
-               err.path.includes('.pm2') ||
-               err.path.includes('/.') ||
-               err.path.endsWith('.sock'))) {
-            return; // Silently ignore
-          }
-        }
-        // eslint-disable-next-line no-console -- Debugging
-        console.error('Watcher error:', error);
-      });
-  } catch (err) {
-    // eslint-disable-next-line no-console -- Debugging
-    console.warn('Could not watch directory:', dirPath, err);
-  }
-}
-
-/**
- * Setup a simple native fs.watch watcher as fallback.
- * Used after folder operations to avoid chokidar freeze.
- *
- * @param {string} dirPath
- * @returns {void}
- */
-function setupNativeWatcher (dirPath) {
-  if (dirPath === '/') {
-    return;
-  }
-
-  try {
-    // Close existing chokidar watcher if any
-    if (currentWatcher) {
-      currentWatcher.close();
-      currentWatcher = null;
-    }
-
-    let debounceTimer = /** @type {NodeJS.Timeout | null} */ (null);
-
-    // Use native fs.watch which doesn't freeze
-    // Only watch the directory itself, not subdirectories (recursive: false)
-    const nativeWatcher = watch(dirPath, {recursive: false}, () => {
-      // Debounce to avoid multiple rapid refreshes
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
+        }, 100); // Debounce delay
       }
+    );
 
-      debounceTimer = setTimeout(() => {
-        // On any change, refresh the view
-        if (!isDeleting && !isCreating) {
-          // Save the currently selected item before refresh
-          const selectedItem = $('li.miller-selected a');
-          const selectedPath = selectedItem
-            ? /** @type {HTMLElement} */ (selectedItem).dataset.path
-            : null;
-
-          // Set flag to prevent watcher recreation
-          isRefreshing = true;
-
-          // Refresh the view
-          changePath();
-
-          // Clear flag after refresh
-          isRefreshing = false;
-
-          // Restore selection after refresh
-          if (selectedPath) {
-            setTimeout(() => {
-              const itemElement = $(
-                `[data-path="${CSS.escape(selectedPath)}"]`
-              );
-              if (itemElement) {
-                const li = itemElement.closest('li');
-                if (li) {
-                // Remove selection from all items
-                  $$('.miller-selected').
-                    forEach((el) => {
-                      el.classList.remove('miller-selected');
-                    });
-                  // Select the item
-                  li.classList.add('miller-selected');
-
-                  // Scroll into view - need to scroll the parent ul container
-                  // eslint-disable-next-line no-console -- Debugging
-                  console.log('Scrolling selected item into view');
-                  const parentUl = li.closest('ul');
-                  if (parentUl) {
-                  // Scroll the li within its parent container
-                    // Scroll into view
-                    li.scrollIntoView({
-                      block: 'center',
-                      inline: 'nearest'
-                    });
-
-                    // Also set focus for keyboard navigation
-                    parentUl.setAttribute('tabindex', '0');
-                    parentUl.focus();
-                  }
-                }
-              }
-            }, 150);
-          }
-        }
-      }, 100); // Debounce delay
-    });
-
-    // Store reference (though it's not a chokidar watcher)
-    // @ts-ignore - Store native watcher temporarily
-    currentWatcher = nativeWatcher;
+    // Store the subscription
+    // @ts-ignore - Store parcel watcher subscription
+    currentWatcher = subscription;
     currentWatchedPath = dirPath;
   } catch (err) {
     // eslint-disable-next-line no-console -- Debugging
-    console.warn('Could not set up native watcher:', err);
+    console.warn('Could not set up parcel watcher:', err);
   }
 }
 
@@ -595,10 +429,8 @@ let isDeleting = false;
 let isCreating = false;
 let isRefreshing = false;
 // eslint-disable-next-line jsdoc/imports-as-dependencies -- Bug
-/** @type {import('chokidar').FSWatcher|null} */
+/** @type {import('@parcel/watcher').AsyncSubscription|null} */
 let currentWatcher = null;
-/** @type {NodeJS.Timeout|null} */
-let watcherTimeout = null;
 /** @type {string|null} */
 let currentWatchedPath = null;
 

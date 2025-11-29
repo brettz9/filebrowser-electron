@@ -34,8 +34,8 @@
     "node": ">=22.16.0"
   },
   "dependencies": {
+    "@parcel/watcher": "^2.5.1",
     "base64-js": "^1.5.1",
-    "chokidar": "^5.0.0",
     "electron-squirrel-startup": "^1.0.1",
     "jamilih": "^0.63.1",
     "jquery": "^3.7.1",
