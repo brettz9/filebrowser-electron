@@ -40,10 +40,11 @@ done
 1. Better listening for external changes
 1. Moving/Copying
 1. Preview/Editing Metadata/File
-1. Build/set icon:
-    <https://stackoverflow.com/questions/31529772/how-to-set-app-icon-for-electron-atom-shell-app>
+1. List view/Gallery view
 1. Demo with file handler web apps
 1. Cypress Tests
+1. Build/set icon:
+    <https://stackoverflow.com/questions/31529772/how-to-set-app-icon-for-electron-atom-shell-app>
 1. Proper publishing: <https://www.electronjs.org/docs/latest/tutorial/tutorial-publishing-updating>
 1. Make extensible
 1. Design in such a way that privileged APIs could work if WebExtensions
