@@ -51,3 +51,8 @@ done
     allowed overriding browser's `file:///` browser (not only for
     directories, but also to allow injecting a button to allow editing
     browsed files as well)
+
+## Misc. to-dos
+
+1. After deleting an external file, prompting a refresh, let the scroll be back
+    to the exact coordinates as before if that is in the viewport

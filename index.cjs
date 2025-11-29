@@ -438,16 +438,25 @@ async function setupNativeWatcher (dirPath) {
                     // Remember what was selected so we can restore it
                     const previouslySelectedPath = selectedPath;
 
+                    // Save scroll positions of all columns before refresh
+                    const scrollPositions = new Map();
+                    $$('.miller-column').forEach((col) => {
+                      scrollPositions.set(col, {
+                        scrollTop: col.scrollTop,
+                        scrollLeft: col.scrollLeft
+                      });
+                    });
+
                     // Add delay to let filesystem settle before refresh
                     setTimeout(() => {
                       // Re-click this folder to refresh its contents
                       jQuery(li).trigger('click');
 
-                      // Scroll the parent folder into view
+                      // Restore scroll positions
                       requestAnimationFrame(() => {
-                        li.scrollIntoView({
-                          block: 'nearest',
-                          inline: 'start'
+                        scrollPositions.forEach((pos, col) => {
+                          col.scrollTop = pos.scrollTop;
+                          col.scrollLeft = pos.scrollLeft;
                         });
                       });
 
@@ -462,30 +471,33 @@ async function setupNativeWatcher (dirPath) {
                               `[data-path="${escapedPath}"]`
                             );
 
-                            // eslint-disable-next-line no-console -- Debug
-                            console.log(
-                              '[RESELECT] Found element:',
-                              Boolean(reselect)
-                            );
-
                             if (reselect) {
-                              // eslint-disable-next-line no-console -- Debug
-                              console.log(
-                                '[RESELECT] Element text:',
-                                reselect.textContent
-                              );
-
                               const reselectLi = reselect.closest('li');
                               if (reselectLi) {
                                 jQuery(reselectLi).trigger('click');
 
-                                // Scroll the reselected item into view
-                                requestAnimationFrame(() => {
-                                  reselectLi.scrollIntoView({
-                                    block: 'nearest',
-                                    inline: 'start'
-                                  });
-                                });
+                                // Only scroll if item is out of viewport
+                                const rect = reselectLi.getBoundingClientRect();
+                                const column = reselectLi.closest(
+                                  '.miller-column'
+                                );
+                                if (column) {
+                                  const colRect = column.
+                                    getBoundingClientRect();
+                                  const isVisible = (
+                                    rect.top >= colRect.top &&
+                                    rect.bottom <= colRect.bottom &&
+                                    rect.left >= colRect.left &&
+                                    rect.right <= colRect.right
+                                  );
+
+                                  if (!isVisible) {
+                                    reselectLi.scrollIntoView({
+                                      block: 'nearest',
+                                      inline: 'nearest'
+                                    });
+                                  }
+                                }
                               }
                             }
 
@@ -750,6 +762,10 @@ function addItems (result, basePath, currentBasePath) {
     textElement.textContent = '';
     textElement.append(input);
 
+    // Focus and select the text
+    input.focus();
+    input.select();
+
     let isFinishing = false;
 
     const finishRename = () => {
@@ -795,10 +811,45 @@ function addItems (result, basePath, currentBasePath) {
                 foundParent = true;
                 const li = el.closest('li');
                 if (li) {
+                  // Save scroll positions of all columns before refresh
+                  /**
+                   * @type {Array<{
+                   *   index: number,
+                   *   path: string,
+                   *   scrollTop: number,
+                   *   scrollLeft: number
+                   * }>}
+                   */
+                  const scrollPositions = [];
+                  $$('.miller-column').forEach((col, index) => {
+                    // Get the directory path this column represents
+                    // by looking at any item's path and getting its parent dir
+                    const anyItem = col.querySelector(
+                      'a[data-path], span[data-path]'
+                    );
+                    let colDirPath = '';
+                    if (anyItem) {
+                      const itemPath = /** @type {HTMLElement} */ (anyItem).
+                        dataset.path;
+                      if (itemPath) {
+                        // Decode and get parent directory
+                        const decoded = decodeURIComponent(itemPath);
+                        colDirPath = path.dirname(decoded);
+                      }
+                    }
+                    scrollPositions.push({
+                      index,
+                      path: colDirPath,
+                      scrollTop: col.scrollTop,
+                      scrollLeft: col.scrollLeft
+                    });
+                  });
+
                   // Trigger refresh
                   jQuery(li).trigger('click');
 
                   // After refresh, find and select the renamed item
+                  // eslint-disable-next-line no-loop-func -- Loop breaks after
                   setTimeout(() => {
                     const encodedNewPath = parentPath + '/' +
                       encodeURIComponent(newName);
@@ -809,6 +860,52 @@ function addItems (result, basePath, currentBasePath) {
                       const reselectLi = renamedElement.closest('li');
                       if (reselectLi) {
                         jQuery(reselectLi).trigger('click');
+
+                        // Restore scroll after plugin finishes rebuild
+                        // Plugin rebuilds columns async after click,
+                        // so wait for completion before restoring
+                        setTimeout(() => {
+                          // Get fresh column references after rebuild
+                          const newColumns = $$('.miller-column');
+
+                          // Restore scroll by matching paths, not indices
+                          newColumns.forEach((col) => {
+                            // Skip collapsed columns
+                            if (col.classList.contains('miller-collapse')) {
+                              return;
+                            }
+                            // Get the directory path this column represents
+                            const anyItem = col.querySelector(
+                              'a[data-path], span[data-path]'
+                            );
+                            let colDirPath = '';
+                            if (anyItem) {
+                              const itemPath = /** @type {HTMLElement} */
+                                (anyItem).dataset.path;
+                              if (itemPath) {
+                                const decoded = decodeURIComponent(itemPath);
+                                colDirPath = path.dirname(decoded);
+                              }
+                            }
+                            // Find saved scroll for this path
+                            const saved = scrollPositions.find(
+                              (sp) => sp.path === colDirPath
+                            );
+                            if (saved && saved.scrollTop > 0) {
+                              col.scrollTop = saved.scrollTop;
+                              col.scrollLeft = saved.scrollLeft;
+                            }
+                          });
+
+                          // Don't scroll the renamed item into view - trust
+                          // the restored scroll position preserves the user's
+                          // intended view
+
+                          // Clear the flag well after watcher debounce
+                          setTimeout(() => {
+                            isCreating = false;
+                          }, 600);
+                        }, 100);
                       }
                     }
 
@@ -824,12 +921,11 @@ function addItems (result, basePath, currentBasePath) {
             if (!foundParent) {
               // eslint-disable-next-line no-console -- Debugging
               console.log('  -> Parent not found in DOM');
+              // Clear the flag if parent not found
+              setTimeout(() => {
+                isCreating = false;
+              }, 800);
             }
-
-            // Clear the flag after everything
-            setTimeout(() => {
-              isCreating = false;
-            }, 500);
           } else {
             // For icon view, manually refresh
             changePath();
@@ -861,9 +957,11 @@ function addItems (result, basePath, currentBasePath) {
                   }
 
                   // Scroll into view
-                  li.scrollIntoView({
-                    block: 'nearest',
-                    inline: 'nearest'
+                  requestAnimationFrame(() => {
+                    li.scrollIntoView({
+                      block: 'nearest',
+                      inline: 'nearest'
+                    });
                   });
                 }
               }
@@ -1612,14 +1710,17 @@ function addItems (result, basePath, currentBasePath) {
             // Scroll the child item's parent column into view
             const column = childElement.closest('.miller-column');
             if (column) {
-              requestAnimationFrame(() => {
+              // Skip scrollIntoView during rename to preserve scroll
+              if (!isCreating) {
                 requestAnimationFrame(() => {
-                  column.scrollIntoView({
-                    block: 'nearest',
-                    inline: 'start'
+                  requestAnimationFrame(() => {
+                    column.scrollIntoView({
+                      block: 'nearest',
+                      inline: 'start'
+                    });
                   });
                 });
-              });
+              }
             }
           }
           return;
@@ -1730,13 +1831,16 @@ function addItems (result, basePath, currentBasePath) {
 
         if (childItems.length > 0) {
           childMap.set($item[0], childItems[0]);
-          requestAnimationFrame(() => {
+          // Skip scrollIntoView during rename to preserve scroll restoration
+          if (!isCreating) {
             requestAnimationFrame(() => {
-              childItems[0].scrollIntoView({
-                block: 'start', inline: 'start'
+              requestAnimationFrame(() => {
+                childItems[0].scrollIntoView({
+                  block: 'start', inline: 'start'
+                });
               });
             });
-          });
+          }
         }
       } else if ($columns.addItem && typeof $columns.addItem === 'function') {
         // Normal addItem path for first-time navigation
@@ -1747,13 +1851,16 @@ function addItems (result, basePath, currentBasePath) {
 
           if (idx === 0) {
             childMap.set($item[0], item[0]);
-            requestAnimationFrame(() => {
+            // Skip scrollIntoView during rename to preserve scroll restoration
+            if (!isCreating) {
               requestAnimationFrame(() => {
-                item[0].scrollIntoView({
-                  block: 'start', inline: 'start'
+                requestAnimationFrame(() => {
+                  item[0].scrollIntoView({
+                    block: 'start', inline: 'start'
+                  });
                 });
               });
-            });
+            }
           }
         });
       }

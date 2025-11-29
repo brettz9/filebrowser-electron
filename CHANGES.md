@@ -3,6 +3,7 @@
 ## 0.7.1
 
 - fix: fuller file/folder change detection
+- fix: preserve scroll after renames
 
 ## 0.7.0
 
