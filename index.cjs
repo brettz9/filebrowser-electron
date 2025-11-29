@@ -284,40 +284,51 @@ async function setupNativeWatcher (dirPath) {
           return;
         }
 
+        // Get all visible miller columns to check which folders need refresh
+        const visibleColumns = $$('ul.miller-column:not(.miller-collapse)');
 
-        // Check if any event is in a selected folder (depth 1 change)
+        // Get currently selected item
         const selectedItem = $('li.miller-selected a');
         const selectedPath = selectedItem
           ? /** @type {HTMLElement} */ (selectedItem).dataset.path
           : null;
 
+        // Track which columns need to be refreshed
+        const columnsToRefresh = new Set();
+        let changeInSelectedFolder = false;
 
-        const changeInSelectedFolder = selectedPath &&
-          relevantEvents.some((evt) => {
-            // Remove the dirPath prefix properly
-            let relativePath = evt.path;
-            if (relativePath.startsWith(dirPath)) {
-              relativePath = relativePath.slice(dirPath.length);
-              // Remove leading slash if present
-              if (relativePath.startsWith('/')) {
-                relativePath = relativePath.slice(1);
+        // Check each event against all visible columns
+        for (const evt of relevantEvents) {
+          const eventPath = evt.path;
+
+          // Check against selected folder for auto-expand
+          if (selectedPath) {
+            const eventDir = path.dirname(eventPath);
+            if (decodeURIComponent(selectedPath) === eventDir) {
+              changeInSelectedFolder = true;
+            }
+          }
+
+          // Check which visible columns contain this change
+          for (const column of visibleColumns) {
+            const columnItems = [
+              ...column.querySelectorAll('li a[data-path]')
+            ];
+
+            for (const item of columnItems) {
+              const itemPath =
+                /** @type {HTMLElement} */ (item).dataset.path ?? '';
+              const decodedItemPath = decodeURIComponent(itemPath);
+
+              // Check if the event is a direct child of this item
+              const eventDir = path.dirname(eventPath);
+              if (decodedItemPath === eventDir) {
+                columnsToRefresh.add(item);
+                break;
               }
             }
-
-
-            const slashCount = (relativePath.match(/\//gv) || []).length;
-            // Check if this is a depth-1 change (file in a subfolder)
-            if (slashCount === 1) {
-              // Get the folder name from the path
-              const folderName = relativePath.split('/')[0];
-              const folderPath = path.join(dirPath, folderName);
-
-              // Check if this matches the selected folder
-              return decodeURIComponent(selectedPath) === folderPath;
-            }
-            return false;
-          });
-
+          }
+        }
 
         // Debounce to avoid multiple rapid refreshes
         if (debounceTimer) {
@@ -336,7 +347,7 @@ async function setupNativeWatcher (dirPath) {
             // Clear flag after refresh
             isRefreshing = false;
 
-            // Restore selection after refresh
+            // Restore selection and refresh affected columns
             if (selectedPath) {
               setTimeout(() => {
                 const itemElement = $(
@@ -371,6 +382,16 @@ async function setupNativeWatcher (dirPath) {
                       parentUl.setAttribute('tabindex', '0');
                       parentUl.focus();
                     }
+                  }
+                }
+
+                // Refresh all affected columns by triggering clicks
+                for (const itemToRefresh of columnsToRefresh) {
+                  const liToRefresh = itemToRefresh.closest('li');
+                  if (liToRefresh &&
+                      liToRefresh.classList.contains('miller-selected')) {
+                    // Trigger click to reload the folder's contents
+                    jQuery(liToRefresh).trigger('click');
                   }
                 }
               }, 150);
@@ -428,6 +449,7 @@ let $columns;
 let isDeleting = false;
 let isCreating = false;
 let isRefreshing = false;
+
 // eslint-disable-next-line jsdoc/imports-as-dependencies -- Bug
 /** @type {import('@parcel/watcher').AsyncSubscription|null} */
 let currentWatcher = null;
