@@ -229,7 +229,7 @@ function setupFileWatcher (dirPath) {
   }
 
   // Don't recreate watcher if already watching this path
-  if (currentWatcher && currentWatchedPath === dirPath) {
+  if (activeWatchers.has(dirPath)) {
     return;
   }
 
@@ -249,10 +249,9 @@ async function setupNativeWatcher (dirPath) {
     return;
   }
 
-  // Close existing watcher if any
-  if (currentWatcher) {
-    await currentWatcher.unsubscribe();
-    currentWatcher = null;
+  // Check if already watching this path
+  if (activeWatchers.has(dirPath)) {
+    return;
   }
 
   let debounceTimer = /** @type {NodeJS.Timeout | null} */ (null);
@@ -284,48 +283,34 @@ async function setupNativeWatcher (dirPath) {
           return;
         }
 
-        // Get all visible miller columns to check which folders need refresh
-        const visibleColumns = $$('ul.miller-column:not(.miller-collapse)');
-
         // Get currently selected item
         const selectedItem = $('li.miller-selected a');
         const selectedPath = selectedItem
           ? /** @type {HTMLElement} */ (selectedItem).dataset.path
           : null;
 
-        // Track which columns need to be refreshed
-        const columnsToRefresh = new Set();
+        // Track which folders have changes (for later refresh when visited)
         let changeInSelectedFolder = false;
 
-        // Check each event against all visible columns
+        // Check each event against the watched folder
         for (const evt of relevantEvents) {
           const eventPath = evt.path;
+          const eventDir = path.dirname(eventPath);
+
+          // Ignore macOS Trash events – moving items there shouldn’t refresh
+          if (eventDir.includes('/.Trash')) {
+            continue;
+          }
+
+          // Track this folder as having pending changes
+          foldersWithPendingChanges.add(eventDir);
 
           // Check against selected folder for auto-expand
           if (selectedPath) {
-            const eventDir = path.dirname(eventPath);
-            if (decodeURIComponent(selectedPath) === eventDir) {
+            const decodedSelectedPath = decodeURIComponent(selectedPath);
+            // Check if change is in the selected folder (direct child)
+            if (decodedSelectedPath === eventDir) {
               changeInSelectedFolder = true;
-            }
-          }
-
-          // Check which visible columns contain this change
-          for (const column of visibleColumns) {
-            const columnItems = [
-              ...column.querySelectorAll('li a[data-path]')
-            ];
-
-            for (const item of columnItems) {
-              const itemPath =
-                /** @type {HTMLElement} */ (item).dataset.path ?? '';
-              const decodedItemPath = decodeURIComponent(itemPath);
-
-              // Check if the event is a direct child of this item
-              const eventDir = path.dirname(eventPath);
-              if (decodedItemPath === eventDir) {
-                columnsToRefresh.add(item);
-                break;
-              }
             }
           }
         }
@@ -336,75 +321,28 @@ async function setupNativeWatcher (dirPath) {
         }
 
         debounceTimer = setTimeout(() => {
-          // On any change, refresh the view
-          if (!isDeleting && !isCreating) {
-            // Set flag to prevent watcher recreation
-            isRefreshing = true;
-
-            // Refresh the view
-            changePath();
-
-            // Clear flag after refresh
-            isRefreshing = false;
-
-            // Restore selection and refresh affected columns
-            if (selectedPath) {
-              setTimeout(() => {
-                const itemElement = $(
-                  `[data-path="${CSS.escape(selectedPath)}"]`
-                );
-                if (itemElement) {
-                  const li = itemElement.closest('li');
-                  if (li) {
-                    // Remove selection from all items
-                    $$('.miller-selected').
-                      forEach((el) => {
-                        el.classList.remove('miller-selected');
-                      });
-                    // Select the item
-                    li.classList.add('miller-selected');
-
-                    // Scroll into view
-                    li.scrollIntoView({
-                      block: 'center',
-                      inline: 'nearest'
-                    });
-
-                    // If change was in the selected folder, trigger click
-                    // to reload its contents
-                    if (changeInSelectedFolder) {
-                      jQuery(li).trigger('click');
-                    }
-
-                    // Also set focus for keyboard navigation
-                    const parentUl = li.closest('ul');
-                    if (parentUl) {
-                      parentUl.setAttribute('tabindex', '0');
-                      parentUl.focus();
-                    }
-                  }
-                }
-
-                // Refresh all affected columns by triggering clicks
-                for (const itemToRefresh of columnsToRefresh) {
-                  const liToRefresh = itemToRefresh.closest('li');
-                  if (liToRefresh &&
-                      liToRefresh.classList.contains('miller-selected')) {
-                    // Trigger click to reload the folder's contents
-                    jQuery(liToRefresh).trigger('click');
-                  }
-                }
-              }, 150);
+          // Only trigger auto-expand if change was in the selected folder
+          // Don't refresh anything else - pending changes are already tracked
+          if (!isDeleting && !isCreating && changeInSelectedFolder &&
+              selectedPath) {
+            // Find the selected folder and trigger click to refresh it
+            const itemElement = $(
+              `[data-path="${CSS.escape(selectedPath)}"]`
+            );
+            if (itemElement) {
+              const li = itemElement.closest('li');
+              if (li) {
+                // Trigger click to reload the selected folder's contents
+                jQuery(li).trigger('click');
+              }
             }
           }
         }, 100); // Debounce delay
       }
     );
 
-    // Store the subscription
-    // @ts-ignore - Store parcel watcher subscription
-    currentWatcher = subscription;
-    currentWatchedPath = dirPath;
+    // Store the subscription in the map
+    activeWatchers.set(dirPath, subscription);
   } catch (err) {
     // eslint-disable-next-line no-console -- Debugging
     console.warn('Could not set up parcel watcher:', err);
@@ -421,8 +359,6 @@ function changePath () {
   const basePath = view === 'icon-view' ? currentBasePath : '/';
   if (!(/^[\w.\/ \-]*$/v).test(basePath)) {
     // Todo: Refactor to allow non-ASCII and just escape single quotes, etc.
-    // eslint-disable-next-line no-console -- Debugging
-    console.log('Non-ASCII path provided');
     return;
   }
 
@@ -448,13 +384,14 @@ function changePath () {
 let $columns;
 let isDeleting = false;
 let isCreating = false;
-let isRefreshing = false;
+const isRefreshing = false;
 
-// eslint-disable-next-line jsdoc/imports-as-dependencies -- Bug
-/** @type {import('@parcel/watcher').AsyncSubscription|null} */
-let currentWatcher = null;
-/** @type {string|null} */
-let currentWatchedPath = null;
+// Map of directory paths to their watcher subscriptions
+// eslint-disable-next-line jsdoc/reject-any-type -- Watcher type
+/** @type {Map<string, any>} */
+const activeWatchers = new Map();
+/** @type {Set<string>} */
+const foldersWithPendingChanges = new Set();
 
 /**
  *
@@ -666,15 +603,9 @@ function addItems (result, basePath, currentBasePath) {
           setTimeout(() => {
             const encodedNewPath = parentPath + '/' +
               encodeURIComponent(newName);
-            // eslint-disable-next-line no-console -- Debugging
-            console.log(
-              'Looking for renamed element with path:', encodedNewPath
-            );
             const renamedElement = $(
               `[data-path="${CSS.escape(encodedNewPath)}"]`
             );
-            // eslint-disable-next-line no-console -- Debugging
-            console.log('Found renamed element:', renamedElement);
             if (renamedElement) {
               const li = renamedElement.closest('li');
               if (li) {
@@ -739,10 +670,6 @@ function addItems (result, basePath, currentBasePath) {
           const itemElement = $(
             `[data-path="${CSS.escape(itemPath)}"]`
           );
-          // eslint-disable-next-line no-console -- Debugging
-          console.log('Looking for item with path:', itemPath);
-          // eslint-disable-next-line no-console -- Debugging
-          console.log('Found item element:', itemElement);
           if (itemElement) {
             const li = itemElement.closest('li');
             if (li) {
@@ -897,10 +824,7 @@ function addItems (result, basePath, currentBasePath) {
                         const encodedPath = decodedFolderPath +
                           '/' + encodeURIComponent(tempFileName);
 
-                        if (attempts === 0) {
-                          // eslint-disable-next-line no-console -- Debugging
-                          console.log('Searching for path:', encodedPath);
-                        }
+                        // Minimal logging
                         // Check both span and a tags (files are span,
                         //   folders are a)
                         const allElements = [
@@ -918,8 +842,6 @@ function addItems (result, basePath, currentBasePath) {
                         );
 
                         if (newFileElement) {
-                          // eslint-disable-next-line no-console -- Debugging
-                          console.log('Found element on attempt', attempts + 1);
                           startRename(/** @type {HTMLElement} */ (
                             newFileElement
                           ));
@@ -931,8 +853,7 @@ function addItems (result, basePath, currentBasePath) {
                     };
                     tryFindElement();
                   } else {
-                    // eslint-disable-next-line no-console -- Debugging
-                    console.log('Could not find folder element to trigger');
+                    // Minimal logging on failure
                   }
                 });
               });
@@ -1409,25 +1330,67 @@ function addItems (result, basePath, currentBasePath) {
           });
         }
       };
+      // Minimal logging: diagnostics removed
       if (parentMap.has($item[0])) {
-        updateHistoryAndStickies(parentMap.get($item[0]));
-        const childElement = childMap.get($item[0]);
-        if (childElement) {
-          // Scroll the child item's parent column into view
-          const column = childElement.closest('.miller-column');
-          if (column) {
-            requestAnimationFrame(() => {
+        const itemPath = parentMap.get($item[0]);
+
+        // Check if this folder has pending changes
+        const hasPendingChanges =
+          itemPath && foldersWithPendingChanges.has(itemPath);
+
+        if (hasPendingChanges) {
+          // Pending changes detected; rebuild next
+
+          // Clear the pending changes flag
+          foldersWithPendingChanges.delete(itemPath);
+
+          // Clear ALL caches - this will force a complete reload
+          parentMap.delete($item[0]);
+          childMap.delete($item[0]);
+
+          // Clear miller-columns data
+          $item.removeData('miller-columns-child');
+          $item.removeData('miller-columns-ancestor');
+          $item.removeClass('miller-columns-parent');
+
+          // Remove existing child columns to avoid duplicates
+          const parentColumn = $item.closest('ul')[0];
+          if (parentColumn) {
+            let nextColumn = parentColumn.nextElementSibling;
+            while (nextColumn) {
+              const toRemove = nextColumn;
+              nextColumn = nextColumn.nextElementSibling;
+              toRemove.remove();
+            }
+          }
+
+          // Fall through to force reload
+        } else {
+          // No pending changes - use normal cached behavior
+          updateHistoryAndStickies(itemPath);
+
+          const childElement = childMap.get($item[0]);
+          if (childElement) {
+            // Scroll the child item's parent column into view
+            const column = childElement.closest('.miller-column');
+            if (column) {
               requestAnimationFrame(() => {
-                column.scrollIntoView({
-                  block: 'nearest',
-                  inline: 'start'
+                requestAnimationFrame(() => {
+                  column.scrollIntoView({
+                    block: 'nearest',
+                    inline: 'start'
+                  });
                 });
               });
-            });
+            }
           }
+          return;
         }
-        return;
       }
+
+      // If we reach here, either:
+      // 1. Item wasn't in parentMap (fresh load)
+      // 2. Item had pending changes (need to reload)
 
       const a = $item.children('a[title]');
       if (!a.length) {
@@ -1443,12 +1406,20 @@ function addItems (result, basePath, currentBasePath) {
       const parentText = parentMap.get(parentLi) ?? '';
       const currentPath = parentText + '/' + a.text();
 
+      // Minimal logging
+
       parentMap.set($item[0], currentPath);
 
       updateHistoryAndStickies(currentPath);
 
+      // Check if this folder has pending changes and remove from tracking
+      const hasPendingChanges2 =
+        foldersWithPendingChanges.has(currentPath);
+      if (hasPendingChanges2) {
+        foldersWithPendingChanges.delete(currentPath);
+      }
       const childResult = readDirectory(currentPath);
-      // console.log('childResult', childResult);
+      // Minimal logging
 
       const childItems = childResult.map(([
         isDir, childDirectory, title
@@ -1527,6 +1498,37 @@ function addItems (result, basePath, currentBasePath) {
           });
         }
       });
+
+      // Check if the column was actually created
+      const parentColumn = $item.closest('ul')[0];
+      if (parentColumn) {
+        const nextColumn = parentColumn.nextElementSibling;
+        const anchorEl = $item.children('a[title]')[0];
+        // Fallback: if plugin failed to create a next column but we have items
+        if (!nextColumn && childItems.length) {
+          const newColumn = document.createElement('ul');
+          newColumn.className = 'miller-column';
+          childItems.forEach((childItem) => {
+            newColumn.append(childItem);
+          });
+          if (parentColumn.parentNode) {
+            parentColumn.parentNode.insertBefore(
+              newColumn,
+              parentColumn.nextSibling
+            );
+          }
+          $item.addClass('miller-columns-parent');
+          if (anchorEl) {
+            jQuery(anchorEl).data('miller-columns-child', newColumn);
+          }
+        }
+      }
+
+      // Set up watcher for this expanded folder in miller columns view
+      const currentView = localStorage.getItem('view') ?? 'icon-view';
+      if (currentView === 'three-columns') {
+        setupFileWatcher(currentPath);
+      }
     }
   });
 
