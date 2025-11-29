@@ -1331,6 +1331,8 @@ function addItems (result, basePath, currentBasePath) {
         }
       };
       // Minimal logging: diagnostics removed
+      let needsRefresh = false;
+
       if (parentMap.has($item[0])) {
         const itemPath = parentMap.get($item[0]);
 
@@ -1344,25 +1346,21 @@ function addItems (result, basePath, currentBasePath) {
           // Clear the pending changes flag
           foldersWithPendingChanges.delete(itemPath);
 
-          // Clear ALL caches - this will force a complete reload
-          parentMap.delete($item[0]);
-          childMap.delete($item[0]);
+          // Mark that we need to do a full refresh rebuild
+          needsRefresh = true;
 
-          // Clear miller-columns data
-          $item.removeData('miller-columns-child');
+          // Clear plugin data from this item
+          // (DOM cleanup will happen before addItem)
+          const anchorEl = $item.children('a[title]')[0];
+          if (anchorEl) {
+            jQuery(anchorEl).removeData('miller-columns-child');
+          }
           $item.removeData('miller-columns-ancestor');
           $item.removeClass('miller-columns-parent');
 
-          // Remove existing child columns to avoid duplicates
-          const parentColumn = $item.closest('ul')[0];
-          if (parentColumn) {
-            let nextColumn = parentColumn.nextElementSibling;
-            while (nextColumn) {
-              const toRemove = nextColumn;
-              nextColumn = nextColumn.nextElementSibling;
-              toRemove.remove();
-            }
-          }
+          // Clear caches for this specific item
+          parentMap.delete($item[0]);
+          childMap.delete($item[0]);
 
           // Fall through to force reload
         } else {
@@ -1408,8 +1406,6 @@ function addItems (result, basePath, currentBasePath) {
 
       // Minimal logging
 
-      parentMap.set($item[0], currentPath);
-
       updateHistoryAndStickies(currentPath);
 
       // Check if this folder has pending changes and remove from tracking
@@ -1418,6 +1414,7 @@ function addItems (result, basePath, currentBasePath) {
       if (hasPendingChanges2) {
         foldersWithPendingChanges.delete(currentPath);
       }
+
       const childResult = readDirectory(currentPath);
       // Minimal logging
 
@@ -1482,47 +1479,48 @@ function addItems (result, basePath, currentBasePath) {
         return li;
       });
 
-      childItems.forEach((childItem, idx) => {
-        if (!$columns.addItem) {
-          return;
-        }
-        const item = $columns.addItem(jQuery(childItem), $item);
-        if (idx === 0) {
-          childMap.set($item[0], item[0]);
+      // Build children - use refreshChildren for refresh, addItem for fresh
+      if (needsRefresh && $columns.refreshChildren &&
+          typeof $columns.refreshChildren === 'function') {
+        // For refresh: use refreshChildren to replace children properly
+        $columns.refreshChildren(
+          $item,
+          childItems.map((item) => jQuery(item))
+        );
+
+        if (childItems.length > 0) {
+          childMap.set($item[0], childItems[0]);
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-              item[0].scrollIntoView({
+              childItems[0].scrollIntoView({
                 block: 'start', inline: 'start'
               });
             });
           });
         }
-      });
+      } else if ($columns.addItem && typeof $columns.addItem === 'function') {
+        // Normal addItem path for first-time navigation
+        const addItemFn = $columns.addItem;
 
-      // Check if the column was actually created
-      const parentColumn = $item.closest('ul')[0];
-      if (parentColumn) {
-        const nextColumn = parentColumn.nextElementSibling;
-        const anchorEl = $item.children('a[title]')[0];
-        // Fallback: if plugin failed to create a next column but we have items
-        if (!nextColumn && childItems.length) {
-          const newColumn = document.createElement('ul');
-          newColumn.className = 'miller-column';
-          childItems.forEach((childItem) => {
-            newColumn.append(childItem);
-          });
-          if (parentColumn.parentNode) {
-            parentColumn.parentNode.insertBefore(
-              newColumn,
-              parentColumn.nextSibling
-            );
+        childItems.forEach((childItem, idx) => {
+          const item = addItemFn.call($columns, jQuery(childItem), $item);
+
+          if (idx === 0) {
+            childMap.set($item[0], item[0]);
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                item[0].scrollIntoView({
+                  block: 'start', inline: 'start'
+                });
+              });
+            });
           }
-          $item.addClass('miller-columns-parent');
-          if (anchorEl) {
-            jQuery(anchorEl).data('miller-columns-child', newColumn);
-          }
-        }
+        });
       }
+
+      // CRITICAL: Update parentMap after building children
+      // This ensures subsequent navigation will hit the cache path
+      parentMap.set($item[0], currentPath);
 
       // Set up watcher for this expanded folder in miller columns view
       const currentView = localStorage.getItem('view') ?? 'icon-view';
