@@ -1,5 +1,9 @@
 # CHANGES to filebrowser-electron
 
+## 0.7.1
+
+- fix: fuller file/folder change detection
+
 ## 0.7.0
 
 - feat: create new folder
