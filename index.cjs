@@ -284,13 +284,20 @@ async function setupNativeWatcher (dirPath) {
         }
 
         // Get currently selected item
-        const selectedItem = $('li.miller-selected a');
+        // In miller-columns, there can be multiple selected items
+        //   (one per column). We want the rightmost (deepest) one
+        const allSelected = $$('li.miller-selected a, li.miller-selected span');
+        const selectedItem = allSelected.length > 0
+          ? allSelected.at(-1)
+          : null;
         const selectedPath = selectedItem
           ? /** @type {HTMLElement} */ (selectedItem).dataset.path
           : null;
 
         // Track which folders have changes (for later refresh when visited)
         let changeInSelectedFolder = false;
+        let changeInVisibleArea = false;
+        const columnsToRefresh = new Set();
 
         // Check each event against the watched folder
         for (const evt of relevantEvents) {
@@ -305,12 +312,39 @@ async function setupNativeWatcher (dirPath) {
           // Track this folder as having pending changes
           foldersWithPendingChanges.add(eventDir);
 
-          // Check against selected folder for auto-expand
+          // Check if change affects visible columns
           if (selectedPath) {
             const decodedSelectedPath = decodeURIComponent(selectedPath);
-            // Check if change is in the selected folder (direct child)
+            const selectedDir = path.dirname(decodedSelectedPath);
+
+            // Case 1: Change in selected folder's children (if folder)
             if (decodedSelectedPath === eventDir) {
               changeInSelectedFolder = true;
+              changeInVisibleArea = true;
+            }
+
+            // Case 2: Change in selected item's siblings (same parent)
+            if (selectedDir === eventDir) {
+              changeInVisibleArea = true;
+              columnsToRefresh.add(selectedDir);
+            }
+
+            // Case 3: Change in ancestor columns (visible parent/grandparent)
+            // Walk up the selected path to check all visible ancestors
+            let ancestorPath = selectedDir;
+            while (
+              ancestorPath && ancestorPath !== '/' && ancestorPath !== '.'
+            ) {
+              if (ancestorPath === eventDir) {
+                changeInVisibleArea = true;
+                columnsToRefresh.add(eventDir);
+                break;
+              }
+              const nextAncestor = path.dirname(ancestorPath);
+              if (nextAncestor === ancestorPath) {
+                break;
+              }
+              ancestorPath = nextAncestor;
             }
           }
         }
@@ -321,23 +355,160 @@ async function setupNativeWatcher (dirPath) {
         }
 
         debounceTimer = setTimeout(() => {
-          // Only trigger auto-expand if change was in the selected folder
-          // Don't refresh anything else - pending changes are already tracked
-          if (!isDeleting && !isCreating && changeInSelectedFolder &&
-              selectedPath) {
-            // Find the selected folder and trigger click to refresh it
-            const itemElement = $(
-              `[data-path="${CSS.escape(selectedPath)}"]`
-            );
-            if (itemElement) {
-              const li = itemElement.closest('li');
-              if (li) {
-                // Trigger click to reload the selected folder's contents
-                jQuery(li).trigger('click');
+          if (isDeleting || isCreating || isWatcherRefreshing) {
+            return;
+          }
+
+          // Refresh visible changes
+          if (changeInVisibleArea) {
+            // Set flag to prevent concurrent refreshes
+            isWatcherRefreshing = true;
+
+            // If change was in selected folder's children, refresh it
+            if (changeInSelectedFolder && selectedPath) {
+              const itemElement = $(
+                `[data-path="${CSS.escape(selectedPath)}"]`
+              );
+              if (itemElement) {
+                const li = itemElement.closest('li');
+                if (li) {
+                  jQuery(li).trigger('click');
+                }
               }
             }
+
+            // Refresh any ancestor columns that changed
+            let refreshHandled = false;
+
+            // Check if any changed paths are the current base path
+            // (root directory being viewed)
+            const currentBasePath = getBasePath();
+            const rootChanged = columnsToRefresh.has(currentBasePath);
+
+            if (rootChanged) {
+              // Root directory changed - reload entire view
+              setTimeout(() => {
+                changePath();
+                isWatcherRefreshing = false;
+              }, 150);
+              refreshHandled = true;
+            }
+
+            /**
+             * Clear refresh flag helper.
+             * @returns {void}
+             */
+            const clearRefreshFlag = () => {
+              setTimeout(() => {
+                isWatcherRefreshing = false;
+              }, 300);
+            };
+
+            for (const columnPath of columnsToRefresh) {
+              if (refreshHandled) {
+                break;
+              }
+
+              // Special case: if the changed path is an ancestor of current
+              // path but not directly visible as a folder element, we need to
+              // rebuild the leftmost column that shows this path's contents
+              if (currentBasePath.startsWith(columnPath + '/')) {
+                // The changed directory is an ancestor
+                // We need to reload the entire view to refresh it
+                setTimeout(changePath, 150);
+                clearRefreshFlag();
+                refreshHandled = true;
+                break;
+              }
+
+              // Find the folder element that represents this directory
+              // We need to find an <a> tag whose data-path equals
+              //   this directory
+              const allFolders = $$('a[data-path]');
+
+              for (const folderEl of allFolders) {
+                const folderPath = decodeURIComponent(
+                  /** @type {HTMLElement} */ (folderEl).dataset.path || ''
+                );
+
+                // If this folder's path matches the changed directory
+                if (folderPath === columnPath) {
+                  const li = folderEl.closest('li');
+                  if (li) {
+                    // Remember what was selected so we can restore it
+                    const previouslySelectedPath = selectedPath;
+
+                    // Add delay to let filesystem settle before refresh
+                    setTimeout(() => {
+                      // Re-click this folder to refresh its contents
+                      jQuery(li).trigger('click');
+
+                      // Scroll the parent folder into view
+                      requestAnimationFrame(() => {
+                        li.scrollIntoView({
+                          block: 'nearest',
+                          inline: 'start'
+                        });
+                      });
+
+                      // After refresh, re-select the previously selected item
+                      if (previouslySelectedPath) {
+                        requestAnimationFrame(() => {
+                          requestAnimationFrame(() => {
+                            const escapedPath = CSS.escape(
+                              previouslySelectedPath
+                            );
+                            const reselect = $(
+                              `[data-path="${escapedPath}"]`
+                            );
+
+                            // eslint-disable-next-line no-console -- Debug
+                            console.log(
+                              '[RESELECT] Found element:',
+                              Boolean(reselect)
+                            );
+
+                            if (reselect) {
+                              // eslint-disable-next-line no-console -- Debug
+                              console.log(
+                                '[RESELECT] Element text:',
+                                reselect.textContent
+                              );
+
+                              const reselectLi = reselect.closest('li');
+                              if (reselectLi) {
+                                jQuery(reselectLi).trigger('click');
+
+                                // Scroll the reselected item into view
+                                requestAnimationFrame(() => {
+                                  reselectLi.scrollIntoView({
+                                    block: 'nearest',
+                                    inline: 'start'
+                                  });
+                                });
+                              }
+                            }
+
+                            clearRefreshFlag();
+                          });
+                        });
+                      } else {
+                        clearRefreshFlag();
+                      }
+                    }, 150); // Delay for filesystem to settle
+                    refreshHandled = true;
+                    break;
+                  }
+                }
+              }
+            }
+
+            // If no columns were refreshed, clear the flag
+            if (!refreshHandled) {
+              isWatcherRefreshing = false;
+            }
           }
-        }, 100); // Debounce delay
+        }, 500); // Debounce delay - wait for filesystem operations to settle
       }
     );
 
@@ -385,6 +556,7 @@ let $columns;
 let isDeleting = false;
 let isCreating = false;
 const isRefreshing = false;
+let isWatcherRefreshing = false;
 
 // Map of directory paths to their watcher subscriptions
 // eslint-disable-next-line jsdoc/reject-any-type -- Watcher type
@@ -592,57 +764,121 @@ function addItems (result, basePath, currentBasePath) {
         const newPath = path.join(parentPath, newName);
 
         try {
+          // eslint-disable-next-line no-console -- Debugging
+          console.log('Starting rename from', oldName, 'to', newName);
           // Set flag to prevent watcher from interfering during rename
           isCreating = true;
 
           renameSync(decodeURIComponent(oldPath), newPath);
-          // Refresh the view - this will rebuild the DOM with new names
-          changePath();
 
-          // Re-select the renamed item after view refresh
-          setTimeout(() => {
-            const encodedNewPath = parentPath + '/' +
-              encodeURIComponent(newName);
-            const renamedElement = $(
-              `[data-path="${CSS.escape(encodedNewPath)}"]`
-            );
-            if (renamedElement) {
-              const li = renamedElement.closest('li');
-              if (li) {
-                // Remove selection from all items
-                $$('.miller-selected').
-                  forEach((el) => {
-                    el.classList.remove('miller-selected');
-                  });
-                // Select the renamed item
-                li.classList.add('miller-selected');
+          // eslint-disable-next-line no-console -- Debugging
+          console.log('Rename completed');
 
-                // Focus the parent ul to enable keyboard navigation
-                // without triggering folder navigation
-                const parentUl = li.closest('ul');
-                if (parentUl) {
-                  parentUl.setAttribute('tabindex', '0');
-                  parentUl.focus();
+          // Clear the flag immediately after rename so watcher
+          //   can detect change
+          // In three-columns mode, manually trigger parent refresh
+          const currentView = localStorage.getItem('view') ?? 'icon-view';
+          // eslint-disable-next-line no-console -- Debugging
+          console.log('Current view:', currentView);
+          if (currentView === 'three-columns') {
+            // Mark parent folder as having pending changes
+            foldersWithPendingChanges.add(parentPath);
+
+            // Find and click the parent folder to refresh it
+            const parentElements = $$('a[data-path]');
+            let foundParent = false;
+            for (const el of parentElements) {
+              const elPath = decodeURIComponent(
+                /** @type {HTMLElement} */ (el).dataset.path || ''
+              );
+              if (elPath === parentPath) {
+                foundParent = true;
+                const li = el.closest('li');
+                if (li) {
+                  // Trigger refresh
+                  jQuery(li).trigger('click');
+
+                  // After refresh, find and select the renamed item
+                  setTimeout(() => {
+                    const encodedNewPath = parentPath + '/' +
+                      encodeURIComponent(newName);
+                    const renamedElement = $(
+                      `[data-path="${CSS.escape(encodedNewPath)}"]`
+                    );
+                    if (renamedElement) {
+                      const reselectLi = renamedElement.closest('li');
+                      if (reselectLi) {
+                        jQuery(reselectLi).trigger('click');
+                      }
+                    }
+
+                    if (onComplete) {
+                      setTimeout(onComplete, 100);
+                    }
+                  }, 200);
+                  break;
                 }
-
-                // Scroll into view
-                li.scrollIntoView({
-                  block: 'nearest',
-                  inline: 'nearest'
-                });
               }
             }
 
-            // Call completion callback after everything is done
-            if (onComplete) {
-              setTimeout(onComplete, 250);
-            } else {
-              // If no callback, just clear the flag after a delay
-              setTimeout(() => {
-                isCreating = false;
-              }, 250);
+            if (!foundParent) {
+              // eslint-disable-next-line no-console -- Debugging
+              console.log('  -> Parent not found in DOM');
             }
-          }, 100);
+
+            // Clear the flag after everything
+            setTimeout(() => {
+              isCreating = false;
+            }, 500);
+          } else {
+            // For icon view, manually refresh
+            changePath();
+
+            // Re-select the renamed item after view refresh
+            setTimeout(() => {
+              const encodedNewPath = parentPath + '/' +
+                encodeURIComponent(newName);
+              const renamedElement = $(
+                `[data-path="${CSS.escape(encodedNewPath)}"]`
+              );
+              if (renamedElement) {
+                const li = renamedElement.closest('li');
+                if (li) {
+                  // Remove selection from all items
+                  $$('.miller-selected').
+                    forEach((el) => {
+                      el.classList.remove('miller-selected');
+                    });
+                  // Select the renamed item
+                  li.classList.add('miller-selected');
+
+                  // Focus the parent ul to enable keyboard navigation
+                  // without triggering folder navigation
+                  const parentUl = li.closest('ul');
+                  if (parentUl) {
+                    parentUl.setAttribute('tabindex', '0');
+                    parentUl.focus();
+                  }
+
+                  // Scroll into view
+                  li.scrollIntoView({
+                    block: 'nearest',
+                    inline: 'nearest'
+                  });
+                }
+              }
+
+              // Call completion callback after everything is done
+              if (onComplete) {
+                setTimeout(onComplete, 250);
+              } else {
+                // If no callback, just clear the flag after a delay
+                setTimeout(() => {
+                  isCreating = false;
+                }, 250);
+              }
+            }, 100);
+          }
         } catch (err) {
           // eslint-disable-next-line no-alert -- User feedback
           alert('Failed to rename: ' + (/** @type {Error} */ (err)).message);
@@ -662,8 +898,12 @@ function addItems (result, basePath, currentBasePath) {
         // Get the path before refresh
         const itemPath = oldPath;
 
-        // Refresh the view to ensure miller-columns state is correct
-        changePath();
+        // In three-columns mode, let the watcher handle refreshes
+        const currentView = localStorage.getItem('view') ?? 'icon-view';
+        if (currentView !== 'three-columns') {
+          // For icon view, manually refresh
+          changePath();
+        }
 
         // Re-select the item after view refresh
         setTimeout(() => {
@@ -702,7 +942,7 @@ function addItems (result, basePath, currentBasePath) {
             // Delay clearing the flag to ensure watcher timeout has passed
             setTimeout(onComplete, 250);
           }
-        }, 100);
+        }, currentView === 'three-columns' ? 350 : 100);
       }
     };
 
@@ -1526,6 +1766,18 @@ function addItems (result, basePath, currentBasePath) {
       const currentView = localStorage.getItem('view') ?? 'icon-view';
       if (currentView === 'three-columns') {
         setupFileWatcher(currentPath);
+
+        // Also set up watchers for all ancestor directories to detect
+        // sibling changes
+        let ancestorPath = path.dirname(currentPath);
+        while (ancestorPath && ancestorPath !== '/' && ancestorPath !== '.') {
+          setupFileWatcher(ancestorPath);
+          const nextAncestor = path.dirname(ancestorPath);
+          if (nextAncestor === ancestorPath) {
+            break;
+          }
+          ancestorPath = nextAncestor;
+        }
       }
     }
   });
