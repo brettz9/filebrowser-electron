@@ -10,12 +10,13 @@
     "checkJs": true,
     "strict": true,
     "noEmit": true,
+    "skipLibCheck": true,
     "emitDeclarationOnly": true,
     "declaration": true,
     "forceConsistentCasingInFileNames": true
   },
   "include": [
-    "*.js", "src/**/*.cjs", "*.cjs"
+    "*.js", "src/**/*.cjs", "*.cjs", "test/**/*.js"
   ],
   "exclude": ["node_modules"]
 }

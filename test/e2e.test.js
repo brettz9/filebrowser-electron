@@ -3,6 +3,7 @@ import {existsSync} from 'node:fs';
 import {expect, test} from '@playwright/test';
 import {close, initialize} from './initialize.js';
 
+/** @type {import('./initialize.js').App} */
 let app;
 test.beforeEach(async () => {
   app = await initialize();
@@ -37,7 +38,9 @@ test('Successfully launches the app with @playwright/test.', async () => {
 });
 
 test('successfully finds the basic elements of the page', async () => {
-  expect(await app.main.locator('i').innerText()).toBe(
+  expect(await app.main.locator('i').textContent()).toBe(
     'Waiting for activation...'
   );
+
+  expect(await app.main.locator('i')).toBeHidden();
 });
