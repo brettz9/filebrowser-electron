@@ -66,6 +66,7 @@ const addStickyInputListeners = (note, pth) => {
   });
 
   const noteElement = note.element;
+  let saveTimeout;
   const noteObserver = new MutationObserver(function (mutationsList) {
     for (const mutation of mutationsList) {
       if (mutation.attributeName === 'class' ||
@@ -73,12 +74,17 @@ const addStickyInputListeners = (note, pth) => {
       ) {
         // mutation.target.classList.contains('collapsed')
         saveNotes();
+      } else if (mutation.attributeName === 'style') {
+        // Debounce style changes (position during drag)
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(saveNotes, 300);
       }
     }
   });
   if (noteElement) {
     const config = {
-      attributes: true, attributeFilter: ['class', 'data-color-index']
+      attributes: true,
+      attributeFilter: ['class', 'data-color-index', 'style']
     };
     noteObserver.observe(noteElement, config);
   }
@@ -118,6 +124,7 @@ const addStickyInputListenersGlobal = (note) => {
   });
 
   const noteElement = note.element;
+  let saveTimeout;
   const noteObserver = new MutationObserver(function (mutationsList) {
     for (const mutation of mutationsList) {
       if (mutation.attributeName === 'class' ||
@@ -125,12 +132,17 @@ const addStickyInputListenersGlobal = (note) => {
       ) {
         // mutation.target.classList.contains('collapsed')
         saveNotes();
+      } else if (mutation.attributeName === 'style') {
+        // Debounce style changes (position during drag)
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(saveNotes, 300);
       }
     }
   });
   if (noteElement) {
     const config = {
-      attributes: true, attributeFilter: ['class', 'data-color-index']
+      attributes: true,
+      attributeFilter: ['class', 'data-color-index', 'style']
     };
     noteObserver.observe(noteElement, config);
   }
@@ -2145,14 +2157,7 @@ Click "Create global sticky" to create more notes.`,
     y: 170
   });
 
-  note.content.addEventListener('input', () => {
-    const notes = stickyNotes.getAllNotes(({metadata}) => {
-      return metadata.type === 'global';
-    });
-    localStorage.setItem(
-      `stickyNotes-global`, JSON.stringify(notes)
-    );
-  });
+  addStickyInputListenersGlobal(note);
 });
 
 // eslint-disable-next-line @stylistic/max-len -- Long
