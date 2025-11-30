@@ -1,5 +1,6 @@
 /* eslint-disable chai-expect-keywords/no-unsupported-keywords -- Not Chai */
-import {existsSync} from 'node:fs';
+import {existsSync, mkdirSync, writeFileSync} from 'node:fs';
+import {join} from 'node:path';
 // import {setTimeout} from 'node:timers/promises';
 import {expect, test} from 'playwright-test-coverage';
 import {close, initialize} from './initialize.js';
@@ -13,12 +14,54 @@ test.beforeEach(async () => {
 test.afterEach(async () => {
   if (app?.main) {
     try {
-      const coverage = await app.main.coverage.stopJSCoverage();
-      // eslint-disable-next-line no-console -- Testing
-      console.log('coverage', coverage);
+      // Get Istanbul coverage from the window object
+      // (set by Babel instrumentation)
+      const istanbulCoverage = await app.main.evaluate(() => {
+        // @ts-expect-error - __coverage__ is added by Istanbul instrumentation
+        return globalThis.__coverage__;
+      });
+
+      if (istanbulCoverage) {
+        // Save each file's coverage to separate files in coverage/istanbul
+        const outputDir = join(process.cwd(), 'coverage', 'istanbul');
+        // eslint-disable-next-line n/no-sync -- Test cleanup
+        if (!existsSync(outputDir)) {
+          // eslint-disable-next-line n/no-sync -- Test cleanup
+          mkdirSync(outputDir, {recursive: true});
+        }
+
+        // Create a unique filename for each file's coverage
+        const timestamp = Date.now();
+        // Using random for unique test coverage files (not security-sensitive)
+        // eslint-disable-next-line sonarjs/pseudo-random -- Just testing
+        const random = Math.random().toString(36).slice(2);
+
+        // Write each file's coverage to a separate JSON file
+        for (const [filePath, coverage] of Object.entries(istanbulCoverage)) {
+          const safeFileName = filePath.
+            replaceAll(/[\\:]/gv, '_').
+            replaceAll('/', '_').
+            replace(/^_+/v, '');
+          const coverageFile = join(
+            outputDir,
+            `${safeFileName}-${timestamp}-${random}.json`
+          );
+
+          // eslint-disable-next-line n/no-sync -- Test cleanup
+          writeFileSync(
+            coverageFile,
+            JSON.stringify({[filePath]: coverage}, null, 2)
+          );
+        }
+        // eslint-disable-next-line no-console -- Testing
+        console.log(
+          'Coverage files written:',
+          Object.keys(istanbulCoverage).length
+        );
+      }
     } catch (error) {
       // eslint-disable-next-line no-console -- Testing
-      console.error('Failed to stop coverage:', error);
+      console.error('Failed to save coverage:', error);
     }
   }
   await close(app);

@@ -13,13 +13,12 @@ export const initialize = async () => {
     // Sandbox needs to be disabled for CI to work with Linux (Ubuntu).
     args: [join(process.cwd(), 'src/main.js'), '--no-sandbox'],
     env: {
-      NODE_ENV: 'test'
+      NODE_ENV: 'test',
+      NODE_V8_COVERAGE: join(process.cwd(), 'coverage', 'v8')
     }
   });
 
   const window = await electronApplication.firstWindow();
-
-  await window.coverage.startJSCoverage();
 
   // eslint-disable-next-line no-console -- Testing
   window.on('console', console.log);

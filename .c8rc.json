@@ -1,0 +1,22 @@
+{
+  "all": true,
+  "src": ".",
+  "temp-directory": "coverage/v8",
+  "include": [
+    "src/**/*.js"
+  ],
+  "exclude": [
+    "**/*.test.js",
+    "test/**",
+    "coverage/**",
+    ".nyc_output/**",
+    "instrumented/**",
+    "node_modules/**",
+    "**/*.config.js",
+    "**/*.config.cjs",
+    "forge.config.cjs",
+    ".ncurc.cjs"
+  ],
+  "reporter": ["text", "html"],
+  "resolve-paths": true
+}
