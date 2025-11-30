@@ -58,10 +58,10 @@ test.describe('main', () => {
 
 test.describe('renderer', () => {
   test('successfully finds the basic elements of the page', async () => {
-    expect(await app.main.locator('i').textContent()).toBe(
+    expect(await app.page.locator('i').textContent()).toBe(
       'Waiting for activation...'
     );
 
-    expect(await app.main.locator('i')).toBeHidden();
+    expect(await app.page.locator('i')).toBeHidden();
   });
 });

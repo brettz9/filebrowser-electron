@@ -5,7 +5,7 @@ import {_electron} from 'playwright';
 /**
  * @typedef {{
  *   electron: import('playwright').ElectronApplication,
- *   main: import('playwright').Page
+ *   page: import('playwright').Page
  * }} App
  */
 
@@ -43,7 +43,7 @@ export const initialize = async () => {
 
   return {
     electron: electronApplication,
-    main: window
+    page: window
   };
 };
 
@@ -60,7 +60,7 @@ const close = async (app) => {
 export const coverage = async (app) => {
   try {
     // Get V8 coverage from Playwright (renderer process)
-    const v8Coverage = await app.main.coverage.stopJSCoverage();
+    const v8Coverage = await app.page.coverage.stopJSCoverage();
 
     if (v8Coverage && v8Coverage.length > 0) {
       // Save V8 coverage to coverage/v8
