@@ -12,12 +12,10 @@
   ],
   "scripts": {
     "tsc": "tsc",
-    "instrument:index": "rollup -c",
-    "instrument": "npm run instrument:index",
     "lint": "npm run eslint --",
     "eslint": "eslint --ext=js,cjs,html,md .",
     "report": "c8 report --temp-directory=coverage/v8",
-    "test": "npm run instrument && playwright test --config test/playwright.config.js && npm run report",
+    "test": "playwright test --config test/playwright.config.js && npm run report",
     "postinstall": "./rebuild.sh",
     "rebuild": "./rebuild.sh",
     "start": "electron-forge start --",
@@ -50,7 +48,6 @@
     "system-icon2": "^0.5.1"
   },
   "devDependencies": {
-    "@babel/core": "^7.28.5",
     "@electron-forge/cli": "^7.10.2",
     "@electron-forge/maker-deb": "^7.10.2",
     "@electron-forge/maker-rpm": "^7.10.2",
@@ -69,7 +66,6 @@
     "eslint-config-ash-nazg": "^39.8.0",
     "playwright": "^1.57.0",
     "rollup": "^4.53.3",
-    "rollup-plugin-istanbul": "^5.0.0",
     "typescript": "^5.9.3"
   }
 }
