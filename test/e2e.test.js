@@ -1,9 +1,8 @@
 /* eslint-disable chai-expect-keywords/no-unsupported-keywords -- Not Chai */
-import {existsSync, mkdirSync, writeFileSync} from 'node:fs';
-import {join} from 'node:path';
+import {existsSync} from 'node:fs';
 // import {setTimeout} from 'node:timers/promises';
 import {expect, test} from '@playwright/test';
-import {close, initialize} from './initialize.js';
+import {initialize, coverage} from './initialize.js';
 
 /** @type {import('./initialize.js').App} */
 let app;
@@ -12,44 +11,7 @@ test.beforeEach(async () => {
 });
 
 test.afterEach(async () => {
-  if (app?.main) {
-    try {
-      // Get V8 coverage from Playwright (renderer process)
-      const v8Coverage = await app.main.coverage.stopJSCoverage();
-
-      if (v8Coverage && v8Coverage.length > 0) {
-        // Save V8 coverage to coverage/v8
-        const v8OutputDir = join(process.cwd(), 'coverage', 'v8');
-        // eslint-disable-next-line n/no-sync -- Test cleanup
-        if (!existsSync(v8OutputDir)) {
-          // eslint-disable-next-line n/no-sync -- Test cleanup
-          mkdirSync(v8OutputDir, {recursive: true});
-        }
-
-        const timestamp = Date.now();
-        // Using random for unique test coverage files (not security-sensitive)
-        // eslint-disable-next-line sonarjs/pseudo-random -- Just testing
-        const random = Math.random().toString(36).slice(2);
-        const v8CoverageFile = join(
-          v8OutputDir,
-          `coverage-${timestamp}-${random}.json`
-        );
-
-        // Save in V8 format
-        // eslint-disable-next-line n/no-sync -- Test cleanup
-        writeFileSync(
-          v8CoverageFile,
-          JSON.stringify({result: v8Coverage}, null, 2)
-        );
-        // eslint-disable-next-line no-console -- Testing
-        console.log('V8 coverage files:', v8Coverage.length);
-      }
-    } catch (error) {
-      // eslint-disable-next-line no-console -- Testing
-      console.error('Failed to save coverage:', error);
-    }
-  }
-  await close(app);
+  return await coverage(app);
 });
 
 test('Successfully launches the app with @playwright/test.', async () => {
