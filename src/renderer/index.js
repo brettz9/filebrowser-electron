@@ -20,8 +20,13 @@ const {
   getOpenWithApps,
   getAppIcons,
   parcelWatcher,
-  getIconDataURLForFile
+  getIconDataURLForFile,
+  storage
 } = globalThis.electronAPI;
+
+// Use persistent storage instead of localStorage (synchronous via IPC)
+// eslint-disable-next-line no-shadow -- Intentionally shadowing global
+const localStorage = storage;
 
 const stickyNotes = new StickyNote({
   colors: ['#fff740', '#ff7eb9', '#7afcff', '#feff9c', '#a7ffeb', '#c7ceea'],

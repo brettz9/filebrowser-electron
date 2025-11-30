@@ -122,6 +122,67 @@ ipcMain.handle('parcelWatcher:unsubscribe', async (_event, id) => {
   }
 });
 
+// Persistent storage using a JSON file (replacement for localStorage)
+const storageFilePath = path.join(
+  app.getPath('userData'), 'storage.json'
+);
+
+let storageCache = {};
+
+// Load storage from disk on startup
+try {
+  if (fs.existsSync(storageFilePath)) {
+    const data = fs.readFileSync(storageFilePath, 'utf8');
+    storageCache = JSON.parse(data);
+  }
+} catch (error) {
+  // eslint-disable-next-line no-console -- Main process logging
+  console.error('Failed to load storage:', error.message);
+  storageCache = {};
+}
+
+// Synchronous storage IPC handlers
+ipcMain.on('storage:getItem', (evt, key) => {
+  evt.returnValue = storageCache[key] ?? null;
+});
+
+ipcMain.on('storage:setItem', (evt, key, value) => {
+  storageCache[key] = value;
+  // Write to disk synchronously to ensure persistence
+  try {
+    fs.writeFileSync(storageFilePath, JSON.stringify(storageCache, null, 2));
+    evt.returnValue = true;
+  } catch (error) {
+    // eslint-disable-next-line no-console -- Main process logging
+    console.error('Failed to save storage:', error.message);
+    evt.returnValue = false;
+  }
+});
+
+ipcMain.on('storage:removeItem', (evt, key) => {
+  delete storageCache[key];
+  try {
+    fs.writeFileSync(storageFilePath, JSON.stringify(storageCache, null, 2));
+    evt.returnValue = true;
+  } catch (error) {
+    // eslint-disable-next-line no-console -- Main process logging
+    console.error('Failed to save storage:', error.message);
+    evt.returnValue = false;
+  }
+});
+
+ipcMain.on('storage:clear', (evt) => {
+  storageCache = {};
+  try {
+    fs.writeFileSync(storageFilePath, JSON.stringify(storageCache, null, 2));
+    evt.returnValue = true;
+  } catch (error) {
+    // eslint-disable-next-line no-console -- Main process logging
+    console.error('Failed to save storage:', error.message);
+    evt.returnValue = false;
+  }
+});
+
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 

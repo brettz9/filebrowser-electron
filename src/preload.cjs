@@ -74,5 +74,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
       };
     }
+  },
+  // Synchronous storage API (replacement for localStorage)
+  storage: {
+    getItem: (key) => ipcRenderer.sendSync('storage:getItem', key),
+    setItem: (key, value) => ipcRenderer.sendSync('storage:setItem', key, value),
+    removeItem: (key) => ipcRenderer.sendSync('storage:removeItem', key),
+    clear: () => ipcRenderer.sendSync('storage:clear')
   }
 });

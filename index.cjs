@@ -14585,8 +14585,13 @@
     getOpenWithApps,
     getAppIcons,
     parcelWatcher,
-    getIconDataURLForFile
+    getIconDataURLForFile,
+    storage
   } = globalThis.electronAPI;
+
+  // Use persistent storage instead of localStorage (synchronous via IPC)
+  // eslint-disable-next-line no-shadow -- Intentionally shadowing global
+  const localStorage = storage;
 
   const stickyNotes = new StickyNote({
     colors: ['#fff740', '#ff7eb9', '#7afcff', '#feff9c', '#a7ffeb', '#c7ceea'],
@@ -16631,6 +16636,27 @@
     }
   }
 
+  globalThis.addEventListener('hashchange', changePath);
+
+  $('#icon-view').addEventListener('click', function () {
+    $$('nav button').forEach((button) => {
+      button.classList.remove('selected');
+    });
+    this.classList.add('selected');
+    localStorage.setItem('view', 'icon-view');
+    $('.miller-breadcrumbs').style.display = 'none';
+    changePath();
+  });
+  $('#three-columns').addEventListener('click', function () {
+    $$('nav button').forEach((button) => {
+      button.classList.remove('selected');
+    });
+    this.classList.add('selected');
+    localStorage.setItem('view', 'three-columns');
+    $('.miller-breadcrumbs').style.display = 'block';
+    changePath();
+  });
+
   const view = localStorage.getItem('view') ?? 'icon-view';
   switch (view) {
   case 'three-columns':
@@ -16646,16 +16672,6 @@
     Chromium ${process.versions.chrome},
     and Electron ${process.versions.electron}.
 `;
-
-  // eslint-disable-next-line @stylistic/max-len -- Long
-  // eslint-disable-next-line unicorn/prefer-top-level-await -- Will be IIFE-exported
-  (async () => {
-  try {
-    await addMillerColumnPlugin(jQuery, {stylesheets: ['miller-columns.css']});
-  } catch (error) {
-    // eslint-disable-next-line no-console -- Debugging
-    console.error('[INIT] Miller columns failed:', error);
-  }
 
   $('#create-sticky').addEventListener('click', () => {
     const pth = $columns.find(
@@ -16699,27 +16715,15 @@ Click "Create global sticky" to create more notes.`,
     });
   });
 
-  globalThis.addEventListener('hashchange', changePath);
-
-  $('#icon-view').addEventListener('click', function () {
-    $$('nav button').forEach((button) => {
-      button.classList.remove('selected');
-    });
-    this.classList.add('selected');
-    localStorage.setItem('view', 'icon-view');
-    $('.miller-breadcrumbs').style.display = 'none';
-    changePath();
-  });
-  $('#three-columns').addEventListener('click', function () {
-    $$('nav button').forEach((button) => {
-      button.classList.remove('selected');
-    });
-    this.classList.add('selected');
-    localStorage.setItem('view', 'three-columns');
-    $('.miller-breadcrumbs').style.display = 'block';
-    changePath();
-  });
-
+  // eslint-disable-next-line @stylistic/max-len -- Long
+  // eslint-disable-next-line unicorn/prefer-top-level-await -- Will be IIFE-exported
+  (async () => {
+  try {
+    await addMillerColumnPlugin(jQuery, {stylesheets: ['miller-columns.css']});
+  } catch (error) {
+    // eslint-disable-next-line no-console -- Debugging
+    console.error('[INIT] Miller columns failed:', error);
+  }
   changePath();
 
   const saved = localStorage.getItem('stickyNotes-global');
