@@ -16718,17 +16718,13 @@ Click "Create global sticky" to create more notes.`,
   // eslint-disable-next-line @stylistic/max-len -- Long
   // eslint-disable-next-line unicorn/prefer-top-level-await -- Will be IIFE-exported
   (async () => {
-  try {
-    await addMillerColumnPlugin(jQuery, {stylesheets: ['miller-columns.css']});
-  } catch (error) {
-    // eslint-disable-next-line no-console -- Debugging
-    console.error('[INIT] Miller columns failed:', error);
-  }
+  await addMillerColumnPlugin(jQuery, {stylesheets: ['miller-columns.css']});
   changePath();
 
   const saved = localStorage.getItem('stickyNotes-global');
   if (saved) {
     stickyNotes.clear(({metadata}) => {
+      /* c8 ignore next -- Just a guard as stickies shouldn't exist on load */
       return metadata.type === 'global';
     });
     stickyNotes.loadNotes(JSON.parse(saved));

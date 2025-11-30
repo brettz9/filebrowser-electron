@@ -1,7 +1,10 @@
 /* eslint-disable chai-expect-keywords/no-unsupported-keywords -- Not Chai */
 import {existsSync} from 'node:fs';
+import {rm} from 'node:fs/promises';
+import path from 'node:path';
 // import {setTimeout} from 'node:timers/promises';
 import {expect, test} from '@playwright/test';
+
 import {initialize, coverage} from './initialize.js';
 
 const {beforeEach, afterEach, describe} = test;
@@ -17,6 +20,18 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  // Remove storage
+  const userData = await electron.evaluate(async ({app}) => {
+    return await app.getPath('userData');
+  });
+
+  const storageFilePath = path.join(
+    userData, 'storage.json'
+  );
+  try {
+    await rm(storageFilePath);
+  } catch {}
+
   return await coverage({electron, page});
 });
 
@@ -67,9 +82,15 @@ describe('renderer', () => {
     expect(await page.locator('i')).toBeHidden();
   });
 
-  // describe('stickies (global)', () => {
-  //   test('creates a global sticky and retains it upon refresh', async () => {
-  //     expect(await page.locator('button#create-global-sticky'));
-  //   });
-  // });
+  describe('stickies (global)', () => {
+    test('creates a global sticky and retains it upon refresh', async () => {
+      await page.locator('button#create-global-sticky').click();
+      await page.locator('.sticky-note-content').fill('My global sticky');
+      const window = await electron.firstWindow();
+      await window.reload();
+      expect(await page.locator('.sticky-note-content').textContent()).toBe(
+        'My global sticky'
+      );
+    });
+  });
 });
