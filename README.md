@@ -37,7 +37,6 @@ done
 
 ## To-dos
 
-1. `contextIsolation: true`?
 1. Add Playwright tests
   1. Testing for better listening for external changes; release
 1. Moving/Copying

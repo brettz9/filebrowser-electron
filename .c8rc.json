@@ -2,7 +2,8 @@
   "temp-directory": "coverage/v8",
   "include": [
     "src/**/*.js",
-    "src/**/*.cjs"
+    "src/**/*.cjs",
+    "index.cjs"
   ],
   "exclude": [
     "**/*.test.js",
@@ -17,6 +18,7 @@
     ".ncurc.cjs"
   ],
   "excludeNodeModules": true,
+  "excludeAfterRemap": true,
   "reporter": ["text", "html"],
   "resolve-paths": true
 }

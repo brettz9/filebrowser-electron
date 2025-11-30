@@ -86,8 +86,8 @@ export const coverage = async (app) => {
         v8CoverageFile,
         JSON.stringify({result: v8Coverage}, null, 2)
       );
-      // eslint-disable-next-line no-console -- Testing
-      console.log('V8 coverage files:', v8Coverage.length);
+      // // eslint-disable-next-line no-console -- Testing
+      // console.log('V8 coverage files:', v8Coverage.length);
     }
   } catch (error) {
     // eslint-disable-next-line no-console -- Testing

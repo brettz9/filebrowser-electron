@@ -1,5 +1,6 @@
 /* eslint-disable n/no-sync, n/no-unpublished-require, unicorn/prefer-module,
   @stylistic/max-len -- Preload must use CommonJS */
+// @ts-nocheck Too many APIs and not much else
 'use strict';
 
 const {contextBridge, ipcRenderer, shell} = require('electron');

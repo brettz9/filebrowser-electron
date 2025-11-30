@@ -16714,7 +16714,7 @@ Click "Create global sticky" to create more notes.`,
   // eslint-disable-next-line unicorn/prefer-top-level-await -- Will be IIFE-exported
   (async () => {
   try {
-    await addMillerColumnPlugin(jQuery, {stylesheets: ['@default']});
+    await addMillerColumnPlugin(jQuery, {stylesheets: ['miller-columns.css']});
   } catch (error) {
     // eslint-disable-next-line no-console -- Debugging
     console.error('[INIT] Miller columns failed:', error);
