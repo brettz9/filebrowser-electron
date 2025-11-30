@@ -37,9 +37,9 @@ done
 
 ## To-dos
 
-1. Add Playwright tests
 1. `contextIsolation: true`?
-1. Testing for better listening for external changes; release
+1. Add Playwright tests
+  1. Testing for better listening for external changes; release
 1. Moving/Copying
 1. Preview/Editing Metadata/File
 1. List view/Gallery view
