@@ -4,25 +4,29 @@ import {existsSync} from 'node:fs';
 import {expect, test} from '@playwright/test';
 import {initialize, coverage} from './initialize.js';
 
-/** @type {import('./initialize.js').App} */
-let app;
-test.beforeEach(async () => {
-  app = await initialize();
+const {beforeEach, afterEach, describe} = test;
+
+/** @type {import('playwright').ElectronApplication} */
+let electron;
+
+/** @type {import('playwright').Page} */
+let page;
+
+beforeEach(async () => {
+  ({electron, page} = await initialize());
 });
 
-test.afterEach(async () => {
-  return await coverage(app);
+afterEach(async () => {
+  return await coverage({electron, page});
 });
 
-test.describe('main', () => {
+describe('main', () => {
   test('Successfully launches the app with @playwright/test.', async () => {
     // See https://playwright.dev/docs/api/class-electronapplication for ElectronApplication documentation.
-    const {appPath, isPackaged} = await app.electron.evaluate(({
-      app: application
-    }) => {
+    const {appPath, isPackaged} = await electron.evaluate(({app}) => {
       return {
-        appPath: application.getAppPath(),
-        isPackaged: application.isPackaged
+        appPath: app.getAppPath(),
+        isPackaged: app.isPackaged
       };
     });
 
@@ -31,7 +35,7 @@ test.describe('main', () => {
 
     const initialScreenshotPath = 'test/screenshots/initial.png';
 
-    const window = await app.electron.firstWindow();
+    const window = await electron.firstWindow();
     await window.screenshot({path: initialScreenshotPath});
 
     // eslint-disable-next-line n/no-sync -- Non-deprecated
@@ -43,25 +47,29 @@ test.describe('main', () => {
 
   test('handles activate event', async () => {
     // See https://playwright.dev/docs/api/class-electronapplication for ElectronApplication documentation.
-    await app.electron.evaluate(({
-      app: application
-    }) => {
-      application.emit('activate');
+    await electron.evaluate(({app}) => {
+      app.emit('activate');
     });
 
     // You can then assert on the expected behavior after activation
     // For example, if activation brings a window to the front:
-    const mainWindow = await app.electron.firstWindow();
+    const mainWindow = await electron.firstWindow();
     expect(await mainWindow.evaluate(() => document.hasFocus())).toBe(true);
   });
 });
 
-test.describe('renderer', () => {
+describe('renderer', () => {
   test('successfully finds the basic elements of the page', async () => {
-    expect(await app.page.locator('i').textContent()).toBe(
+    expect(await page.locator('i').textContent()).toBe(
       'Waiting for activation...'
     );
 
-    expect(await app.page.locator('i')).toBeHidden();
+    expect(await page.locator('i')).toBeHidden();
   });
+
+  // describe('stickies (global)', () => {
+  //   test('creates a global sticky and retains it upon refresh', async () => {
+  //     expect(await page.locator('button#create-global-sticky'));
+  //   });
+  // });
 });
