@@ -18,5 +18,5 @@
   "include": [
     "*.js", "src/**/*.cjs", "*.cjs", "test/**/*.js"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "index.instrumented.cjs"]
 }

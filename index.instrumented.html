@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
+    <!--
+    // The instrumenting code adds an evalable Function()
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    />
+    <meta
+      http-equiv="X-Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    />
+    -->
+    <link rel="stylesheet" href="index.css" />
+    <title>Filebrowser</title>
+  </head>
+  <body>
+    <h1 id="filebrowser">Filebrowser</h1>
+    <div id="stickyButtons">
+      <button id="create-sticky" title="Create sticky for current path"><img src="images/create-sticky.svg" /></button>
+      <button id="create-global-sticky" title="Create global sticky"><img src="images/create-global-sticky.svg" /></button>
+    </div>
+    <div class="clear"></div>
+    <nav>
+      <button id="icon-view"><img src="images/icon-view.svg" /></button>
+      <!-- <button><img src="images/bulleted-list.svg" /></button> -->
+      <button id="three-columns"><img src="images/three-columns.svg" /></button>
+      <!-- <button><img src="images/gallery-view.svg" /></button> -->
+    </nav>
+    <h3>Files and folders:</h3>
+    <i>Waiting for activation...</i>
+    <div class="miller-breadcrumbs"></div>
+    <div class="miller-columns-container">
+      <div class="miller-columns" tabindex="1">
+        <ul></ul>
+      </div>
+    </div>
+    <!-- This can't be saved under src as local `require()` then fails -->
+    <script src="index.instrumented.cjs"></script>
+  </body>
+</html>

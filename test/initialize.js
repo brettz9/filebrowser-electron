@@ -19,6 +19,8 @@ export const initialize = async () => {
 
   const window = await electronApplication.firstWindow();
 
+  await window.coverage.startJSCoverage();
+
   // eslint-disable-next-line no-console -- Testing
   window.on('console', console.log);
 

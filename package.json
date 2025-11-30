@@ -12,8 +12,9 @@
   ],
   "scripts": {
     "tsc": "tsc",
-    "instrument:src": "NODE_ENV=test babel ./src --out-dir ./instrumented/src --source-maps",
-    "instrument": "npm run instrument:src",
+    "instrument:src": "NODE_ENV=test babel ./src/main.js --out-file ./instrumented/src/main.js --source-maps",
+    "instrument:index": "rollup -c",
+    "instrument": "npm run instrument:src && npm run instrument:index",
     "lint": "npm run eslint --",
     "eslint": "eslint --ext=js,cjs,html,md .",
     "report": "c8 report",
@@ -72,6 +73,8 @@
     "eslint-config-ash-nazg": "^39.8.0",
     "playwright": "^1.57.0",
     "playwright-test-coverage": "^1.2.12",
+    "rollup": "^4.53.3",
+    "rollup-plugin-istanbul": "^5.0.0",
     "typescript": "^5.9.3"
   }
 }

@@ -1,6 +1,7 @@
 /* eslint-disable chai-expect-keywords/no-unsupported-keywords -- Not Chai */
 import {existsSync} from 'node:fs';
-import {expect, test} from '@playwright/test';
+// import {setTimeout} from 'node:timers/promises';
+import {expect, test} from 'playwright-test-coverage';
 import {close, initialize} from './initialize.js';
 
 /** @type {import('./initialize.js').App} */
@@ -9,7 +10,19 @@ test.beforeEach(async () => {
   app = await initialize();
 });
 
-test.afterEach(async () => await close(app));
+test.afterEach(async () => {
+  if (app?.main) {
+    try {
+      const coverage = await app.main.coverage.stopJSCoverage();
+      // eslint-disable-next-line no-console -- Testing
+      console.log('coverage', coverage);
+    } catch (error) {
+      // eslint-disable-next-line no-console -- Testing
+      console.error('Failed to stop coverage:', error);
+    }
+  }
+  await close(app);
+});
 
 test('Successfully launches the app with @playwright/test.', async () => {
   // See https://playwright.dev/docs/api/class-electronapplication for ElectronApplication documentation.

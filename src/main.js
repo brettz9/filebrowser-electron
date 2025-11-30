@@ -40,7 +40,13 @@ function createWindow () {
   );
 
   // and load the index.html of the app.
-  mainWindow.loadFile(import.meta.dirname + '/../index.html');
+  mainWindow.loadFile(
+    // eslint-disable-next-line n/no-process-env -- Customary
+    process.env.NODE_ENV === 'test'
+      ? import.meta.dirname + '/../index.instrumented.html'
+      /* c8 ignore next -- Not testing */
+      : import.meta.dirname + '/../index.html'
+  );
 
   // Open the DevTools.
   // mainWindow.webContents.openDevTools()
