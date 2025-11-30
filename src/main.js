@@ -72,9 +72,9 @@ await app.whenReady();
 createWindow();
 
 app.on('activate', function () {
-  /* c8 ignore next 5 -- Not needed */
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
+  /* c8 ignore next 3 -- Not null in tests */
   if (mainWindow === null) {
     createWindow();
   }

@@ -37,6 +37,20 @@ test('Successfully launches the app with @playwright/test.', async () => {
   // expect(await window.title()).toBe('Filebrowser');
 });
 
+test('handles activate event', async () => {
+  // See https://playwright.dev/docs/api/class-electronapplication for ElectronApplication documentation.
+  await app.electron.evaluate(({
+    app: application
+  }) => {
+    application.emit('activate');
+  });
+
+  // You can then assert on the expected behavior after activation
+  // For example, if activation brings a window to the front:
+  const mainWindow = await app.electron.firstWindow();
+  expect(await mainWindow.evaluate(() => document.hasFocus())).toBe(true);
+});
+
 test('successfully finds the basic elements of the page', async () => {
   expect(await app.main.locator('i').textContent()).toBe(
     'Waiting for activation...'
