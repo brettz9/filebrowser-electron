@@ -40,7 +40,7 @@ function createWindow () {
   );
 
   // and load the index.html of the app.
-  mainWindow.loadFile('index.html');
+  mainWindow.loadFile(import.meta.dirname + '/../index.html');
 
   // Open the DevTools.
   // mainWindow.webContents.openDevTools()
@@ -56,6 +56,7 @@ function createWindow () {
 
 // Quit when all windows are closed.
 app.on('window-all-closed', function () {
+  /* c8 ignore next 5 -- Mac testing envt */
   // On OS X it is common for applications and their menu bar
   // to stay active until the user quits explicitly with Cmd + Q
   if (process.platform !== 'darwin') {

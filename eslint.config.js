@@ -19,6 +19,15 @@ export default [
     };
   }),
   {
+    files: ['test/**/*.js'],
+    rules: {
+      // Use different `window` than for normal Mocha tests
+      'no-shadow': 'off',
+      // A playwright API
+      'unicorn/prefer-dom-node-text-content': 'off'
+    }
+  },
+  {
     rules: {
       // Thinks we're using Node globals despite browser reference above
       'n/no-unsupported-features/node-builtins': 'off'

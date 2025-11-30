@@ -13,8 +13,7 @@
   "scripts": {
     "tsc": "tsc",
     "instrument:src": "NODE_ENV=test babel ./src --out-dir ./instrumented/src --source-maps",
-    "instrument:index": "NODE_ENV=test babel index.cjs --out-dir ./instrumented --source-maps",
-    "instrument": "npm run instrument:src && npm run instrument:index",
+    "instrument": "npm run instrument:src",
     "lint": "npm run eslint --",
     "eslint": "eslint --ext=js,cjs,html,md .",
     "report": "c8 report",
