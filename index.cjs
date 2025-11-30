@@ -14570,6 +14570,7 @@
   /* eslint-disable n/no-sync,
     promise/prefer-await-to-then,
     promise/catch-or-return -- Needed for performance */
+
   // Get Node APIs from the preload script
   const {
     fs: {
@@ -14577,6 +14578,7 @@
       lstatSync, rmSync
     },
     path,
+    // eslint-disable-next-line no-shadow -- Different process
     process,
     spawnSync,
     shell,
@@ -14584,7 +14586,7 @@
     getAppIcons,
     parcelWatcher,
     getIconDataURLForFile
-  } = window.electronAPI;
+  } = globalThis.electronAPI;
 
   const stickyNotes = new StickyNote({
     colors: ['#fff740', '#ff7eb9', '#7afcff', '#feff9c', '#a7ffeb', '#c7ceea'],
@@ -16708,10 +16710,13 @@ Click "Create global sticky" to create more notes.`,
     });
   });
 
+  // eslint-disable-next-line @stylistic/max-len -- Long
+  // eslint-disable-next-line unicorn/prefer-top-level-await -- Will be IIFE-exported
   (async () => {
   try {
     await addMillerColumnPlugin(jQuery, {stylesheets: ['@default']});
   } catch (error) {
+    // eslint-disable-next-line no-console -- Debugging
     console.error('[INIT] Miller columns failed:', error);
   }
   changePath();

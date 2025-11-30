@@ -1,9 +1,16 @@
 // Modules to control application life and create native browser window
+
+/* eslint-disable n/no-sync -- We need to expose sync APIs for column
+  browser performance; otherwise becomes jarring */
+
 // eslint-disable-next-line @stylistic/max-len -- Long
 // eslint-disable-next-line n/no-unpublished-import -- electron-forge requires electron as devDep.
 import {app, BrowserWindow, ipcMain} from 'electron';
 
+import fs from 'node:fs';
+import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {spawnSync} from 'node:child_process';
 
 // Load native modules in main process
 let openWithMe, parcelWatcher, getIconDataURLForFile;
@@ -36,7 +43,9 @@ try {
 // IPC handlers for fs operations
 ipcMain.handle('fs:mkdirSync', (_event, ...args) => fs.mkdirSync(...args));
 ipcMain.handle('fs:readdirSync', (_event, ...args) => fs.readdirSync(...args));
-ipcMain.handle('fs:writeFileSync', (_event, ...args) => fs.writeFileSync(...args));
+ipcMain.handle(
+  'fs:writeFileSync', (_event, ...args) => fs.writeFileSync(...args)
+);
 ipcMain.handle('fs:existsSync', (_event, ...args) => fs.existsSync(...args));
 ipcMain.handle('fs:renameSync', (_event, ...args) => fs.renameSync(...args));
 ipcMain.handle('fs:lstatSync', (_event, ...args) => {
@@ -134,6 +143,8 @@ function createWindow () {
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
+      // We were able to remove nodeIntegration, but we needed the following
+      //  so the column browser would not be jarring with async APIs
       sandbox: false, // Allow preload to access Node.js modules synchronously
       additionalArguments: process.argv
     }

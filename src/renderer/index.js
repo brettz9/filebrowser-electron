@@ -1,6 +1,11 @@
 /* eslint-disable n/no-sync,
   promise/prefer-await-to-then,
   promise/catch-or-return -- Needed for performance */
+import {StickyNote} from 'stickynote';
+import {jml} from 'jamilih';
+import jQuery from 'jquery';
+import addMillerColumnPlugin from 'miller-columns';
+
 // Get Node APIs from the preload script
 const {
   fs: {
@@ -8,6 +13,7 @@ const {
     lstatSync, rmSync
   },
   path,
+  // eslint-disable-next-line no-shadow -- Different process
   process,
   spawnSync,
   shell,
@@ -15,12 +21,7 @@ const {
   getAppIcons,
   parcelWatcher,
   getIconDataURLForFile
-} = window.electronAPI;
-
-import {StickyNote} from 'stickynote';
-import {jml} from 'jamilih';
-import jQuery from 'jquery';
-import addMillerColumnPlugin from 'miller-columns';
+} = globalThis.electronAPI;
 
 const stickyNotes = new StickyNote({
   colors: ['#fff740', '#ff7eb9', '#7afcff', '#feff9c', '#a7ffeb', '#c7ceea'],
@@ -2149,10 +2150,13 @@ Click "Create global sticky" to create more notes.`,
   });
 });
 
+// eslint-disable-next-line @stylistic/max-len -- Long
+// eslint-disable-next-line unicorn/prefer-top-level-await -- Will be IIFE-exported
 (async () => {
 try {
   await addMillerColumnPlugin(jQuery, {stylesheets: ['@default']});
 } catch (error) {
+  // eslint-disable-next-line no-console -- Debugging
   console.error('[INIT] Miller columns failed:', error);
 }
 changePath();
