@@ -30,6 +30,17 @@ export const initialize = async () => {
   // eslint-disable-next-line no-console -- Testing
   window.on('console', console.log);
 
+  electronApplication.on('console', (msg) => {
+    // eslint-disable-next-line no-console -- Testing
+    console.log('[ELECTRON MAIN]:', msg);
+  });
+
+  // Capture page errors
+  window.on('pageerror', (error) => {
+    // eslint-disable-next-line no-console -- Testing
+    console.error('[PAGE ERROR]:', error.message, error.stack);
+  });
+
   return {
     electron: electronApplication,
     main: window

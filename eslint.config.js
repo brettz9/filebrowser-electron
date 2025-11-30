@@ -3,9 +3,7 @@ import ashNazg from 'eslint-config-ash-nazg';
 export default [
   {
     ignores: [
-      'instrumented',
-      'coverage',
-      'index.instrumented.cjs'
+      'coverage'
     ]
   },
   ...ashNazg(['sauron', 'browser', 'node']),

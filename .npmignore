@@ -5,6 +5,4 @@ instrumented
 coverage
 eslint.config.js
 rollup.config.js
-index.instrumented.cjs
-index.instrumented.cjs.map
 test

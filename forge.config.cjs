@@ -18,8 +18,9 @@ module.exports = {
     preStart () {
       // eslint-disable-next-line no-console -- Logging
       console.log('Running custom rebuild script...');
-      // eslint-disable-next-line n/no-sync -- For rebuilding
-      execSync('./rebuild.sh', {stdio: 'inherit', cwd: __dirname});
+      // No longer needed
+      // // eslint-disable-next-line n/no-sync -- For rebuilding
+      // execSync('./rebuild.sh', {stdio: 'inherit', cwd: __dirname});
       return Promise.resolve();
     }
   },

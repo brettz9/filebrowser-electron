@@ -3,6 +3,3 @@ node_modules
 out/
 instrumented
 coverage
-index.instrumented.cjs
-index.instrumented.cjs.map
-

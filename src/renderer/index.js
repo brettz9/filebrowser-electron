@@ -1,0 +1,2172 @@
+/* eslint-disable n/no-sync,
+  promise/prefer-await-to-then,
+  promise/catch-or-return -- Needed for performance */
+// Get Node APIs from the preload script
+const {
+  fs: {
+    mkdirSync, readdirSync, writeFileSync, existsSync, renameSync,
+    lstatSync, rmSync
+  },
+  path,
+  process,
+  spawnSync,
+  shell,
+  getOpenWithApps,
+  getAppIcons,
+  parcelWatcher,
+  getIconDataURLForFile
+} = window.electronAPI;
+
+import {StickyNote} from 'stickynote';
+import {jml} from 'jamilih';
+import jQuery from 'jquery';
+import addMillerColumnPlugin from 'miller-columns';
+
+const stickyNotes = new StickyNote({
+  colors: ['#fff740', '#ff7eb9', '#7afcff', '#feff9c', '#a7ffeb', '#c7ceea'],
+  onDelete (note) {
+    const notes = stickyNotes.getAllNotes(({metadata}) => {
+      return metadata.type === 'local' &&
+        metadata.path === note.metadata.path;
+    });
+    if (note.metadata.type === 'local') {
+      localStorage.setItem(
+        `stickyNotes-${note.metadata.path}`, JSON.stringify(notes)
+      );
+    } else {
+      localStorage.setItem(
+        `stickyNotes-global`, JSON.stringify(notes)
+      );
+    }
+  }
+});
+
+/**
+ * @param {import('stickynote').NoteData} note
+ * @param {string} pth
+ */
+const addStickyInputListeners = (note, pth) => {
+  const saveNotes = () => {
+    const notes = stickyNotes.getAllNotes(({metadata}) => {
+      return metadata.type === 'local' &&
+        metadata.path === note.metadata.path;
+    });
+    localStorage.setItem(
+      `stickyNotes-${pth}`, JSON.stringify(notes)
+    );
+  };
+  note.content.addEventListener('input', () => {
+    saveNotes();
+  });
+
+  const noteElement = note.element;
+  const noteObserver = new MutationObserver(function (mutationsList) {
+    for (const mutation of mutationsList) {
+      if (mutation.attributeName === 'class' ||
+        mutation.attributeName === 'data-color-index'
+      ) {
+        // mutation.target.classList.contains('collapsed')
+        saveNotes();
+      }
+    }
+  });
+  if (noteElement) {
+    const config = {
+      attributes: true, attributeFilter: ['class', 'data-color-index']
+    };
+    noteObserver.observe(noteElement, config);
+  }
+
+  const titleObserver = new MutationObserver(function (mutationsList) {
+    for (const mutation of mutationsList) {
+      if (mutation.attributeName === 'class') {
+        // mutation.target.classList.contains('collapsed')
+        saveNotes();
+      }
+    }
+  });
+  const titleElement = note.title;
+  if (titleElement) {
+    const config = {attributes: true, attributeFilter: ['class']};
+    titleObserver.observe(titleElement, config);
+  }
+
+  // To stop observing later:
+  // noteObserver.disconnect();
+};
+
+/**
+ * @param {import('stickynote').NoteData} note
+ */
+const addStickyInputListenersGlobal = (note) => {
+  const saveNotes = () => {
+    const notes = stickyNotes.getAllNotes(({metadata}) => {
+      return metadata.type === 'global';
+    });
+    localStorage.setItem(
+      `stickyNotes-global`, JSON.stringify(notes)
+    );
+  };
+  note.content.addEventListener('input', () => {
+    saveNotes();
+  });
+
+  const noteElement = note.element;
+  const noteObserver = new MutationObserver(function (mutationsList) {
+    for (const mutation of mutationsList) {
+      if (mutation.attributeName === 'class' ||
+        mutation.attributeName === 'data-color-index'
+      ) {
+        // mutation.target.classList.contains('collapsed')
+        saveNotes();
+      }
+    }
+  });
+  if (noteElement) {
+    const config = {
+      attributes: true, attributeFilter: ['class', 'data-color-index']
+    };
+    noteObserver.observe(noteElement, config);
+  }
+
+  const titleObserver = new MutationObserver(function (mutationsList) {
+    for (const mutation of mutationsList) {
+      if (mutation.attributeName === 'class') {
+        // mutation.target.classList.contains('collapsed')
+        saveNotes();
+      }
+    }
+  });
+  const titleElement = note.title;
+  if (titleElement) {
+    const config = {attributes: true, attributeFilter: ['class']};
+    titleObserver.observe(titleElement, config);
+  }
+
+  // To stop observing later:
+  // noteObserver.disconnect();
+};
+
+/* eslint-disable jsdoc/reject-any-type -- Generic */
+/**
+ * @param {any[]} arr
+ * @param {number} n
+ */
+const chunk = (arr, n) => Array.from({
+  length: Math.ceil(arr.length / n)
+}, (_, i) => arr.slice(n * i, n + (n * i)));
+/* eslint-enable jsdoc/reject-any-type -- Generic */
+
+/**
+ * @param {string} sel
+ */
+const $ = (sel) => {
+  return /** @type {HTMLElement} */ (document.querySelector(sel));
+};
+
+/**
+ * @param {string} sel
+ */
+const $$ = (sel) => {
+  return /** @type {HTMLElement[]} */ ([...document.querySelectorAll(sel)]);
+};
+
+// Ensure jamilih uses the browser's DOM instead of jsdom
+jml.setWindow(globalThis);
+
+/**
+ *
+ * @returns {string}
+ */
+function getBasePath () {
+  if (!location.hash.length && process.argv.length) {
+    const idx = process.argv.findIndex((arg) => {
+      return arg === '--path' || arg === 'p';
+    });
+    return idx === -1 ? '/' : process.argv[idx + 1];
+  }
+
+  const params = new URLSearchParams(location.hash.slice(1));
+  return path.normalize(
+    params.has('path') ? params.get('path') + '/' : '/'
+  );
+}
+
+/**
+ * @param {string} basePath
+ * @returns {Result[]}
+ */
+function readDirectory (basePath) {
+  return readdirSync(basePath).map((fileOrDir) => {
+    const stat = lstatSync(path.join(basePath, fileOrDir));
+    return /** @type {Result} */ (
+      [stat.isDirectory() || stat.isSymbolicLink(), basePath, fileOrDir]
+    );
+  }).toSorted(([, , a], [, , b]) => {
+    return a.localeCompare(b, undefined, {sensitivity: 'base'});
+  });
+}
+
+/**
+ * Setup file system watcher for a directory.
+ * Now uses parcel watcher exclusively.
+ *
+ * @param {string} dirPath
+ * @returns {void}
+ */
+function setupFileWatcher (dirPath) {
+  // Don't recreate watcher during external refresh
+  if (isRefreshing) {
+    return;
+  }
+
+  // Don't watch root directory
+  if (dirPath === '/') {
+    return;
+  }
+
+  // Don't recreate watcher if already watching this path
+  if (activeWatchers.has(dirPath)) {
+    return;
+  }
+
+  // Use parcel watcher for all cases
+  setupNativeWatcher(dirPath);
+}
+
+/**
+ * Setup a parcel/watcher as fallback.
+ * Used after folder operations to avoid chokidar freeze.
+ *
+ * @param {string} dirPath
+ * @returns {Promise<void>}
+ */
+async function setupNativeWatcher (dirPath) {
+  if (dirPath === '/') {
+    return;
+  }
+
+  // Check if already watching this path
+  if (activeWatchers.has(dirPath)) {
+    return;
+  }
+
+  let debounceTimer = /** @type {NodeJS.Timeout | null} */ (null);
+
+  try {
+    // Use @parcel/watcher which is more efficient and tracks subdirectories
+    const subscription = await parcelWatcher.subscribe(
+      dirPath,
+      (err, events) => {
+        if (err) {
+          // eslint-disable-next-line no-console -- Debugging
+          console.error('Parcel watcher error:', err);
+          return;
+        }
+
+        // Filter events to include direct children and first-level
+        // subdirectories (depth 0 and depth 1 only)
+        const relevantEvents = events.filter((evt) => {
+          const relativePath = evt.path.slice(dirPath.length + 1);
+          // Count slashes to determine depth
+          const slashCount = (relativePath.match(/\//gv) || []).length;
+          // Include depth 0 (direct children) and depth 1
+          // (files in direct child folders)
+          return slashCount <= 1;
+        });
+
+        // Skip if no relevant events
+        if (relevantEvents.length === 0) {
+          return;
+        }
+
+        // Get currently selected item
+        // In miller-columns, there can be multiple selected items
+        //   (one per column). We want the rightmost (deepest) one
+        const allSelected = $$('li.miller-selected a, li.miller-selected span');
+        const selectedItem = allSelected.length > 0
+          ? allSelected.at(-1)
+          : null;
+        const selectedPath = selectedItem
+          ? /** @type {HTMLElement} */ (selectedItem).dataset.path
+          : null;
+
+        // Track which folders have changes (for later refresh when visited)
+        let changeInSelectedFolder = false;
+        let changeInVisibleArea = false;
+        const columnsToRefresh = new Set();
+
+        // Check each event against the watched folder
+        for (const evt of relevantEvents) {
+          const eventPath = evt.path;
+          const eventDir = path.dirname(eventPath);
+
+          // Ignore macOS Trash events – moving items there shouldn’t refresh
+          if (eventDir.includes('/.Trash')) {
+            continue;
+          }
+
+          // Track this folder as having pending changes
+          foldersWithPendingChanges.add(eventDir);
+
+          // Check if change affects visible columns
+          if (selectedPath) {
+            const decodedSelectedPath = decodeURIComponent(selectedPath);
+            const selectedDir = path.dirname(decodedSelectedPath);
+
+            // Case 1: Change in selected folder's children (if folder)
+            if (decodedSelectedPath === eventDir) {
+              changeInSelectedFolder = true;
+              changeInVisibleArea = true;
+            }
+
+            // Case 2: Change in selected item's siblings (same parent)
+            if (selectedDir === eventDir) {
+              changeInVisibleArea = true;
+              columnsToRefresh.add(selectedDir);
+            }
+
+            // Case 3: Change in ancestor columns (visible parent/grandparent)
+            // Walk up the selected path to check all visible ancestors
+            let ancestorPath = selectedDir;
+            while (
+              ancestorPath && ancestorPath !== '/' && ancestorPath !== '.'
+            ) {
+              if (ancestorPath === eventDir) {
+                changeInVisibleArea = true;
+                columnsToRefresh.add(eventDir);
+                break;
+              }
+              const nextAncestor = path.dirname(ancestorPath);
+              if (nextAncestor === ancestorPath) {
+                break;
+              }
+              ancestorPath = nextAncestor;
+            }
+          }
+        }
+
+        // Debounce to avoid multiple rapid refreshes
+        if (debounceTimer) {
+          clearTimeout(debounceTimer);
+        }
+
+        debounceTimer = setTimeout(() => {
+          if (isDeleting || isCreating || isWatcherRefreshing) {
+            return;
+          }
+
+          // Refresh visible changes
+          if (changeInVisibleArea) {
+            // Set flag to prevent concurrent refreshes
+            isWatcherRefreshing = true;
+
+            // If change was in selected folder's children, refresh it
+            if (changeInSelectedFolder && selectedPath) {
+              const itemElement = $(
+                `[data-path="${CSS.escape(selectedPath)}"]`
+              );
+              if (itemElement) {
+                const li = itemElement.closest('li');
+                if (li) {
+                  jQuery(li).trigger('click');
+                }
+              }
+            }
+
+            // Refresh any ancestor columns that changed
+            let refreshHandled = false;
+
+            // Check if any changed paths are the current base path
+            // (root directory being viewed)
+            const currentBasePath = getBasePath();
+            const rootChanged = columnsToRefresh.has(currentBasePath);
+
+            if (rootChanged) {
+              // Root directory changed - reload entire view
+              setTimeout(() => {
+                changePath();
+                isWatcherRefreshing = false;
+              }, 150);
+              refreshHandled = true;
+            }
+
+            /**
+             * Clear refresh flag helper.
+             * @returns {void}
+             */
+            const clearRefreshFlag = () => {
+              setTimeout(() => {
+                isWatcherRefreshing = false;
+              }, 300);
+            };
+
+            for (const columnPath of columnsToRefresh) {
+              if (refreshHandled) {
+                break;
+              }
+
+              // Special case: if the changed path is an ancestor of current
+              // path but not directly visible as a folder element, we need to
+              // rebuild the leftmost column that shows this path's contents
+              if (currentBasePath.startsWith(columnPath + '/')) {
+                // The changed directory is an ancestor
+                // We need to reload the entire view to refresh it
+                setTimeout(changePath, 150);
+                clearRefreshFlag();
+                refreshHandled = true;
+                break;
+              }
+
+              // Find the folder element that represents this directory
+              // We need to find an <a> tag whose data-path equals
+              //   this directory
+              const allFolders = $$('a[data-path]');
+
+              for (const folderEl of allFolders) {
+                const folderPath = decodeURIComponent(
+                  /** @type {HTMLElement} */ (folderEl).dataset.path || ''
+                );
+
+                // If this folder's path matches the changed directory
+                if (folderPath === columnPath) {
+                  const li = folderEl.closest('li');
+                  if (li) {
+                    // Remember what was selected so we can restore it
+                    const previouslySelectedPath = selectedPath;
+
+                    // Save scroll positions of all columns before refresh
+                    const scrollPositions = new Map();
+                    $$('.miller-column').forEach((col) => {
+                      scrollPositions.set(col, {
+                        scrollTop: col.scrollTop,
+                        scrollLeft: col.scrollLeft
+                      });
+                    });
+
+                    // Add delay to let filesystem settle before refresh
+                    setTimeout(() => {
+                      // Re-click this folder to refresh its contents
+                      jQuery(li).trigger('click');
+
+                      // Restore scroll positions
+                      requestAnimationFrame(() => {
+                        scrollPositions.forEach((pos, col) => {
+                          col.scrollTop = pos.scrollTop;
+                          col.scrollLeft = pos.scrollLeft;
+                        });
+                      });
+
+                      // After refresh, re-select the previously selected item
+                      if (previouslySelectedPath) {
+                        requestAnimationFrame(() => {
+                          requestAnimationFrame(() => {
+                            const escapedPath = CSS.escape(
+                              previouslySelectedPath
+                            );
+                            const reselect = $(
+                              `[data-path="${escapedPath}"]`
+                            );
+
+                            if (reselect) {
+                              const reselectLi = reselect.closest('li');
+                              if (reselectLi) {
+                                jQuery(reselectLi).trigger('click');
+
+                                // Only scroll if item is out of viewport
+                                const rect = reselectLi.getBoundingClientRect();
+                                const column = reselectLi.closest(
+                                  '.miller-column'
+                                );
+                                if (column) {
+                                  const colRect = column.
+                                    getBoundingClientRect();
+                                  const isVisible = (
+                                    rect.top >= colRect.top &&
+                                    rect.bottom <= colRect.bottom &&
+                                    rect.left >= colRect.left &&
+                                    rect.right <= colRect.right
+                                  );
+
+                                  if (!isVisible) {
+                                    reselectLi.scrollIntoView({
+                                      block: 'nearest',
+                                      inline: 'nearest'
+                                    });
+                                  }
+                                }
+                              }
+                            }
+
+                            clearRefreshFlag();
+                          });
+                        });
+                      } else {
+                        clearRefreshFlag();
+                      }
+                    }, 150); // Delay for filesystem to settle
+                    refreshHandled = true;
+                    break;
+                  }
+                }
+              }
+            }
+
+            // If no columns were refreshed, clear the flag
+            if (!refreshHandled) {
+              isWatcherRefreshing = false;
+            }
+          }
+        }, 500); // Debounce delay - wait for filesystem operations to settle
+      }
+    );
+
+    // Store the subscription in the map
+    activeWatchers.set(dirPath, subscription);
+  } catch (err) {
+    // eslint-disable-next-line no-console -- Debugging
+    console.warn('Could not set up parcel watcher:', err);
+  }
+}
+
+/**
+ *
+ * @returns {void}
+ */
+function changePath () {
+  const view = localStorage.getItem('view') ?? 'icon-view';
+  const currentBasePath = getBasePath();
+  const basePath = view === 'icon-view' ? currentBasePath : '/';
+  if (!(/^[\w.\/ \-]*$/v).test(basePath)) {
+    // Todo: Refactor to allow non-ASCII and just escape single quotes, etc.
+    return;
+  }
+
+  const result = readDirectory(basePath);
+  addItems(result, basePath, currentBasePath);
+
+  // Setup watcher for the current directory being viewed
+  // (not basePath which could be / in list view)
+  // During folder creation, skip entirely - the watcher stays alive
+  // and will detect changes after isCreating becomes false
+  if (isCreating) {
+    return;
+  }
+
+  setupFileWatcher(currentBasePath);
+}
+
+/**
+ * @typedef {[isDir: boolean, childDir: string, title: string]} Result
+ */
+
+/** @type {JQuery} */
+let $columns;
+let isDeleting = false;
+let isCreating = false;
+const isRefreshing = false;
+let isWatcherRefreshing = false;
+
+// Map of directory paths to their watcher subscriptions
+// eslint-disable-next-line jsdoc/reject-any-type -- Watcher type
+/** @type {Map<string, any>} */
+const activeWatchers = new Map();
+/** @type {Set<string>} */
+const foldersWithPendingChanges = new Set();
+
+/**
+ *
+ * @param {Result[]} result
+ * @param {string} basePath
+ * @param {string} currentBasePath
+ * @returns {void}
+ */
+function addItems (result, basePath, currentBasePath) {
+  const view = localStorage.getItem('view') ?? 'icon-view';
+
+  $('i').hidden = true;
+  const ul = $('ul');
+  while (ul.firstChild) {
+    ul.firstChild.remove();
+  }
+
+  /**
+   * @param {string} itemPath
+   */
+  const deleteItem = (itemPath) => {
+    // Prevent multiple simultaneous deletions
+    if (isDeleting) {
+      return;
+    }
+
+    isDeleting = true;
+
+    const decodedPath = decodeURIComponent(itemPath);
+    const itemName = path.basename(decodedPath);
+
+    // eslint-disable-next-line no-alert -- User confirmation
+    const confirmed = confirm(`Are you sure you want to delete "${itemName}"?`);
+
+    if (!confirmed) {
+      isDeleting = false;
+      return;
+    }
+
+    try {
+      // rmSync with recursive and force options to handle both files
+      //   and directories
+      rmSync(decodedPath, {recursive: true, force: true});
+
+      // Refresh the view to reflect deletion
+      changePath();
+
+      // Reset flag after a delay to allow view to update
+      setTimeout(() => {
+        isDeleting = false;
+      }, 100);
+    } catch (err) {
+      // eslint-disable-next-line no-alert -- User feedback
+      alert('Failed to delete: ' + (/** @type {Error} */ (err)).message);
+      isDeleting = false;
+    }
+  };
+
+  /**
+   * @param {string} folderPath
+   */
+  const createNewFolder = (folderPath) => {
+    // Prevent double-creation if already in progress
+    if (isCreating) {
+      return;
+    }
+
+    // Set flag to prevent watcher from interfering
+    isCreating = true;
+
+    // Find an available "untitled folder" name
+    const baseName = 'untitled folder';
+    let newFolderName = baseName;
+    let counter = 2;
+
+    while (existsSync(path.join(folderPath, newFolderName))) {
+      newFolderName = baseName + counter;
+      counter++;
+    }
+
+    const newFolderPath = path.join(folderPath, newFolderName);
+
+    try {
+      // Don't close the watcher - just let it detect the change
+      // The isCreating flag will prevent it from refreshing the view
+
+      // Create the directory
+      mkdirSync(newFolderPath);
+
+      // Refresh the view to show the new folder
+      // Watcher setup will be skipped due to isCreating flag
+      changePath();
+
+      // Wait for the view to refresh, then find and start renaming
+      // Use setTimeout instead of nested requestAnimationFrame to avoid freeze
+      setTimeout(() => {
+        // The data-path attribute uses encodeURIComponent for the folder name
+        const encodedPath = folderPath + '/' +
+          encodeURIComponent(newFolderName);
+        const newFolderElement = $(
+          `[data-path="${CSS.escape(encodedPath)}"]`
+        );
+        if (newFolderElement) {
+          startRename(newFolderElement, () => {
+            // Clear flag after rename completes
+            isCreating = false;
+
+            // Use native fs.watch instead of chokidar to avoid freeze
+            const currentDir = getBasePath();
+            if (currentDir !== '/') {
+              setupNativeWatcher(currentDir);
+            }
+          });
+
+          // Scroll the folder into view after a delay to avoid freeze
+          setTimeout(() => {
+            const inputElement = newFolderElement.querySelector('input');
+            if (inputElement) {
+              inputElement.scrollIntoView({
+                behavior: 'instant',
+                block: 'center'
+              });
+
+              // Focus immediately after instant scroll
+              inputElement.focus();
+              inputElement.select();
+            }
+          }, 100);
+        } else {
+          // eslint-disable-next-line no-console -- Debugging
+          console.warn('Could not find new folder element');
+          isCreating = false;
+        }
+      }, 50);
+    } catch (err) {
+      isCreating = false;
+      // eslint-disable-next-line no-alert -- User feedback
+      alert('Failed to create folder: ' + (/** @type {Error} */ (err)).message);
+    }
+  };
+
+  /**
+   * @param {HTMLElement} textElement
+   * @param {(() => void)} [onComplete] - Callback when rename completes
+   */
+  const startRename = (textElement, onComplete) => {
+    if (!textElement || !textElement.dataset.path) {
+      // Call callback even if we exit early
+      if (onComplete) {
+        onComplete();
+      }
+      return;
+    }
+
+    // Check if already in rename mode (input exists)
+    if (textElement.querySelector('input')) {
+      // Call callback even if we exit early
+      if (onComplete) {
+        onComplete();
+      }
+      return;
+    }
+
+    const oldPath = textElement.dataset.path;
+    const oldName = textElement.textContent.trim();
+    const parentPath = path.dirname(oldPath);
+
+    // Create input element for renaming
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = oldName;
+    input.style.width = '100%';
+    input.style.boxSizing = 'border-box';
+    input.style.position = 'relative';
+    input.style.zIndex = '9999'; // Above sticky headers
+    input.style.padding = '2px 4px';
+    input.style.border = '1px solid #ccc';
+    input.style.borderRadius = '2px';
+    input.style.backgroundColor = 'white';
+    input.style.color = 'black';
+
+    // Replace text with input
+    const originalContent = textElement.textContent;
+    textElement.textContent = '';
+    textElement.append(input);
+
+    // Focus and select the text
+    input.focus();
+    input.select();
+
+    let isFinishing = false;
+
+    const finishRename = () => {
+      if (isFinishing) {
+        return;
+      }
+      isFinishing = true;
+
+      const newName = input.value.trim();
+
+      if (newName && newName !== oldName) {
+        const newPath = path.join(parentPath, newName);
+
+        try {
+          // eslint-disable-next-line no-console -- Debugging
+          console.log('Starting rename from', oldName, 'to', newName);
+          // Set flag to prevent watcher from interfering during rename
+          isCreating = true;
+
+          renameSync(decodeURIComponent(oldPath), newPath);
+
+          // eslint-disable-next-line no-console -- Debugging
+          console.log('Rename completed');
+
+          // Clear the flag immediately after rename so watcher
+          //   can detect change
+          // In three-columns mode, manually trigger parent refresh
+          const currentView = localStorage.getItem('view') ?? 'icon-view';
+          // eslint-disable-next-line no-console -- Debugging
+          console.log('Current view:', currentView);
+          if (currentView === 'three-columns') {
+            // Mark parent folder as having pending changes
+            foldersWithPendingChanges.add(parentPath);
+
+            // Find and click the parent folder to refresh it
+            const parentElements = $$('a[data-path]');
+            let foundParent = false;
+            for (const el of parentElements) {
+              const elPath = decodeURIComponent(
+                /** @type {HTMLElement} */ (el).dataset.path || ''
+              );
+              if (elPath === parentPath) {
+                foundParent = true;
+                const li = el.closest('li');
+                if (li) {
+                  // Save scroll positions of all columns before refresh
+                  /**
+                   * @type {Array<{
+                   *   index: number,
+                   *   path: string,
+                   *   scrollTop: number,
+                   *   scrollLeft: number
+                   * }>}
+                   */
+                  const scrollPositions = [];
+                  $$('.miller-column').forEach((col, index) => {
+                    // Get the directory path this column represents
+                    // by looking at any item's path and getting its parent dir
+                    const anyItem = col.querySelector(
+                      'a[data-path], span[data-path]'
+                    );
+                    let colDirPath = '';
+                    if (anyItem) {
+                      const itemPath = /** @type {HTMLElement} */ (anyItem).
+                        dataset.path;
+                      if (itemPath) {
+                        // Decode and get parent directory
+                        const decoded = decodeURIComponent(itemPath);
+                        colDirPath = path.dirname(decoded);
+                      }
+                    }
+                    scrollPositions.push({
+                      index,
+                      path: colDirPath,
+                      scrollTop: col.scrollTop,
+                      scrollLeft: col.scrollLeft
+                    });
+                  });
+
+                  // Trigger refresh
+                  jQuery(li).trigger('click');
+
+                  // After refresh, find and select the renamed item
+                  // eslint-disable-next-line no-loop-func -- Loop breaks after
+                  setTimeout(() => {
+                    const encodedNewPath = parentPath + '/' +
+                      encodeURIComponent(newName);
+                    const renamedElement = $(
+                      `[data-path="${CSS.escape(encodedNewPath)}"]`
+                    );
+                    if (renamedElement) {
+                      const reselectLi = renamedElement.closest('li');
+                      if (reselectLi) {
+                        jQuery(reselectLi).trigger('click');
+
+                        // Restore scroll after plugin finishes rebuild
+                        // Plugin rebuilds columns async after click,
+                        // so wait for completion before restoring
+                        setTimeout(() => {
+                          // Get fresh column references after rebuild
+                          const newColumns = $$('.miller-column');
+
+                          // Restore scroll by matching paths, not indices
+                          newColumns.forEach((col) => {
+                            // Skip collapsed columns
+                            if (col.classList.contains('miller-collapse')) {
+                              return;
+                            }
+                            // Get the directory path this column represents
+                            const anyItem = col.querySelector(
+                              'a[data-path], span[data-path]'
+                            );
+                            let colDirPath = '';
+                            if (anyItem) {
+                              const itemPath = /** @type {HTMLElement} */
+                                (anyItem).dataset.path;
+                              if (itemPath) {
+                                const decoded = decodeURIComponent(itemPath);
+                                colDirPath = path.dirname(decoded);
+                              }
+                            }
+                            // Find saved scroll for this path
+                            const saved = scrollPositions.find(
+                              (sp) => sp.path === colDirPath
+                            );
+                            if (saved && saved.scrollTop > 0) {
+                              col.scrollTop = saved.scrollTop;
+                              col.scrollLeft = saved.scrollLeft;
+                            }
+                          });
+
+                          // Don't scroll the renamed item into view - trust
+                          // the restored scroll position preserves the user's
+                          // intended view
+
+                          // Clear the flag well after watcher debounce
+                          setTimeout(() => {
+                            isCreating = false;
+                          }, 600);
+                        }, 100);
+                      }
+                    }
+
+                    if (onComplete) {
+                      setTimeout(onComplete, 100);
+                    }
+                  }, 200);
+                  break;
+                }
+              }
+            }
+
+            if (!foundParent) {
+              // eslint-disable-next-line no-console -- Debugging
+              console.log('  -> Parent not found in DOM');
+              // Clear the flag if parent not found
+              setTimeout(() => {
+                isCreating = false;
+              }, 800);
+            }
+          } else {
+            // For icon view, manually refresh
+            changePath();
+
+            // Re-select the renamed item after view refresh
+            setTimeout(() => {
+              const encodedNewPath = parentPath + '/' +
+                encodeURIComponent(newName);
+              const renamedElement = $(
+                `[data-path="${CSS.escape(encodedNewPath)}"]`
+              );
+              if (renamedElement) {
+                const li = renamedElement.closest('li');
+                if (li) {
+                  // Remove selection from all items
+                  $$('.miller-selected').
+                    forEach((el) => {
+                      el.classList.remove('miller-selected');
+                    });
+                  // Select the renamed item
+                  li.classList.add('miller-selected');
+
+                  // Focus the parent ul to enable keyboard navigation
+                  // without triggering folder navigation
+                  const parentUl = li.closest('ul');
+                  if (parentUl) {
+                    parentUl.setAttribute('tabindex', '0');
+                    parentUl.focus();
+                  }
+
+                  // Scroll into view
+                  requestAnimationFrame(() => {
+                    li.scrollIntoView({
+                      block: 'nearest',
+                      inline: 'nearest'
+                    });
+                  });
+                }
+              }
+
+              // Call completion callback after everything is done
+              if (onComplete) {
+                setTimeout(onComplete, 250);
+              } else {
+                // If no callback, just clear the flag after a delay
+                setTimeout(() => {
+                  isCreating = false;
+                }, 250);
+              }
+            }, 100);
+          }
+        } catch (err) {
+          // eslint-disable-next-line no-alert -- User feedback
+          alert('Failed to rename: ' + (/** @type {Error} */ (err)).message);
+          input.remove();
+          textElement.textContent = originalContent;
+
+          // Call completion callback on error too
+          if (onComplete) {
+            onComplete();
+          }
+        }
+      } else {
+        // No rename needed, but still need to refresh to ensure proper state
+        input.remove();
+        textElement.textContent = originalContent;
+
+        // Get the path before refresh
+        const itemPath = oldPath;
+
+        // In three-columns mode, let the watcher handle refreshes
+        const currentView = localStorage.getItem('view') ?? 'icon-view';
+        if (currentView !== 'three-columns') {
+          // For icon view, manually refresh
+          changePath();
+        }
+
+        // Re-select the item after view refresh
+        setTimeout(() => {
+          const itemElement = $(
+            `[data-path="${CSS.escape(itemPath)}"]`
+          );
+          if (itemElement) {
+            const li = itemElement.closest('li');
+            if (li) {
+              // Remove selection from all items
+              $$('.miller-selected').
+                forEach((el) => {
+                  el.classList.remove('miller-selected');
+                });
+              // Select the item
+              li.classList.add('miller-selected');
+
+              // Focus the parent ul to enable keyboard navigation
+              // without triggering folder navigation
+              const parentUl = li.closest('ul');
+              if (parentUl) {
+                parentUl.setAttribute('tabindex', '0');
+                parentUl.focus();
+              }
+
+              // Scroll into view
+              li.scrollIntoView({
+                block: 'nearest',
+                inline: 'nearest'
+              });
+            }
+          }
+
+          // Call completion callback after everything is done
+          if (onComplete) {
+            // Delay clearing the flag to ensure watcher timeout has passed
+            setTimeout(onComplete, 250);
+          }
+        }, currentView === 'three-columns' ? 350 : 100);
+      }
+    };
+
+    input.addEventListener('blur', finishRename);
+
+    input.addEventListener('keydown', (ev) => {
+      // Stop propagation to prevent miller-columns from handling these events
+      ev.stopPropagation();
+
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        input.blur();
+      } else if (ev.key === 'Escape') {
+        ev.preventDefault();
+        input.remove();
+        textElement.textContent = originalContent;
+      }
+    });
+
+    // Also stop propagation for keypress and keyup to prevent interference
+    input.addEventListener('keypress', (ev) => {
+      ev.stopPropagation();
+    });
+    input.addEventListener('keyup', (ev) => {
+      ev.stopPropagation();
+    });
+  };
+
+  /**
+   * @param {Event} e
+   */
+  const folderContextmenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const {path: pth} = /** @type {HTMLElement} */ (e.target).dataset;
+    if (!pth) {
+      return;
+    }
+
+    const customContextMenu = jml('ul', {
+      class: 'context-menu',
+      style: {
+        left: /** @type {MouseEvent} */ (e).pageX + 'px',
+        top: /** @type {MouseEvent} */ (e).pageY + 'px'
+      }
+    }, [
+      ['li', {
+        class: 'context-menu-item',
+        $on: {
+          click () {
+            shell.openPath(pth);
+          }
+        }
+      }, [
+        'Open in Finder'
+      ]],
+      ['li', {
+        class: 'context-menu-item',
+        $on: {
+          click () {
+            customContextMenu.style.display = 'none';
+
+            // Create a temporary new file in the folder
+            const folderPath = decodeURIComponent(pth);
+
+            // Find an available "untitled.txt" name
+            const baseName = 'untitled';
+            const extension = '.txt';
+            let tempFileName = baseName + extension;
+            let counter = 2;
+
+            while (existsSync(path.join(folderPath, tempFileName))) {
+              tempFileName = baseName + counter + extension;
+              counter++;
+            }
+
+            const tempFilePath = path.join(folderPath, tempFileName);
+
+            try {
+              // Create empty file
+              writeFileSync(tempFilePath, '');
+
+              // Refresh the view to show the new file
+              changePath();
+
+              // Wait for the view to refresh, then find the folder and trigger
+              //   it to load children
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  // Find the folder element (anchor tag with this path)
+                  const folderElement = $$('a[data-path]').find(
+                    /** @type {(el: Element) => boolean} */ (
+                      el
+                    ) => /** @type {HTMLElement} */ (el).dataset.path === pth
+                  );
+
+                  if (folderElement && folderElement.parentElement) {
+                    // Trigger the folder to be selected so miller-columns
+                    //   builds its children
+                    jQuery(folderElement.parentElement).trigger('click');
+
+                    // Now wait for children to be built and find our file
+                    const tryFindElement = (attempts = 0) => {
+                      if (attempts > 20) {
+                        // eslint-disable-next-line no-console -- Debugging
+                        console.log(
+                          'Could not find newly created file ' +
+                          'element after multiple attempts'
+                        );
+                        return;
+                      }
+
+                      requestAnimationFrame(() => {
+                        // The data-path attribute uses:
+                        //   childDirectory + '/' + encodeURIComponent(title)
+                        // where childDirectory is the decoded path, so we
+                        //   need to decode pth first
+                        const decodedFolderPath = decodeURIComponent(pth);
+                        const encodedPath = decodedFolderPath +
+                          '/' + encodeURIComponent(tempFileName);
+
+                        // Minimal logging
+                        // Check both span and a tags (files are span,
+                        //   folders are a)
+                        const allElements = [
+                          ...$$('span[data-path]'),
+                          ...$$('a[data-path]')
+                        ];
+
+                        // Find by matching the data-path attribute directly
+                        const newFileElement = allElements.find(
+                          /** @type {(el: Element) => boolean} */ (
+                            el
+                          ) => /** @type {HTMLElement} */ (
+                            el
+                          ).dataset.path === encodedPath
+                        );
+
+                        if (newFileElement) {
+                          startRename(/** @type {HTMLElement} */ (
+                            newFileElement
+                          ));
+                        } else {
+                          // Try again
+                          tryFindElement(attempts + 1);
+                        }
+                      });
+                    };
+                    tryFindElement();
+                  } else {
+                    // Minimal logging on failure
+                  }
+                });
+              });
+            } catch (err) {
+              // eslint-disable-next-line no-alert -- User feedback
+              alert(
+                'Failed to create file: ' + (/** @type {Error} */ (err)).message
+              );
+            }
+          }
+        }
+      }, [
+        'Create text file'
+      ]],
+      ['li', {
+        class: 'context-menu-item',
+        $on: {
+          click () {
+            customContextMenu.style.display = 'none';
+            // Find the element with this path
+            const targetElement = $(
+              `[data-path="${CSS.escape(pth)}"]`
+            );
+            if (targetElement) {
+              startRename(targetElement);
+            }
+          }
+        }
+      }, [
+        'Rename'
+      ]],
+      ['li', {
+        class: 'context-menu-item',
+        $on: {
+          click (ev) {
+            ev.stopPropagation();
+            customContextMenu.style.display = 'none';
+            deleteItem(pth);
+          }
+        }
+      }, [
+        'Delete'
+      ]]
+    ], document.body);
+
+    // Ensure main context menu is visible within viewport
+    requestAnimationFrame(() => {
+      const menuRect = customContextMenu.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      // Adjust horizontal position if needed
+      if (menuRect.right > viewportWidth) {
+        customContextMenu.style.left =
+          (viewportWidth - menuRect.width - 10) + 'px';
+      }
+      if (menuRect.left < 0) {
+        customContextMenu.style.left = '10px';
+      }
+
+      // Adjust vertical position if needed
+      if (menuRect.bottom > viewportHeight) {
+        customContextMenu.style.top =
+          (viewportHeight - menuRect.height - 10) + 'px';
+      }
+      if (menuRect.top < 0) {
+        customContextMenu.style.top = '10px';
+      }
+    });
+
+    // Hide the custom context menu when clicking anywhere else
+    const hideCustomContextMenu = () => {
+      customContextMenu.style.display = 'none';
+      document.removeEventListener('click', hideCustomContextMenu);
+      document.removeEventListener('contextmenu', hideCustomContextMenu);
+    };
+    document.addEventListener('click', hideCustomContextMenu, {
+      capture: true
+    });
+    document.addEventListener('contextmenu', hideCustomContextMenu, {
+      capture: true
+    });
+  };
+
+  /**
+   * @param {Event} e
+   */
+  const contextmenu = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const {path: pth} = /** @type {HTMLElement} */ (e.target).dataset;
+    if (!pth) {
+      return;
+    }
+    /** @type {import('open-with-me').OpenWithApp & {image?: string}} */
+    let defaultApp = {name: '', path: '', rank: '', image: ''};
+    const appsOrig = await getOpenWithApps(pth);
+    const icons = await getAppIcons(appsOrig);
+
+    // Add icons to apps before filtering
+    const appsWithIcons = appsOrig.map((app, idx) => {
+      // @ts-expect-error Add it ourselves
+      app.image = icons[idx];
+      return app;
+    });
+
+    // Find default app and filter
+    const apps = appsWithIcons.filter((app) => {
+      if (app.isSystemDefault) {
+        defaultApp = app;
+      }
+      return !app.isSystemDefault;
+    }).toSorted((a, b) => {
+      return a.name.localeCompare(b.name);
+    });
+
+    const customContextMenu = jml('ul', {
+      class: 'context-menu',
+      style: {
+        left: /** @type {MouseEvent} */ (e).pageX + 'px',
+        top: /** @type {MouseEvent} */ (e).pageY + 'px'
+      }
+    }, [
+      ['li', {
+        class: 'context-menu-item',
+        $on: {
+          click () {
+            shell.openPath(pth);
+          }
+        }
+      }, [
+        'Open'
+      ]],
+      ['li', {
+        class: 'context-menu-item has-submenu'
+      }, [
+        'Open with...',
+        ['ul', {class: 'context-submenu'}, [
+          ['li', {
+            class: 'context-menu-item', dataset: {
+              apppath: defaultApp.path
+            }}, [
+            defaultApp.name + ' (default)'
+          ]],
+          ['li', {class: 'context-menu-separator'}],
+          ...apps.map((app) => {
+            return /** @type {import('jamilih').JamilihArray} */ (['li', {
+              class: 'context-menu-item', dataset: {
+                apppath: app.path
+              }}, [
+              app.name
+            ]]);
+          })
+        ]]
+      ]],
+      ['li', {
+        class: 'context-menu-item',
+        $on: {
+          click () {
+            customContextMenu.style.display = 'none';
+            // Find the element with this path
+            const targetElement = $(
+              `[data-path="${CSS.escape(pth)}"]`
+            );
+            if (targetElement) {
+              startRename(targetElement);
+            }
+          }
+        }
+      }, [
+        'Rename'
+      ]],
+      ['li', {
+        class: 'context-menu-item',
+        $on: {
+          click (ev) {
+            ev.stopPropagation();
+            customContextMenu.style.display = 'none';
+            deleteItem(pth);
+          }
+        }
+      }, [
+        'Delete'
+      ]]
+    ], document.body);
+
+    // Ensure main context menu is visible within viewport
+    requestAnimationFrame(() => {
+      const menuRect = customContextMenu.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      // Adjust horizontal position if needed
+      if (menuRect.right > viewportWidth) {
+        customContextMenu.style.left =
+          (viewportWidth - menuRect.width - 10) + 'px';
+      }
+      if (menuRect.left < 0) {
+        customContextMenu.style.left = '10px';
+      }
+
+      // Adjust vertical position if needed
+      if (menuRect.bottom > viewportHeight) {
+        customContextMenu.style.top =
+          (viewportHeight - menuRect.height - 10) + 'px';
+      }
+      if (menuRect.top < 0) {
+        customContextMenu.style.top = '10px';
+      }
+    });
+
+    // const targetElement = e.target;
+
+    // Hide the custom context menu when clicking anywhere else
+    const hideCustomContextMenu = () => {
+      // eslint-disable-next-line @stylistic/max-len -- Long
+      // if (!customContextMenu.contains(/** @type {MouseEvent & {target: Node}} */ (ev).target) &&
+      //   ev.target !== targetElement
+      // ) {
+      customContextMenu.style.display = 'none';
+      document.removeEventListener('click', hideCustomContextMenu);
+      document.removeEventListener('contextmenu', hideCustomContextMenu);
+      // }
+    };
+    document.addEventListener('click', hideCustomContextMenu, {
+      capture: true
+    });
+    document.addEventListener('contextmenu', hideCustomContextMenu, {
+      capture: true
+    });
+
+    // Add functionality to submenu items
+    const submenu = /** @type {HTMLElement|null} */ (
+      customContextMenu.querySelector('.context-submenu')
+    );
+    if (submenu) {
+      submenu.querySelectorAll('.context-menu-item').forEach((
+        item, idx
+      ) => {
+        /** @type {HTMLElement} */
+        const htmlItem = /** @type {HTMLElement} */ (item);
+        const iconUrl = idx === 0
+          ? defaultApp.image
+          // @ts-expect-error We added it above
+          : apps[idx - 1]?.image;
+
+        // Only set background if we have a valid icon URL
+        if (iconUrl && iconUrl.trim()) {
+          htmlItem.style.setProperty(
+            '--background',
+            `url("${iconUrl}")`
+          );
+        }
+
+        item.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          customContextMenu.style.display = 'none';
+          const {apppath} = /** @type {HTMLElement} */ (item).dataset;
+          if (!apppath) {
+            return;
+          }
+          spawnSync('open', [
+            '-a',
+            apppath,
+            pth
+          ]);
+        });
+      });
+
+      // Ensure submenu is visible horizontally by adjusting its position
+      // Use mouseenter to check when submenu becomes visible
+      const parentLi = submenu.parentElement;
+      if (parentLi) {
+        parentLi.addEventListener('mouseenter', () => {
+          requestAnimationFrame(() => {
+            // Get measurements BEFORE any adjustments
+            const submenuRect = submenu.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            // Check if submenu actually overflows (is already
+            //   visible but cut off)
+            const actuallyOverflowsRight = submenuRect.right > viewportWidth;
+            const actuallyOverflowsBottom = submenuRect.bottom > viewportHeight;
+            const actuallyOverflowsTop = submenuRect.top < 0;
+
+            // Handle horizontal overflow - only reposition submenu,
+            //   never main menu
+            if (actuallyOverflowsRight) {
+              const parentRect = parentLi.getBoundingClientRect();
+              const wouldFitOnLeft = parentRect.left - submenuRect.width >= 0;
+
+              if (wouldFitOnLeft) {
+                // Open to the left instead
+                submenu.style.left = 'auto';
+                submenu.style.right = '100%';
+              } else {
+                // Can't fit on left either, pin to right edge of viewport
+                submenu.style.left = 'auto';
+                submenu.style.right = '10px';
+              }
+            }
+
+            // Handle vertical overflow - only reposition submenu,
+            //   never main menu
+            if (actuallyOverflowsTop) {
+              // Submenu is cut off at the top, position it at viewport top
+              submenu.style.position = 'fixed';
+              submenu.style.top = '10px';
+              submenu.style.bottom = 'auto';
+              submenu.style.left = submenuRect.left + 'px';
+            } else if (actuallyOverflowsBottom) {
+              const parentRect = parentLi.getBoundingClientRect();
+              const wouldFitOnTop = parentRect.top - submenuRect.height >= 0;
+
+              if (wouldFitOnTop) {
+                // Align to bottom of parent instead
+                submenu.style.top = 'auto';
+                submenu.style.bottom = '0';
+              } else {
+                // Can't fit on top either, pin to bottom edge of viewport
+                submenu.style.position = 'fixed';
+                submenu.style.top = 'auto';
+                submenu.style.bottom = '10px';
+                submenu.style.left = submenuRect.left + 'px';
+              }
+            }
+          });
+        });
+      }
+    }
+  };
+
+  const listItems = result.map(([
+    isDir,
+    // eslint-disable-next-line no-unused-vars -- Not in use
+    _childDir,
+    title
+  ]) => {
+    const li = jml(
+      view === 'icon-view' ? 'td' : 'li',
+      {
+        class: 'list-item'
+        // style: url ? 'list-style-image: url("' + url + '")' : undefined
+      }, [
+        isDir
+          ? ['a', {
+            title: basePath + encodeURIComponent(title),
+            $on: {
+              contextmenu: folderContextmenu
+            },
+            dataset: {
+              path: basePath + encodeURIComponent(title)
+            },
+            ...(view === 'icon-view'
+              ? {
+                href: '#path=' + basePath + encodeURIComponent(title)
+              }
+              : {})
+          }, [
+            title
+          ]]
+          : ['span', {
+            title: basePath + encodeURIComponent(title),
+            $on: {
+              contextmenu
+            },
+            dataset: {
+              path: basePath + encodeURIComponent(title)
+            }
+          }, [title]]
+      ]
+    );
+
+    getIconDataURLForFile(
+      path.join(basePath, title)
+    ).then((url) => {
+      const width = '25px';
+      const paddingTopBottom = '5px';
+      const paddingRightLeft = '30px';
+      const marginTopBottom = '18px';
+      li.setAttribute(
+        'style',
+        url
+          ? `margin-top: ${
+            marginTopBottom
+          }; margin-bottom: ${
+            marginTopBottom
+          }; padding: ${paddingTopBottom} ${
+            paddingRightLeft
+          } ${paddingTopBottom} ${
+            paddingRightLeft
+          }; background-image: url(${
+            url
+          }); background-size: ${width};`
+          : ''
+      );
+      return undefined;
+    });
+
+    return li;
+  });
+
+  const numIconColumns = 4;
+
+  jml(ul, [
+    (view === 'icon-view' && basePath !== '/'
+      ? [
+        'li', [
+          ['a', {
+            title: path.normalize(path.join(basePath, '..')),
+            href: '#path=' + path.normalize(path.join(basePath, '..'))
+          }, [
+            '..'
+          ]]
+        ]
+      ]
+      : ''),
+    ...(view === 'icon-view'
+      ? /** @type {import('jamilih').JamilihArray[]} */ ([[
+        'table',
+        chunk(listItems, numIconColumns).map((innerArr) => {
+          return ['tr', innerArr];
+        })
+      ]])
+      : listItems)
+  ]);
+
+  if ($columns?.destroy) {
+    $columns.destroy();
+    if (view === 'icon-view') {
+      changePath();
+    }
+  }
+
+  if (view === 'icon-view') {
+    return;
+  }
+
+  const millerColumns = jQuery('div.miller-columns');
+  const parentMap = new WeakMap();
+  const childMap = new WeakMap();
+  $columns = millerColumns.millerColumns({
+    // Options:
+    // preview () {
+    //   return 'preview placeholder';
+    // },
+    animation () {
+      // No-op to avoid need for timeouts and jarring redraws
+    },
+    // @ts-ignore Sometime bugginess
+    current ($item /* , $cols */) {
+      /**
+       * @param {string} pth
+       */
+      const updateHistoryAndStickies = (pth) => {
+        history.replaceState(
+          null,
+          '',
+          location.pathname + '#path=' + encodeURIComponent(
+            pth
+          )
+        );
+        const saved = localStorage.getItem(`stickyNotes-${pth}`);
+        stickyNotes.clear(({metadata}) => {
+          return metadata.type === 'local';
+        });
+        if (saved) {
+          stickyNotes.loadNotes(JSON.parse(saved));
+          stickyNotes.notes.forEach((note) => {
+            if (note.metadata.type === 'local') {
+              addStickyInputListeners(note, pth);
+            }
+          });
+        }
+      };
+      // Minimal logging: diagnostics removed
+      let needsRefresh = false;
+
+      if (parentMap.has($item[0])) {
+        const itemPath = parentMap.get($item[0]);
+
+        // Check if this folder has pending changes
+        const hasPendingChanges =
+          itemPath && foldersWithPendingChanges.has(itemPath);
+
+        if (hasPendingChanges) {
+          // Pending changes detected; rebuild next
+
+          // Clear the pending changes flag
+          foldersWithPendingChanges.delete(itemPath);
+
+          // Mark that we need to do a full refresh rebuild
+          needsRefresh = true;
+
+          // Clear plugin data from this item
+          // (DOM cleanup will happen before addItem)
+          const anchorEl = $item.children('a[title]')[0];
+          if (anchorEl) {
+            jQuery(anchorEl).removeData('miller-columns-child');
+          }
+          $item.removeData('miller-columns-ancestor');
+          $item.removeClass('miller-columns-parent');
+
+          // Clear caches for this specific item
+          parentMap.delete($item[0]);
+          childMap.delete($item[0]);
+
+          // Fall through to force reload
+        } else {
+          // No pending changes - use normal cached behavior
+          updateHistoryAndStickies(itemPath);
+
+          const childElement = childMap.get($item[0]);
+          if (childElement) {
+            // Scroll the child item's parent column into view
+            const column = childElement.closest('.miller-column');
+            if (column) {
+              // Skip scrollIntoView during rename to preserve scroll
+              if (!isCreating) {
+                requestAnimationFrame(() => {
+                  requestAnimationFrame(() => {
+                    column.scrollIntoView({
+                      block: 'nearest',
+                      inline: 'start'
+                    });
+                  });
+                });
+              }
+            }
+          }
+          return;
+        }
+      }
+
+      // If we reach here, either:
+      // 1. Item wasn't in parentMap (fresh load)
+      // 2. Item had pending changes (need to reload)
+
+      const a = $item.children('a[title]');
+      if (!a.length) {
+        return;
+      }
+
+      const parent = $item.parent();
+      const prev = parent.prevAll(
+        'ul.miller-column:not(.miller-collapse)'
+      ).first();
+      const parentLi = prev.children('li.miller-selected')[0];
+
+      const parentText = parentMap.get(parentLi) ?? '';
+      const currentPath = parentText + '/' + a.text();
+
+      // Minimal logging
+
+      updateHistoryAndStickies(currentPath);
+
+      // Check if this folder has pending changes and remove from tracking
+      const hasPendingChanges2 =
+        foldersWithPendingChanges.has(currentPath);
+      if (hasPendingChanges2) {
+        foldersWithPendingChanges.delete(currentPath);
+      }
+
+      const childResult = readDirectory(currentPath);
+      // Minimal logging
+
+      const childItems = childResult.map(([
+        isDir, childDirectory, title
+      ]) => {
+        const width = '25px';
+        const paddingRightLeft = '30px';
+        const marginTopBottom = '18px';
+        const li = jml('li', {class: 'list-item'}, [
+          isDir
+            ? ['a', {
+              title: childDirectory + '/' +
+                encodeURIComponent(title),
+              $on: {
+                contextmenu: folderContextmenu
+              },
+              dataset: {
+                path: childDirectory + '/' +
+                  encodeURIComponent(title)
+              }
+              // href: '#path=' + childDirectory + '/' +
+              //  encodeURIComponent(title)
+            }, [
+              title
+            ]]
+            : ['span', {
+              $on: {
+                contextmenu
+              },
+              title: childDirectory + '/' +
+                encodeURIComponent(title),
+              dataset: {
+                path: childDirectory + '/' +
+                  encodeURIComponent(title)
+              }
+            }, [title]]
+        ]);
+        getIconDataURLForFile(
+          path.join(childDirectory, title)
+        ).then((url) => {
+          li.setAttribute(
+            'style',
+            url
+              ? `margin-top: ${
+                marginTopBottom
+              }; margin-bottom: ${
+                marginTopBottom
+              }; padding: 0 ${
+                paddingRightLeft
+              } 0 ${
+                paddingRightLeft
+              }; list-style: none; background-image: url(${
+                url
+              }); background-repeat: no-repeat; ` +
+              `background-position: left center; background-size: ${width};`
+              : ''
+          );
+          return undefined;
+        });
+
+        return li;
+      });
+
+      // Build children - use refreshChildren for refresh, addItem for fresh
+      if (needsRefresh && $columns.refreshChildren &&
+          typeof $columns.refreshChildren === 'function') {
+        // For refresh: use refreshChildren to replace children properly
+        $columns.refreshChildren(
+          $item,
+          childItems.map((item) => jQuery(item))
+        );
+
+        if (childItems.length > 0) {
+          childMap.set($item[0], childItems[0]);
+          // Skip scrollIntoView during rename to preserve scroll restoration
+          if (!isCreating) {
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                childItems[0].scrollIntoView({
+                  block: 'start', inline: 'start'
+                });
+              });
+            });
+          }
+        }
+      } else if ($columns.addItem && typeof $columns.addItem === 'function') {
+        // Normal addItem path for first-time navigation
+        const addItemFn = $columns.addItem;
+
+        childItems.forEach((childItem, idx) => {
+          const item = addItemFn.call($columns, jQuery(childItem), $item);
+
+          if (idx === 0) {
+            childMap.set($item[0], item[0]);
+            // Skip scrollIntoView during rename to preserve scroll restoration
+            if (!isCreating) {
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  item[0].scrollIntoView({
+                    block: 'start', inline: 'start'
+                  });
+                });
+              });
+            }
+          }
+        });
+      }
+
+      // CRITICAL: Update parentMap after building children
+      // This ensures subsequent navigation will hit the cache path
+      parentMap.set($item[0], currentPath);
+
+      // Set up watcher for this expanded folder in miller columns view
+      const currentView = localStorage.getItem('view') ?? 'icon-view';
+      if (currentView === 'three-columns') {
+        setupFileWatcher(currentPath);
+
+        // Also set up watchers for all ancestor directories to detect
+        // sibling changes
+        let ancestorPath = path.dirname(currentPath);
+        while (ancestorPath && ancestorPath !== '/' && ancestorPath !== '.') {
+          setupFileWatcher(ancestorPath);
+          const nextAncestor = path.dirname(ancestorPath);
+          if (nextAncestor === ancestorPath) {
+            break;
+          }
+          ancestorPath = nextAncestor;
+        }
+      }
+    }
+  });
+
+  $columns.on('dblclick', (e) => {
+    if (e.target.dataset.path) {
+      shell.openPath(e.target.dataset.path);
+    }
+  });
+  $columns.on('keydown', (e) => {
+    const selectedLi = $columns.find('li.miller-selected').last();
+    const pth = selectedLi.find('span, a')[0]?.dataset?.path;
+
+    if (e.metaKey && e.key === 'o' && pth) {
+      shell.openPath(pth);
+    }
+
+    // Cmd+Delete to delete selected item
+    if (e.metaKey && e.key === 'Backspace' && pth) {
+      e.preventDefault();
+      deleteItem(pth);
+    }
+
+    // Cmd+Shift+N to create new folder
+    if (e.metaKey && e.shiftKey && e.key === 'n') {
+      e.preventDefault();
+
+      // Determine the folder path based on current selection
+      let folderPath = '/';
+      if (selectedLi.length) {
+        const anchor = selectedLi.find('a[title]');
+        if (anchor.length && anchor[0].dataset.path) {
+          // If selected item is a folder, create inside it
+          folderPath = decodeURIComponent(anchor[0].dataset.path);
+        } else {
+          // If selected item is a file, create in its parent folder
+          const span = selectedLi.find('span[title]');
+          if (span.length && span[0].dataset.path) {
+            folderPath = path.dirname(decodeURIComponent(span[0].dataset.path));
+          }
+        }
+      }
+
+      createNewFolder(folderPath);
+    }
+
+    // Enter key to rename
+    if (e.key === 'Enter' && selectedLi.length) {
+      e.preventDefault();
+      const textElement = selectedLi.find('span, a')[0];
+      if (textElement) {
+        startRename(textElement);
+      }
+    }
+  });
+
+  // Context menu for empty areas in column panes
+  $columns.on('contextmenu', (e) => {
+    // eslint-disable-next-line prefer-destructuring -- TS
+    const target = /** @type {HTMLElement} */ (e.target);
+
+    // Only show context menu if clicking on the ul.miller-column
+    //   itself, not on items
+    if (!target.classList.contains('miller-column')) {
+      return;
+    }
+
+    e.preventDefault();
+
+    // Find which column was clicked and get its path
+    const columnElement = target;
+    const prevColumn = jQuery(columnElement).prevAll(
+      'ul.miller-column:not(.miller-collapse)'
+    ).first();
+    const selectedInPrev = prevColumn.find('li.miller-selected');
+
+    let folderPath = '/';
+    if (selectedInPrev.length) {
+      const anchor = selectedInPrev.find('a[title]');
+      if (anchor.length && anchor[0].dataset.path) {
+        folderPath = decodeURIComponent(anchor[0].dataset.path);
+      }
+    }
+
+    const customContextMenu = jml('ul', {
+      class: 'context-menu',
+      style: {
+        left: e.pageX + 'px',
+        top: e.pageY + 'px'
+      }
+    }, [
+      ['li', {
+        class: 'context-menu-item',
+        $on: {
+          click () {
+            customContextMenu.style.display = 'none';
+            createNewFolder(folderPath);
+          }
+        }
+      }, [
+        'Create new folder'
+      ]]
+    ], document.body);
+
+    // Ensure main context menu is visible within viewport
+    requestAnimationFrame(() => {
+      const menuRect = customContextMenu.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      // Adjust horizontal position if needed
+      if (menuRect.right > viewportWidth) {
+        customContextMenu.style.left =
+          (viewportWidth - menuRect.width - 10) + 'px';
+      }
+      if (menuRect.left < 0) {
+        customContextMenu.style.left = '10px';
+      }
+
+      // Adjust vertical position if needed
+      if (menuRect.bottom > viewportHeight) {
+        customContextMenu.style.top =
+          (viewportHeight - menuRect.height - 10) + 'px';
+      }
+      if (menuRect.top < 0) {
+        customContextMenu.style.top = '10px';
+      }
+    });
+
+    // Hide the custom context menu when clicking anywhere else
+    const hideCustomContextMenu = () => {
+      customContextMenu.style.display = 'none';
+      document.removeEventListener('click', hideCustomContextMenu);
+      document.removeEventListener('contextmenu', hideCustomContextMenu);
+    };
+    document.addEventListener('click', hideCustomContextMenu, {
+      capture: true
+    });
+    document.addEventListener('contextmenu', hideCustomContextMenu, {
+      capture: true
+    });
+  });
+
+  if (currentBasePath !== '/') {
+    currentBasePath.split('/').slice(1).forEach(
+      (pathSegment, idx) => {
+        if (pathSegment === '/') {
+          return undefined;
+        }
+
+        const ulNth = jQuery(`ul.miller-column:nth-of-type(${
+          idx + 1
+        }):not(.miller-collapse)`);
+        // eslint-disable-next-line @stylistic/max-len -- Long
+        // console.log('ul idx:', idx + ', length:', ulNth.length, '::', pathSegment);
+        const anchors = ulNth.find('a[title]').filter(
+          function () {
+            return jQuery(this).text() === pathSegment;
+          }
+        );
+        // console.log('anchors', anchors.length);
+        anchors.trigger('click');
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            anchors[0]?.scrollIntoView({
+              block: 'start',
+              inline: 'start'
+            });
+          });
+        });
+        return undefined;
+      }
+    );
+  }
+
+  // Ensure the miller-columns container is focusable and
+  //   focused for keyboard navigation
+  if (view === 'three-columns') {
+    requestAnimationFrame(() => {
+      const millerColumnsDiv = $('div.miller-columns');
+      if (millerColumnsDiv) {
+        millerColumnsDiv.setAttribute('tabindex', '0');
+        millerColumnsDiv.focus();
+      }
+    });
+  }
+}
+
+globalThis.addEventListener('hashchange', changePath);
+
+$('#icon-view').addEventListener('click', function () {
+  $$('nav button').forEach((button) => {
+    button.classList.remove('selected');
+  });
+  this.classList.add('selected');
+  localStorage.setItem('view', 'icon-view');
+  $('.miller-breadcrumbs').style.display = 'none';
+  changePath();
+});
+$('#three-columns').addEventListener('click', function () {
+  $$('nav button').forEach((button) => {
+    button.classList.remove('selected');
+  });
+  this.classList.add('selected');
+  localStorage.setItem('view', 'three-columns');
+  $('.miller-breadcrumbs').style.display = 'block';
+  changePath();
+});
+
+const view = localStorage.getItem('view') ?? 'icon-view';
+switch (view) {
+case 'three-columns':
+case 'icon-view':
+  $('#' + view).classList.add('selected');
+  break;
+default:
+  throw new Error('Unrecognized view');
+}
+
+$('#filebrowser').title = `
+    We are using Node.js ${process.versions.node},
+    Chromium ${process.versions.chrome},
+    and Electron ${process.versions.electron}.
+`;
+
+$('#create-sticky').addEventListener('click', () => {
+  const pth = $columns.find(
+    'li.miller-selected a, li.miller-selected span'
+  ).last()[0]?.dataset?.path ?? '/';
+  const note = stickyNotes.createNote({
+    metadata: {type: 'local', path: pth},
+    html: `Welcome to Sticky Notes!<br /><br />
+
+This sticky will only appear when the currently selected file or folder is
+chosen.<br /><br />
+
+Click "Create sticky for current path" to create more notes.`,
+    x: 100,
+    y: 150
+  });
+
+  addStickyInputListeners(note, pth);
+});
+
+$('#create-global-sticky').addEventListener('click', () => {
+  const note = stickyNotes.createNote({
+    metadata: {type: 'global'},
+    html: `Welcome to Sticky Notes!<br /><br />
+
+This sticky will show regardless of whatever file or folder is selected.
+<br /><br />
+
+Click "Create global sticky" to create more notes.`,
+    x: 150,
+    y: 170
+  });
+
+  note.content.addEventListener('input', () => {
+    const notes = stickyNotes.getAllNotes(({metadata}) => {
+      return metadata.type === 'global';
+    });
+    localStorage.setItem(
+      `stickyNotes-global`, JSON.stringify(notes)
+    );
+  });
+});
+
+(async () => {
+try {
+  await addMillerColumnPlugin(jQuery, {stylesheets: ['@default']});
+} catch (error) {
+  console.error('[INIT] Miller columns failed:', error);
+}
+changePath();
+
+const saved = localStorage.getItem('stickyNotes-global');
+if (saved) {
+  stickyNotes.clear(({metadata}) => {
+    return metadata.type === 'global';
+  });
+  stickyNotes.loadNotes(JSON.parse(saved));
+  stickyNotes.notes.forEach((note) => {
+    if (note.metadata.type === 'global') {
+      addStickyInputListenersGlobal(note);
+    }
+  });
+}
+})();
