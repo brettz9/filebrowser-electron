@@ -1,8 +1,8 @@
 {
   "temp-directory": "coverage/v8",
   "include": [
-    "**/*.js",
-    "**/*.cjs"
+    "src/**/*.js",
+    "src/**/*.cjs"
   ],
   "exclude": [
     "**/*.test.js",
@@ -16,6 +16,7 @@
     "forge.config.cjs",
     ".ncurc.cjs"
   ],
+  "excludeNodeModules": true,
   "reporter": ["text", "html"],
   "resolve-paths": true
 }
