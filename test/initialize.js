@@ -14,11 +14,17 @@ export const initialize = async () => {
     args: [join(process.cwd(), 'src/main.js'), '--no-sandbox'],
     env: {
       NODE_ENV: 'test',
+      // Gives us v8 (c8-friendly) coverage from `main`
       NODE_V8_COVERAGE: join(process.cwd(), 'coverage', 'v8')
     }
   });
 
   const window = await electronApplication.firstWindow();
+
+  // Start V8 coverage for renderer process
+  await window.coverage.startJSCoverage({
+    resetOnNavigation: false
+  });
 
   // eslint-disable-next-line no-console -- Testing
   window.on('console', console.log);

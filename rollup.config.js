@@ -11,7 +11,8 @@ export default {
   ],
   output: {
     file: 'index.instrumented.cjs',
-    format: 'cjs'
+    format: 'cjs',
+    sourcemap: true
   },
   plugins: [
     istanbul()

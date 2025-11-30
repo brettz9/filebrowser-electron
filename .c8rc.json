@@ -1,9 +1,8 @@
 {
-  "all": true,
-  "src": ".",
   "temp-directory": "coverage/v8",
   "include": [
-    "src/**/*.js"
+    "**/*.js",
+    "**/*.cjs"
   ],
   "exclude": [
     "**/*.test.js",
