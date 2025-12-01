@@ -37,7 +37,7 @@ const stickyNotes = new StickyNote({
     });
     if (note.metadata.type === 'local') {
       localStorage.setItem(
-        `stickyNotes-${note.metadata.path}`, JSON.stringify(notes)
+        `stickyNotes-local-${note.metadata.path}`, JSON.stringify(notes)
       );
     } else {
       localStorage.setItem(
@@ -51,14 +51,14 @@ const stickyNotes = new StickyNote({
  * @param {import('stickynote').NoteData} note
  * @param {string} pth
  */
-const addStickyInputListeners = (note, pth) => {
+const addLocalStickyInputListeners = (note, pth) => {
   const saveNotes = () => {
     const notes = stickyNotes.getAllNotes(({metadata}) => {
       return metadata.type === 'local' &&
         metadata.path === note.metadata.path;
     });
     localStorage.setItem(
-      `stickyNotes-${pth}`, JSON.stringify(notes)
+      `stickyNotes-local-${pth}`, JSON.stringify(notes)
     );
   };
   note.content.addEventListener('input', () => {
@@ -110,7 +110,7 @@ const addStickyInputListeners = (note, pth) => {
 /**
  * @param {import('stickynote').NoteData} note
  */
-const addStickyInputListenersGlobal = (note) => {
+const addGlobalStickyInputListeners = (note) => {
   const saveNotes = () => {
     const notes = stickyNotes.getAllNotes(({metadata}) => {
       return metadata.type === 'global';
@@ -553,8 +553,22 @@ async function setupNativeWatcher (dirPath) {
  */
 function changePath () {
   const view = localStorage.getItem('view') ?? 'icon-view';
+
   const currentBasePath = getBasePath();
   const basePath = view === 'icon-view' ? currentBasePath : '/';
+
+  const localSaved = localStorage.getItem(`stickyNotes-local-${basePath}`);
+  stickyNotes.clear(({metadata}) => {
+    return metadata.type === 'local';
+  });
+  if (localSaved) {
+    stickyNotes.loadNotes(JSON.parse(localSaved));
+    stickyNotes.notes.forEach((note) => {
+      if (note.metadata.type === 'local') {
+        addLocalStickyInputListeners(note, basePath);
+      }
+    });
+  }
   if (!(/^[\w.\/ \-]*$/v).test(basePath)) {
     // Todo: Refactor to allow non-ASCII and just escape single quotes, etc.
     return;
@@ -1617,6 +1631,7 @@ function addItems (result, basePath, currentBasePath) {
       ? [
         'li', [
           ['a', {
+            class: 'go-up-path',
             title: path.normalize(path.join(basePath, '..')),
             href: '#path=' + path.normalize(path.join(basePath, '..'))
           }, [
@@ -1627,7 +1642,7 @@ function addItems (result, basePath, currentBasePath) {
       : ''),
     ...(view === 'icon-view'
       ? /** @type {import('jamilih').JamilihArray[]} */ ([[
-        'table',
+        'table', {dataset: {basePath}},
         chunk(listItems, numIconColumns).map((innerArr) => {
           return ['tr', innerArr];
         })
@@ -1670,7 +1685,7 @@ function addItems (result, basePath, currentBasePath) {
             pth
           )
         );
-        const saved = localStorage.getItem(`stickyNotes-${pth}`);
+        const saved = localStorage.getItem(`stickyNotes-local-${pth}`);
         stickyNotes.clear(({metadata}) => {
           return metadata.type === 'local';
         });
@@ -1678,7 +1693,7 @@ function addItems (result, basePath, currentBasePath) {
           stickyNotes.loadNotes(JSON.parse(saved));
           stickyNotes.notes.forEach((note) => {
             if (note.metadata.type === 'local') {
-              addStickyInputListeners(note, pth);
+              addLocalStickyInputListeners(note, pth);
             }
           });
         }
@@ -2046,8 +2061,9 @@ function addItems (result, basePath, currentBasePath) {
   if (currentBasePath !== '/') {
     currentBasePath.split('/').slice(1).forEach(
       (pathSegment, idx) => {
+        /* c8 ignore next 3 -- Guard for poorly formed paths */
         if (pathSegment === '/') {
-          return undefined;
+          return;
         }
 
         const ulNth = jQuery(`ul.miller-column:nth-of-type(${
@@ -2070,7 +2086,6 @@ function addItems (result, basePath, currentBasePath) {
             });
           });
         });
-        return undefined;
       }
     );
   }
@@ -2115,6 +2130,7 @@ case 'three-columns':
 case 'icon-view':
   $('#' + view).classList.add('selected');
   break;
+/* c8 ignore next 3 -- Guard */
 default:
   throw new Error('Unrecognized view');
 }
@@ -2128,7 +2144,7 @@ $('#filebrowser').title = `
 $('#create-sticky').addEventListener('click', () => {
   const currentView = localStorage.getItem('view') ?? 'icon-view';
   const pth = currentView === 'icon-view'
-    ? jQuery('a[data-path], span[data-path]').attr('data-path')
+    ? jQuery('table[data-base-path]').attr('data-base-path')
     : ($columns && $columns.find(
       'li.miller-selected a, li.miller-selected span'
     ).last()[0]?.dataset?.path) ?? '/';
@@ -2144,7 +2160,7 @@ Click "Create sticky for current path" to create more notes.`,
     y: 150
   });
 
-  addStickyInputListeners(note, pth);
+  addLocalStickyInputListeners(note, pth);
 });
 
 $('#create-global-sticky').addEventListener('click', () => {
@@ -2160,7 +2176,7 @@ Click "Create global sticky" to create more notes.`,
     y: 170
   });
 
-  addStickyInputListenersGlobal(note);
+  addGlobalStickyInputListeners(note);
 });
 
 // eslint-disable-next-line @stylistic/max-len -- Long
@@ -2179,7 +2195,7 @@ if (saved) {
   stickyNotes.loadNotes(JSON.parse(saved));
   stickyNotes.notes.forEach((note) => {
     if (note.metadata.type === 'global') {
-      addStickyInputListenersGlobal(note);
+      addGlobalStickyInputListeners(note);
     }
   });
 }

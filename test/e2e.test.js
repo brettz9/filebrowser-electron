@@ -213,97 +213,232 @@ describe('renderer', () => {
       expect(positionAfterReload.x).toBe(positionAfterDrag.x);
       expect(positionAfterReload.y).toBe(positionAfterDrag.y);
 
-      const rootFolderRefreshed = await page.locator('a[data-path="/Users"]');
-      await rootFolderRefreshed.click();
+      const usersFolderRefreshed = await page.locator('a[data-path="/Users"]');
+      await usersFolderRefreshed.click();
 
       expect(noteContentRefreshed).toBeVisible();
     });
   });
 
-  test(
-    'creates a local sticky and retains it upon visiting and refresh',
-    async () => {
+  describe('stickies (local)', () => {
+    test(
+      'creates a local sticky and retains it upon visiting and refresh',
+      async () => {
+        await page.locator('#three-columns').click();
+
+        let noteContent = await page.locator('.sticky-note-content');
+        expect(noteContent).toBeHidden();
+
+        const usersFolder = await page.locator('a[data-path="/Users"]');
+        await usersFolder.click();
+
+        await page.locator('button#create-sticky').click();
+        noteContent = await page.locator('.sticky-note-content');
+
+        await noteContent.fill('My local sticky');
+        expect(noteContent).toBeVisible();
+
+        // Move sticky far to the right to avoid blocking any UI elements
+        // (needs to be far enough that it won't overlap after reload)
+        await dragAndDropRelativeToElement({
+          x: 2000,
+          y: 100
+        }, '.sticky-note-header', 'button#create-sticky');
+
+        // Wait for the MutationObserver debounce and save to complete
+        await page.waitForTimeout(1000);
+
+        // Get the position after drag
+        const stickyAfterDrag = await page.locator('.sticky-note');
+        const positionAfterDrag = /** @type {Box} */ (
+          await stickyAfterDrag.boundingBox()
+        );
+
+        // // Check what's actually saved in storage
+        // const savedData = await page.evaluate(() => {
+        //   // @ts-expect-error - electronAPI available via preload
+        //   return globalThis.electronAPI.storage.getItem(
+        //     'stickyNotes-global'
+        //   );
+        // });
+        // // eslint-disable-next-line no-console -- Debug
+        // console.log('Saved sticky data:', savedData);
+
+        const appFolder = await page.locator('a[data-path="/Applications"]');
+        await appFolder.click();
+
+        // Hidden as this is a local sticky
+        expect(noteContent).toBeHidden();
+
+        const window = await electron.firstWindow();
+
+        // Navigate back to root before reload to clear the hash
+        await page.evaluate(() => {
+          location.hash = '';
+        });
+
+        await window.reload();
+
+        // Wait for the page to be ready after reload
+        await page.waitForLoadState('domcontentloaded');
+
+        const noteContentRefreshed = await page.locator('.sticky-note-content');
+        expect(noteContentRefreshed).toBeHidden();
+
+
+        const usersFolderRefreshed =
+          await page.locator('a[data-path="/Users"]');
+        await usersFolderRefreshed.click();
+
+        // Get fresh locator after navigation and wait for it to be visible
+        const noteContentAfterNav = await page.locator('.sticky-note-content');
+
+        expect(noteContentAfterNav).toBeVisible();
+
+        expect(await noteContentAfterNav.textContent()).toBe(
+          'My local sticky'
+        );
+
+        // Verify the sticky position is maintained after reload
+        const stickyAfterReload = await page.locator('.sticky-note');
+        const positionAfterReload = /** @type {Box} */ (
+          await stickyAfterReload.boundingBox()
+        );
+
+        // Allow for small rendering differences (within 300px)
+        const xDiff = Math.abs(positionAfterReload.x - positionAfterDrag.x);
+        const yDiff = Math.abs(positionAfterReload.y - positionAfterDrag.y);
+        expect(xDiff).toBeLessThan(300);
+        expect(yDiff).toBeLessThan(50);
+      }
+    );
+
+    test(
+      'creates a local sticky and retains it upon visiting and ' +
+      'refresh (icon view)',
+      async () => {
+        await page.locator('#icon-view').click();
+
+        let noteContent = await page.locator('.sticky-note-content');
+        expect(noteContent).toBeHidden();
+
+        const usersFolder = await page.locator('a[data-path="/Users"]');
+        await usersFolder.click();
+
+        await page.locator('button#create-sticky').click();
+        noteContent = await page.locator('.sticky-note-content');
+
+        await noteContent.fill('My local sticky');
+        expect(noteContent).toBeVisible();
+
+        // Move sticky far to the right to avoid blocking any UI elements
+        // (needs to be far enough that it won't overlap after reload)
+        await dragAndDropRelativeToElement({
+          x: 2000,
+          y: 100
+        }, '.sticky-note-header', 'button#create-sticky');
+
+        // Wait for the MutationObserver debounce and save to complete
+        await page.waitForTimeout(1000);
+
+        // Get the position after drag
+        const stickyAfterDrag = await page.locator('.sticky-note');
+        const positionAfterDrag = /** @type {Box} */ (
+          await stickyAfterDrag.boundingBox()
+        );
+
+        // // Check what's actually saved in storage
+        // const savedData = await page.evaluate(() => {
+        //   // @ts-expect-error - electronAPI available via preload
+        //   return globalThis.electronAPI.storage.getItem(
+        //     'stickyNotes-global'
+        //   );
+        // });
+        // // eslint-disable-next-line no-console -- Debug
+        // console.log('Saved sticky data:', savedData);
+
+        const backToRootFolder = await page.locator('a.go-up-path');
+        await backToRootFolder.click();
+
+        // Hidden as this is a local sticky
+        expect(noteContent).toBeHidden();
+
+        const appFolder = await page.locator('a[data-path="/Applications"]');
+        await appFolder.click();
+
+        // Hidden as this is a local sticky
+        expect(noteContent).toBeHidden();
+
+        const window = await electron.firstWindow();
+
+        // Navigate back to root before reload to clear the hash
+        await page.evaluate(() => {
+          location.hash = '';
+        });
+
+        await window.reload();
+
+        // Wait for the page to be ready after reload
+        await page.waitForLoadState('domcontentloaded');
+
+        const noteContentRefreshed = await page.locator('.sticky-note-content');
+        expect(noteContentRefreshed).toBeHidden();
+
+
+        const usersFolderRefreshed =
+          await page.locator('a[data-path="/Users"]');
+        await usersFolderRefreshed.click();
+
+        // Get fresh locator after navigation and wait for it to be visible
+        const noteContentAfterNav = await page.locator('.sticky-note-content');
+
+        await noteContentAfterNav.waitFor({state: 'visible', timeout: 10000});
+
+        expect(noteContentAfterNav).toBeVisible();
+
+        expect(await noteContentAfterNav.textContent()).toBe(
+          'My local sticky'
+        );
+
+        // Verify the sticky position is maintained after reload
+        const stickyAfterReload = await page.locator('.sticky-note');
+        const positionAfterReload = /** @type {Box} */ (
+          await stickyAfterReload.boundingBox()
+        );
+
+        // Allow for small rendering differences (within 300px)
+        const xDiff = Math.abs(positionAfterReload.x - positionAfterDrag.x);
+        const yDiff = Math.abs(positionAfterReload.y - positionAfterDrag.y);
+        expect(xDiff).toBeLessThan(300);
+        expect(yDiff).toBeLessThan(50);
+      }
+    );
+  });
+
+  describe('column browser', () => {
+    test('retains path upon refresh', async () => {
       await page.locator('#three-columns').click();
-
-      let noteContent = await page.locator('.sticky-note-content');
-      expect(noteContent).toBeHidden();
-
-      const usersFolder = await page.locator('a[data-path="/Users"]');
-      await usersFolder.click();
-
-      await page.locator('button#create-sticky').click();
-      noteContent = await page.locator('.sticky-note-content');
-
-      await noteContent.fill('My local sticky');
-      expect(noteContent).toBeVisible();
-
-      // Move sticky far to the right to avoid blocking any UI elements
-      // (needs to be far enough that it won't overlap after reload)
-      await dragAndDropRelativeToElement({
-        x: 2000,
-        y: 100
-      }, '.sticky-note-header', 'button#create-sticky');
 
       // Wait for the MutationObserver debounce and save to complete
       await page.waitForTimeout(1000);
 
-      // Get the position after drag
-      const stickyAfterDrag = await page.locator('.sticky-note');
-      const positionAfterDrag = /** @type {Box} */ (
-        await stickyAfterDrag.boundingBox()
-      );
+      const rootFolder = await page.locator('a[data-path="/Users"]');
+      await rootFolder.click();
 
-      // // Check what's actually saved in storage
-      // const savedData = await page.evaluate(() => {
-      //   // @ts-expect-error - electronAPI available via preload
-      //   return globalThis.electronAPI.storage.getItem('stickyNotes-global');
-      // });
-      // // eslint-disable-next-line no-console -- Debug
-      // console.log('Saved sticky data:', savedData);
-
-      const appFolder = await page.locator('a[data-path="/Applications"]');
-      await appFolder.click();
-
-      // Hidden as this is a local sticky
-      expect(noteContent).toBeHidden();
+      await page.waitForTimeout(1000);
 
       const window = await electron.firstWindow();
-
-      // Navigate back to root before reload to clear the hash
-      await page.evaluate(() => {
-        location.hash = '';
-      });
 
       await window.reload();
 
       // Wait for the page to be ready after reload
       await page.waitForLoadState('domcontentloaded');
 
-      const noteContentRefreshed = await page.locator('.sticky-note-content');
-      expect(noteContentRefreshed).toBeHidden();
-
-
-      const usersFolderRefreshed = await page.locator('a[data-path="/Users"]');
-      await usersFolderRefreshed.click();
-
-      // Get fresh locator after navigation and wait for it to be visible
-      const noteContentAfterNav = await page.locator('.sticky-note-content');
-
-      expect(await noteContentAfterNav.textContent()).toBe(
-        'My local sticky'
+      const usersFolderRefreshed = await page.locator(
+        '.miller-selected a[data-path="/Users"]'
       );
-
-      // Verify the sticky position is maintained after reload
-      const stickyAfterReload = await page.locator('.sticky-note');
-      const positionAfterReload = /** @type {Box} */ (
-        await stickyAfterReload.boundingBox()
-      );
-
-      // Allow for small rendering differences (within 300px)
-      const xDiff = Math.abs(positionAfterReload.x - positionAfterDrag.x);
-      const yDiff = Math.abs(positionAfterReload.y - positionAfterDrag.y);
-      expect(xDiff).toBeLessThan(300);
-      expect(yDiff).toBeLessThan(50);
-    }
-  );
+      await usersFolderRefreshed.waitFor({state: 'visible', timeout: 10000});
+      expect(usersFolderRefreshed).toBeVisible();
+    });
+  });
 });

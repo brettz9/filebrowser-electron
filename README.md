@@ -51,6 +51,7 @@ done
     allowed overriding browser's `file:///` browser (not only for
     directories, but also to allow injecting a button to allow editing
     browsed files as well)
+1. Ideally would allow separate windows and tabs
 
 ## Misc. to-dos
 
@@ -59,3 +60,5 @@ done
 1. Retain z-index of stickies
 1. Fix icon view and local sticky note creation at root
 1. Fix column view and local sticky note creation at root
+1. Allow escape key in column view (or clicking off folder at root) to show
+    local sticky for root
