@@ -2126,9 +2126,12 @@ $('#filebrowser').title = `
 `;
 
 $('#create-sticky').addEventListener('click', () => {
-  const pth = $columns.find(
-    'li.miller-selected a, li.miller-selected span'
-  ).last()[0]?.dataset?.path ?? '/';
+  const currentView = localStorage.getItem('view') ?? 'icon-view';
+  const pth = currentView === 'icon-view'
+    ? jQuery('a[data-path], span[data-path]').attr('data-path')
+    : ($columns && $columns.find(
+      'li.miller-selected a, li.miller-selected span'
+    ).last()[0]?.dataset?.path) ?? '/';
   const note = stickyNotes.createNote({
     metadata: {type: 'local', path: pth},
     html: `Welcome to Sticky Notes!<br /><br />
