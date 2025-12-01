@@ -103,6 +103,11 @@ ipcMain.handle('parcelWatcher:subscribe', async (evt, dir) => {
 
   const id = watcherId++;
   const subscription = await parcelWatcher.subscribe(dir, (err, events) => {
+    // Check if the sender (webContents) is still available
+    if (evt.sender.isDestroyed()) {
+      return;
+    }
+
     if (err) {
       evt.sender.send(`parcelWatcher:callback:${id}`, {error: err.message});
     } else {
@@ -235,7 +240,23 @@ function createWindow () {
   // mainWindow.webContents.openDevTools()
 
   // Emitted when the window is closed.
-  mainWindow.on('closed', function () {
+  mainWindow.on('closed', async function () {
+    // Clean up all file watchers
+    const watcherPromises = [];
+    for (const [id, subscription] of watchers.entries()) {
+      watcherPromises.push(
+        (async () => {
+          try {
+            await subscription.unsubscribe();
+          } catch {
+            // Ignore errors during cleanup
+          }
+        })()
+      );
+      watchers.delete(id);
+    }
+    await Promise.all(watcherPromises);
+
     // Dereference the window object, usually you would store windows
     // in an array if your app supports multi windows, this is the time
     // when you should delete the corresponding element.
