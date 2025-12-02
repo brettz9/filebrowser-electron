@@ -1973,24 +1973,17 @@ function addItems (result, basePath, currentBasePath) {
 
   // Context menu for empty areas in column panes
   $columns.on('contextmenu', (e) => {
-    // eslint-disable-next-line prefer-destructuring -- TS
-    const target = /** @type {HTMLElement} */ (e.target);
-
-    // Only show context menu if clicking on the ul.miller-column
-    //   itself, not on items
-    if (!target.classList.contains('miller-column')) {
-      return;
-    }
-
     e.preventDefault();
 
     // Remove any existing context menus
-    document.querySelectorAll('.context-menu').forEach((menu) => {
+    /* c8 ignore next 4 -- Defensive cleanup; event listeners
+       should remove menus before this runs */
+    for (const menu of $$('.context-menu')) {
       menu.remove();
-    });
+    }
 
     // Find which column was clicked and get its path
-    const columnElement = target;
+    const columnElement = /** @type {HTMLElement} */ (e.target);
     const prevColumn = jQuery(columnElement).prevAll(
       'ul.miller-column:not(.miller-collapse)'
     ).first();

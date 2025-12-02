@@ -546,6 +546,40 @@ describe('renderer', () => {
       await page.waitForTimeout(300);
     });
 
+    test('right-click on empty column creates context menu', async () => {
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      const usersFolder = await page.locator('a[data-path="/Users"]');
+      await usersFolder.click();
+      await page.waitForTimeout(500);
+
+      // Find an empty miller-column element
+      const millerColumn = await page.locator('ul.miller-column').last();
+      const box = await millerColumn.boundingBox();
+      if (!box) {
+        throw new Error('Miller column not found');
+      }
+
+      // Right-click on empty space to create context menu
+      await page.mouse.click(
+        box.x + (box.width / 2),
+        box.y + (box.height / 2),
+        {button: 'right'}
+      );
+      await page.waitForTimeout(100);
+
+      // Verify menu exists and has "Create new folder" option
+      const contextMenu = await page.locator('.context-menu');
+      await expect(contextMenu).toBeVisible();
+      const menuText = await contextMenu.textContent();
+      expect(menuText).toContain('Create new folder');
+
+      // Clean up
+      await page.mouse.click(100, 100);
+      await page.waitForTimeout(300);
+    });
+
     test('context menu creates folder when clicked', async () => {
       await page.locator('#three-columns').click();
       await page.waitForTimeout(500);

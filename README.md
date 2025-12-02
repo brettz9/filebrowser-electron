@@ -62,3 +62,5 @@ done
 1. Fix column view and local sticky note creation at root
 1. Allow escape key in column view (or clicking off folder at root) to show
     local sticky for root
+1. Investigate why icons on context menu are no longer visible in
+    context-isolated code

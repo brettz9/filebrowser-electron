@@ -40,6 +40,10 @@ nav button.selected {
   clear: both;
 }
 
+#stickyButtons button {
+  margin: 2px;
+}
+
 .context-menu {
   /* display: none; /* Hidden by default */
   position: absolute;
