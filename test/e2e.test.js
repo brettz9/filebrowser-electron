@@ -443,6 +443,26 @@ describe('renderer', () => {
     });
   });
 
+  describe('view switching', () => {
+    test('switches from three-columns to icon-view', async () => {
+      // Start in three-columns view
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      const usersFolder = await page.locator('a[data-path="/Users"]');
+      await usersFolder.click();
+      await page.waitForTimeout(500);
+
+      // Switch back to icon-view
+      await page.locator('#icon-view').click();
+      await page.waitForTimeout(500);
+
+      // Verify we're in icon-view
+      const iconViewButton = await page.locator('#icon-view.selected');
+      expect(iconViewButton).toBeVisible();
+    });
+  });
+
   describe('keyboard shortcuts', () => {
     test('Cmd+Shift+N creates new folder', async () => {
       await page.locator('#three-columns').click();

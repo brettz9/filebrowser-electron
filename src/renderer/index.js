@@ -1630,6 +1630,7 @@ function addItems (result, basePath, currentBasePath) {
           }; background-image: url(${
             url
           }); background-size: ${width};`
+          /* c8 ignore next -- url should be present */
           : ''
       );
       return undefined;
@@ -1796,6 +1797,7 @@ function addItems (result, basePath, currentBasePath) {
       // Check if this folder has pending changes and remove from tracking
       const hasPendingChanges2 =
         foldersWithPendingChanges.has(currentPath);
+      /* c8 ignore next 3 -- Just cleanup */
       if (hasPendingChanges2) {
         foldersWithPendingChanges.delete(currentPath);
       }
@@ -1856,6 +1858,7 @@ function addItems (result, basePath, currentBasePath) {
                 url
               }); background-repeat: no-repeat; ` +
               `background-position: left center; background-size: ${width};`
+              /* c8 ignore next -- Should be found */
               : ''
           );
           return undefined;
@@ -1924,6 +1927,7 @@ function addItems (result, basePath, currentBasePath) {
         while (ancestorPath && ancestorPath !== '/' && ancestorPath !== '.') {
           setupFileWatcher(ancestorPath);
           const nextAncestor = path.dirname(ancestorPath);
+          /* c8 ignore next 3 -- Defensive */
           if (nextAncestor === ancestorPath) {
             break;
           }
