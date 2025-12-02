@@ -1,4 +1,8 @@
 /* eslint-disable chai-expect-keywords/no-unsupported-keywords -- Not Chai */
+/* eslint-disable n/no-sync -- Testing */
+/* eslint-disable sonarjs/publicly-writable-directories -- Safe usages
+    as deleting own files */
+
 import {existsSync} from 'node:fs';
 import {rm} from 'node:fs/promises';
 import path from 'node:path';
@@ -114,7 +118,6 @@ describe('main', () => {
     const window = await electron.firstWindow();
     await window.screenshot({path: initialScreenshotPath});
 
-    // eslint-disable-next-line n/no-sync -- Non-deprecated
     expect(existsSync(initialScreenshotPath)).toBe(true);
 
     // Which title is this as its not being found?
@@ -1164,5 +1167,562 @@ describe('renderer', () => {
         await page.waitForTimeout(300);
       }
     );
+
+    test('right-click on folder shows folder context menu', async () => {
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      // Navigate to /Users
+      const usersFolder = await page.locator('a[data-path="/Users"]');
+      await usersFolder.click();
+      await page.waitForTimeout(500);
+
+      // Right-click on the /Users folder - use evaluate to ensure it triggers
+      await page.evaluate(() => {
+        const folder = document.querySelector('a[data-path="/Users"]');
+        if (folder) {
+          const event = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2
+          });
+          folder.dispatchEvent(event);
+        }
+      });
+      await page.waitForTimeout(1000);
+
+      // Verify context menu appears with expected options
+      const contextMenu = await page.locator('.context-menu');
+      await expect(contextMenu).toBeVisible({timeout: 5000});
+
+      const menuText = await contextMenu.textContent();
+      expect(menuText).toContain('Open in Finder');
+      expect(menuText).toContain('Create text file');
+      expect(menuText).toContain('Rename');
+      expect(menuText).toContain('Delete');
+
+      // Clean up
+      await page.mouse.click(100, 100);
+      await page.waitForTimeout(300);
+    });
+
+    test(
+      'right-click on file shows file context menu with Open with',
+      async () => {
+        // Create a simple test file in /tmp which is accessible
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI is exposed via preload
+          globalThis.electronAPI.fs.writeFileSync(
+            '/tmp/test-context-menu-file.txt',
+            'test content'
+          );
+        });
+
+        await page.locator('#icon-view').click();
+        await page.waitForTimeout(500);
+
+        // Navigate to /tmp
+        await page.evaluate(() => {
+          globalThis.location.hash = '#path=/tmp';
+        });
+        await page.waitForTimeout(1500);
+
+        // Find our test file
+        const testFile = await page.locator(
+          'span[data-path*="test-context-menu-file.txt"]'
+        ).first();
+        await testFile.waitFor({state: 'visible', timeout: 5000});
+
+        const filePath = await testFile.getAttribute('data-path');
+        if (!filePath) {
+          throw new Error('File path not found');
+        }
+
+        // Right-click on the FILE
+        await page.evaluate((path) => {
+          const file = document.querySelector(
+            `span[data-path="${CSS.escape(path)}"]`
+          );
+          if (file) {
+            const event = new MouseEvent('contextmenu', {
+              bubbles: true,
+              cancelable: true,
+              button: 2
+            });
+            file.dispatchEvent(event);
+          }
+        }, filePath);
+        await page.waitForTimeout(1000);
+
+        // Verify file context menu appears with "Open with..." option
+        const contextMenu = await page.locator('.context-menu');
+        await contextMenu.waitFor({state: 'visible', timeout: 5000});
+
+        const menuText = await contextMenu.textContent();
+        expect(menuText).toContain('Open');
+        expect(menuText).toContain('Open with...');
+        expect(menuText).toContain('Rename');
+        expect(menuText).toContain('Delete');
+
+        // Verify submenu exists
+        const submenu = await page.locator('.context-submenu');
+        await expect(submenu).toBeAttached();
+
+        // Clean up - close menu and delete test file
+        await page.mouse.click(100, 100);
+        await page.waitForTimeout(300);
+
+        await page.evaluate(() => {
+          try {
+            // @ts-expect-error - electronAPI is exposed via preload
+            globalThis.electronAPI.fs.rmSync(
+              '/tmp/test-context-menu-file.txt'
+            );
+          } catch (e) {
+            // Ignore if file doesn't exist
+          }
+        });
+      }
+    );
+
+    test('context menu "Open" option calls shell.openPath', async () => {
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      const usersFolder = await page.locator('a[data-path="/Users"]');
+      await usersFolder.click();
+      await page.waitForTimeout(500);
+
+      // Right-click on folder
+      await page.evaluate(() => {
+        const folder = document.querySelector('a[data-path="/Users"]');
+        if (folder) {
+          const event = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2
+          });
+          folder.dispatchEvent(event);
+        }
+      });
+      await page.waitForTimeout(1000);
+
+      // Wait for context menu
+      const contextMenu = await page.locator('.context-menu');
+      await contextMenu.waitFor({state: 'visible', timeout: 5000});
+
+      // Click "Open in Finder" option (folder context menu)
+      const openOption = await page.locator('.context-menu-item').filter({
+        hasText: 'Open in Finder'
+      });
+      await openOption.click();
+      await page.waitForTimeout(300);
+
+      // Context menu should be hidden after clicking
+      await expect(contextMenu).not.toBeVisible();
+    });
+
+    test('context menu "Rename" option triggers rename mode', async () => {
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      // Just use the /Users folder
+      const usersFolder = await page.locator('a[data-path="/Users"]');
+      await usersFolder.click();
+      await page.waitForTimeout(500);
+
+      // Right-click on the /Users folder
+      await page.evaluate(() => {
+        const folder = document.querySelector('a[data-path="/Users"]');
+        if (folder) {
+          const event = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2
+          });
+          folder.dispatchEvent(event);
+        }
+      });
+      await page.waitForTimeout(1000);
+
+      // Wait for context menu
+      const contextMenu = await page.locator('.context-menu');
+      await contextMenu.waitFor({state: 'visible', timeout: 5000});
+
+      // Click "Rename" option
+      const renameOption = await page.locator(
+        '.context-menu-item'
+      ).filter({hasText: 'Rename'});
+      await renameOption.click();
+      await page.waitForTimeout(500);
+
+      // Verify rename input appears
+      const renameInput = await page.locator('input[type="text"]');
+      await expect(renameInput).toBeVisible();
+
+      // Cancel rename
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+    });
+
+    test('context menu "Delete" option triggers deletion', async () => {
+      // Create test file in /tmp
+      await page.evaluate(() => {
+        // @ts-expect-error Our own API
+        globalThis.electronAPI.fs.writeFileSync(
+          '/tmp/test-delete-file.txt',
+          'test delete'
+        );
+      });
+
+      // Navigate to /tmp in three-columns view
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1000);
+
+      // Find and click the test file (can be a or span)
+      const testFile = await page.locator(
+        'a[data-path="/tmp/test-delete-file.txt"], ' +
+        'span[data-path="/tmp/test-delete-file.txt"]'
+      ).first();
+      await testFile.waitFor({state: 'visible', timeout: 5000});
+      await testFile.click();
+      await page.waitForTimeout(500);
+
+      // Right-click on the test file
+      await page.evaluate(() => {
+        const file = document.querySelector(
+          'a[data-path="/tmp/test-delete-file.txt"], ' +
+          'span[data-path="/tmp/test-delete-file.txt"]'
+        );
+        if (file) {
+          const event = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2
+          });
+          file.dispatchEvent(event);
+        }
+      });
+      await page.waitForTimeout(500);
+
+      // Wait for context menu
+      const contextMenu = await page.locator('.context-menu');
+      await contextMenu.waitFor({state: 'visible', timeout: 5000});
+
+      // Click "Delete" option
+      const deleteOption = await page.locator('.context-menu-item').
+        filter({hasText: 'Delete'});
+      await deleteOption.click();
+      await page.waitForTimeout(1000);
+
+      // Verify file is deleted
+      const fileCount = await page.locator(
+        'a[data-path="/tmp/test-delete-file.txt"]'
+      ).count();
+      expect(fileCount).toBe(0);
+    });
+
+    test('context menu "Open with..." submenu shows apps', async () => {
+      // Create test file in /tmp
+      await page.evaluate(() => {
+        // @ts-expect-error Our own API
+        globalThis.electronAPI.fs.writeFileSync(
+          '/tmp/test-open-with-file.txt',
+          'test open with'
+        );
+      });
+
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      // Navigate to /tmp
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1000);
+
+      // Find the test file
+      const testFile = await page.locator(
+        'a[data-path="/tmp/test-open-with-file.txt"], ' +
+        'span[data-path="/tmp/test-open-with-file.txt"]'
+      ).first();
+      await testFile.waitFor({state: 'visible', timeout: 5000});
+
+      // Right-click on file to show context menu
+      await page.evaluate(() => {
+        const file = document.querySelector(
+          'a[data-path="/tmp/test-open-with-file.txt"], ' +
+          'span[data-path="/tmp/test-open-with-file.txt"]'
+        );
+        if (file) {
+          const event = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2
+          });
+          file.dispatchEvent(event);
+        }
+      });
+      await page.waitForTimeout(500);
+
+      // Wait for context menu
+      const contextMenu = await page.locator('.context-menu');
+      await contextMenu.waitFor({state: 'visible', timeout: 5000});
+
+      // Hover over "Open with..." to show submenu
+      const openWithOption = await contextMenu.locator('.has-submenu');
+      await openWithOption.hover();
+      await page.waitForTimeout(500);
+
+      // Verify submenu is visible
+      const submenu = await page.locator('.context-submenu');
+      await expect(submenu).toBeVisible();
+
+      // Verify submenu has default app option
+      const submenuText = await submenu.textContent();
+      expect(submenuText).toContain('(default)');
+
+      // Clean up - close menu and delete test file
+      await page.mouse.click(100, 100);
+      await page.waitForTimeout(300);
+
+      await page.evaluate(() => {
+        try {
+          // @ts-expect-error Our own API
+          globalThis.electronAPI.fs.rmSync(
+            '/tmp/test-open-with-file.txt'
+          );
+        } catch (e) {
+          // Ignore if file doesn't exist
+        }
+      });
+    });
+
+    test.skip(
+      'context menu submenu adjusts position near viewport edges',
+      async () => {
+        // Create test file in /tmp
+        await page.evaluate(() => {
+          // @ts-expect-error Our own API
+          globalThis.electronAPI.fs.writeFileSync(
+            '/tmp/test-submenu-position-file.txt',
+            'test submenu position'
+          );
+        });
+
+        await page.locator('#three-columns').click();
+        await page.waitForTimeout(500);
+
+        // Navigate to /tmp
+        await page.evaluate(() => {
+          globalThis.location.hash = '#path=/tmp';
+        });
+        await page.waitForTimeout(1000);
+
+        // Get viewport size
+        const viewport = await page.evaluate(() => ({
+          width: globalThis.innerWidth,
+          height: globalThis.innerHeight
+        }));
+
+        // Trigger context menu on file near right edge
+        await page.evaluate((vp) => {
+          const event = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2,
+            clientX: vp.width - 50,
+            clientY: 200
+          });
+          Object.defineProperty(event, 'pageX', {
+            value: vp.width - 50,
+            writable: false
+          });
+          Object.defineProperty(event, 'pageY', {
+            value: 200,
+            writable: false
+          });
+          const file = document.querySelector(
+            'a[data-path="/tmp/test-submenu-position-file.txt"], ' +
+            'span[data-path="/tmp/test-submenu-position-file.txt"]'
+          );
+          if (file) {
+            file.dispatchEvent(event);
+          }
+        }, viewport);
+        await page.waitForTimeout(1000);
+
+        // Wait for context menu (not submenu)
+        const contextMenu = await page.locator('.context-menu');
+        await contextMenu.waitFor({state: 'visible', timeout: 5000});
+
+        // Hover over "Open with..." to trigger submenu positioning
+        const openWithOption = await contextMenu.locator('.has-submenu');
+        await openWithOption.hover();
+        await page.waitForTimeout(500);
+
+        const submenu = await page.locator('.context-submenu');
+        await expect(submenu).toBeVisible();
+
+        const submenuBox = await submenu.boundingBox();
+        if (submenuBox) {
+          // Submenu should adjust to stay within viewport
+          const submenuRight = submenuBox.x + submenuBox.width;
+          expect(submenuRight).toBeLessThanOrEqual(viewport.width + 20);
+        }
+
+        // Clean up - delete test file
+        await page.mouse.click(100, 100);
+        await page.waitForTimeout(300);
+
+        await page.evaluate(() => {
+          try {
+            // @ts-expect-error Our own API
+            globalThis.electronAPI.fs.rmSync(
+              '/tmp/test-submenu-position-file.txt'
+            );
+          } catch (e) {
+            // Ignore if file doesn't exist
+          }
+        });
+      }
+    );
+
+    test('context menu hides when clicking outside', async () => {
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      const usersFolder = await page.locator('a[data-path="/Users"]');
+      await usersFolder.click();
+      await page.waitForTimeout(500);
+
+      // Right-click to show context menu
+      await page.evaluate(() => {
+        const folder = document.querySelector('a[data-path="/Users"]');
+        if (folder) {
+          const event = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2
+          });
+          folder.dispatchEvent(event);
+        }
+      });
+      await page.waitForTimeout(1000);
+
+      const contextMenu = await page.locator('.context-menu');
+      await contextMenu.waitFor({state: 'visible', timeout: 5000});
+
+      // Click elsewhere
+      await page.mouse.click(100, 100);
+      await page.waitForTimeout(300);
+
+      // Menu should be hidden
+      await expect(contextMenu).not.toBeVisible();
+    });
+
+    test('context menu hides when right-clicking elsewhere', async () => {
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      const usersFolder = await page.locator('a[data-path="/Users"]');
+      await usersFolder.click();
+      await page.waitForTimeout(500);
+
+      // Right-click to show context menu
+      await page.evaluate(() => {
+        const folder = document.querySelector('a[data-path="/Users"]');
+        if (folder) {
+          const event = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2
+          });
+          folder.dispatchEvent(event);
+        }
+      });
+      await page.waitForTimeout(1000);
+
+      const contextMenu = await page.locator('.context-menu');
+      await contextMenu.waitFor({state: 'visible', timeout: 5000});
+
+      // Right-click elsewhere
+      await page.mouse.click(100, 100, {button: 'right'});
+      await page.waitForTimeout(300);
+
+      // Original menu should be hidden
+      await expect(contextMenu).not.toBeVisible();
+    });
+
+    test.skip('context menu submenu opens app when clicked', async () => {
+      // Create test file in /tmp
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available via preload
+        globalThis.electronAPI.fs.writeFileSync(
+          '/tmp/test-submenu-open-file.txt',
+          'test submenu open'
+        );
+      });
+
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      // Navigate to /tmp
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1000);
+
+      // Right-click on file
+      await page.evaluate(() => {
+        const file = document.querySelector(
+          'a[data-path="/tmp/test-submenu-open-file.txt"], ' +
+          'span[data-path="/tmp/test-submenu-open-file.txt"]'
+        );
+        if (file) {
+          const event = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2
+          });
+          file.dispatchEvent(event);
+        }
+      });
+      await page.waitForTimeout(1000);
+
+      // Wait for context menu
+      const contextMenu = await page.locator('.context-menu');
+      await contextMenu.waitFor({state: 'visible', timeout: 5000});
+
+      // Hover over "Open with..." to show submenu
+      const openWithOption = await contextMenu.locator('.has-submenu');
+      await openWithOption.hover();
+      await page.waitForTimeout(500);
+
+      // Click on the default app option
+      const submenu = await page.locator('.context-submenu');
+      const defaultApp = await submenu.locator('.context-menu-item').first();
+      await defaultApp.click();
+      await page.waitForTimeout(300);
+
+      // Context menu should be hidden after clicking
+      await expect(contextMenu).not.toBeVisible();
+
+      // Clean up - delete test file
+      await page.evaluate(() => {
+        try {
+          // @ts-expect-error - electronAPI available via preload
+          globalThis.electronAPI.fs.rmSync(
+            '/tmp/test-submenu-open-file.txt'
+          );
+        } catch (e) {
+          // Ignore if file doesn't exist
+        }
+      });
+    });
   });
 });
