@@ -1670,6 +1670,244 @@ describe('renderer', () => {
       }
     );
 
+    test(
+      'context menu submenu pins to right when no room on either side',
+      async () => {
+        // Create test file in /tmp
+        await page.evaluate(() => {
+          // @ts-expect-error Our own API
+          globalThis.electronAPI.fs.writeFileSync(
+            '/tmp/test-submenu-pin-right.txt',
+            'test submenu pin right'
+          );
+        });
+
+        await page.locator('#three-columns').click();
+        await page.waitForTimeout(500);
+
+        // Navigate to /tmp
+        await page.evaluate(() => {
+          globalThis.location.hash = '#path=/tmp';
+        });
+        await page.waitForTimeout(1000);
+
+        // Use a very narrow viewport where submenu can't fit on either side
+        await page.setViewportSize({width: 300, height: 600});
+        await page.waitForTimeout(500);
+
+        // Trigger context menu near right edge
+        await page.evaluate(() => {
+          const event = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2,
+            clientX: 250,
+            clientY: 200
+          });
+          const file = document.querySelector(
+            'a[data-path="/tmp/test-submenu-pin-right.txt"], ' +
+            'span[data-path="/tmp/test-submenu-pin-right.txt"]'
+          );
+          if (file) {
+            file.dispatchEvent(event);
+          }
+        });
+        await page.waitForTimeout(1000);
+
+        // Wait for context menu
+        const contextMenu = await page.locator('.context-menu');
+        await contextMenu.waitFor({state: 'visible', timeout: 5000});
+
+        // Hover over "Open with..." to show submenu
+        const openWithOption = await contextMenu.locator('.has-submenu');
+        await openWithOption.hover();
+        await page.waitForTimeout(500);
+
+        const submenu = await page.locator('.context-submenu');
+        await expect(submenu).toBeVisible();
+
+        // Check that submenu is pinned to right edge
+        const submenuStyles = await submenu.evaluate((el) => {
+          return {
+            right: el.style.right,
+            left: el.style.left
+          };
+        });
+
+        expect(submenuStyles.right).toBe('10px');
+        expect(submenuStyles.left).toBe('auto');
+
+        // Reset viewport
+        await page.setViewportSize({width: 800, height: 600});
+        await page.mouse.click(100, 100);
+        await page.waitForTimeout(300);
+
+        await page.evaluate(() => {
+          try {
+            // @ts-expect-error Our own API
+            globalThis.electronAPI.fs.rmSync(
+              '/tmp/test-submenu-pin-right.txt'
+            );
+          } catch (e) {
+            // Ignore if file doesn't exist
+          }
+        });
+      }
+    );
+
+    test(
+      'context menu submenu adjusts for top overflow',
+      async () => {
+        // Create test file in /tmp
+        await page.evaluate(() => {
+          // @ts-expect-error Our own API
+          globalThis.electronAPI.fs.writeFileSync(
+            '/tmp/test-submenu-top.txt',
+            'test submenu top'
+          );
+        });
+
+        await page.locator('#three-columns').click();
+        await page.waitForTimeout(500);
+
+        // Navigate to /tmp
+        await page.evaluate(() => {
+          globalThis.location.hash = '#path=/tmp';
+        });
+        await page.waitForTimeout(1000);
+
+        // Trigger context menu near top of viewport
+        await page.evaluate(() => {
+          const event = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2,
+            clientX: 400,
+            clientY: 10
+          });
+          const file = document.querySelector(
+            'a[data-path="/tmp/test-submenu-top.txt"], ' +
+            'span[data-path="/tmp/test-submenu-top.txt"]'
+          );
+          if (file) {
+            file.dispatchEvent(event);
+          }
+        });
+        await page.waitForTimeout(1000);
+
+        // Wait for context menu
+        const contextMenu = await page.locator('.context-menu');
+        await contextMenu.waitFor({state: 'visible', timeout: 5000});
+
+        // Hover over "Open with..." to show submenu
+        const openWithOption = await contextMenu.locator('.has-submenu');
+        await openWithOption.hover();
+        await page.waitForTimeout(1000);
+
+        const submenu = await page.locator('.context-submenu');
+        await expect(submenu).toBeVisible();
+
+        // Check that submenu is positioned at top of viewport
+        const submenuBox = await submenu.boundingBox();
+        if (submenuBox) {
+          // Submenu should be near top of viewport (allowing some margin)
+          expect(submenuBox.y).toBeLessThan(100);
+        }
+
+        await page.mouse.click(100, 100);
+        await page.waitForTimeout(300);
+
+        await page.evaluate(() => {
+          try {
+            // @ts-expect-error Our own API
+            globalThis.electronAPI.fs.rmSync('/tmp/test-submenu-top.txt');
+          } catch (e) {
+            // Ignore if file doesn't exist
+          }
+        });
+      }
+    );
+
+    test(
+      'context menu submenu aligns to bottom when overflows bottom but fits',
+      async () => {
+        // Create test file in /tmp
+        await page.evaluate(() => {
+          // @ts-expect-error Our own API
+          globalThis.electronAPI.fs.writeFileSync(
+            '/tmp/test-submenu-bottom-align.txt',
+            'test submenu bottom'
+          );
+        });
+
+        await page.locator('#three-columns').click();
+        await page.waitForTimeout(500);
+
+        // Navigate to /tmp
+        await page.evaluate(() => {
+          globalThis.location.hash = '#path=/tmp';
+        });
+        await page.waitForTimeout(1000);
+
+        // Trigger context menu near bottom but with room to fit above
+        await page.evaluate(() => {
+          const event = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2,
+            clientX: 400,
+            clientY: 500
+          });
+          const file = document.querySelector(
+            'a[data-path="/tmp/test-submenu-bottom-align.txt"], ' +
+            'span[data-path="/tmp/test-submenu-bottom-align.txt"]'
+          );
+          if (file) {
+            file.dispatchEvent(event);
+          }
+        });
+        await page.waitForTimeout(1000);
+
+        // Wait for context menu
+        const contextMenu = await page.locator('.context-menu');
+        await contextMenu.waitFor({state: 'visible', timeout: 5000});
+
+        // Hover over "Open with..." to show submenu
+        const openWithOption = await contextMenu.locator('.has-submenu');
+        await openWithOption.hover();
+        await page.waitForTimeout(500);
+
+        const submenu = await page.locator('.context-submenu');
+        await expect(submenu).toBeVisible();
+
+        // Check that submenu uses bottom alignment
+        const submenuStyles = await submenu.evaluate((el) => {
+          return {
+            top: el.style.top,
+            bottom: el.style.bottom
+          };
+        });
+
+        // CSS may normalize '0' to '0px'
+        expect(['0', '0px']).toContain(submenuStyles.bottom);
+        expect(submenuStyles.top).toBe('auto');
+
+        await page.mouse.click(100, 100);
+        await page.waitForTimeout(300);
+
+        await page.evaluate(() => {
+          try {
+            // @ts-expect-error Our own API
+            globalThis.electronAPI.fs.rmSync(
+              '/tmp/test-submenu-bottom-align.txt'
+            );
+          } catch (e) {
+            // Ignore if file doesn't exist
+          }
+        });
+      }
+    );
+
     test('context menu hides when clicking outside', async () => {
       await page.locator('#three-columns').click();
       await page.waitForTimeout(500);
