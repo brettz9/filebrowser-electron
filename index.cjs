@@ -16544,6 +16544,11 @@
 
       e.preventDefault();
 
+      // Remove any existing context menus
+      document.querySelectorAll('.context-menu').forEach((menu) => {
+        menu.remove();
+      });
+
       // Find which column was clicked and get its path
       const columnElement = target;
       const prevColumn = jQuery(columnElement).prevAll(
@@ -16570,7 +16575,7 @@
           class: 'context-menu-item',
           $on: {
             click () {
-              customContextMenu.style.display = 'none';
+              customContextMenu.remove();
               createNewFolder(folderPath);
             }
           }
@@ -16606,7 +16611,7 @@
 
       // Hide the custom context menu when clicking anywhere else
       const hideCustomContextMenu = () => {
-        customContextMenu.style.display = 'none';
+        customContextMenu.remove();
         document.removeEventListener('click', hideCustomContextMenu);
         document.removeEventListener('contextmenu', hideCustomContextMenu);
       };
