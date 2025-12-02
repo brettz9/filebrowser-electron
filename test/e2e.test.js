@@ -1285,6 +1285,84 @@ describe('renderer', () => {
       }
     );
 
+    test('context menu icons are loaded for apps', async () => {
+      // Create test file in /tmp
+      await page.evaluate(() => {
+        // @ts-expect-error Our own API
+        globalThis.electronAPI.fs.writeFileSync(
+          '/tmp/test-icon-check.txt',
+          'test icons'
+        );
+      });
+
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      // Navigate to /tmp
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1000);
+
+      // Find the test file
+      const testFile = await page.locator(
+        'a[data-path="/tmp/test-icon-check.txt"], ' +
+        'span[data-path="/tmp/test-icon-check.txt"]'
+      ).first();
+      await testFile.waitFor({state: 'visible', timeout: 5000});
+
+      // Right-click on file to show context menu
+      await page.evaluate(() => {
+        const file = document.querySelector(
+          'a[data-path="/tmp/test-icon-check.txt"], ' +
+          'span[data-path="/tmp/test-icon-check.txt"]'
+        );
+        if (file) {
+          const event = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2
+          });
+          file.dispatchEvent(event);
+        }
+      });
+      await page.waitForTimeout(500);
+
+      // Wait for context menu
+      const contextMenu = await page.locator('.context-menu');
+      await contextMenu.waitFor({state: 'visible', timeout: 5000});
+
+      // Check if submenu items have background styles set
+      const submenuItems = await page.locator(
+        '.context-submenu .context-menu-item'
+      ).all();
+
+      expect(submenuItems.length).toBeGreaterThan(0);
+
+      // Check the first item (default app) for icon
+      const firstItem = submenuItems[0];
+      const backgroundStyle = await firstItem.evaluate((el) => {
+        return globalThis.getComputedStyle(el, '::before').
+          getPropertyValue('background');
+      });
+
+      // Should have a url() in the background
+      expect(backgroundStyle).toContain('url(');
+
+      // Clean up
+      await page.mouse.click(100, 100);
+      await page.waitForTimeout(300);
+
+      await page.evaluate(() => {
+        try {
+          // @ts-expect-error Our own API
+          globalThis.electronAPI.fs.rmSync('/tmp/test-icon-check.txt');
+        } catch (e) {
+          // Ignore if file doesn't exist
+        }
+      });
+    });
+
     test('context menu "Open" option calls shell.openPath', async () => {
       await page.locator('#three-columns').click();
       await page.waitForTimeout(500);
@@ -1502,7 +1580,7 @@ describe('renderer', () => {
       });
     });
 
-    test.skip(
+    test(
       'context menu submenu adjusts position near viewport edges',
       async () => {
         // Create test file in /tmp
@@ -1658,7 +1736,7 @@ describe('renderer', () => {
       await expect(contextMenu).not.toBeVisible();
     });
 
-    test.skip('context menu submenu opens app when clicked', async () => {
+    test('context menu submenu opens app when clicked', async () => {
       // Create test file in /tmp
       await page.evaluate(() => {
         // @ts-expect-error - electronAPI available via preload

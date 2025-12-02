@@ -78,11 +78,11 @@ ipcMain.handle('getOpenWithApps', (_event, filePath) => {
   return openWithMe.getOpenWithApps(filePath);
 });
 
-ipcMain.handle('getAppIcons', (_event, appPaths) => {
+ipcMain.handle('getAppIcons', async (_event, appPaths) => {
   if (!openWithMe?.getAppIcons) {
     return [];
   }
-  return openWithMe.getAppIcons(appPaths);
+  return await openWithMe.getAppIcons(appPaths);
 });
 
 ipcMain.handle('getIconDataURLForFile', (_event, filePath) => {

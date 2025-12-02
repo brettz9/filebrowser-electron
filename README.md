@@ -37,9 +37,6 @@ done
 
 ## To-dos
 
-1. **BUG**: Context menu "Open with..." submenu icons may not be visible after moving to context-isolated preload script - the icon URLs (data URLs from `getAppIcons`) might not be loading properly in the CSS `--background` variable
-1. **BUG**: Context menu "Open with..." submenu doesn't adjust position correctly near viewport edges - submenu extends beyond viewport (950px) when it should stay within (820px)
-1. **BUG**: Context menu submenu items are not visible/clickable when testing - element appears in DOM but is not visible for Playwright click action (may be timing or visibility CSS issue)
 1. Add Playwright tests
   1. Testing for better listening for external changes; release
 1. Moving/Copying
@@ -65,7 +62,5 @@ done
 1. Fix column view and local sticky note creation at root
 1. Allow escape key in column view (or clicking off folder at root) to show
     local sticky for root
-1. Investigate why icons on context menu are no longer visible in
-    context-isolated code
 1. Add breadcrumbs for both views
 1. Way to clean up opened Finder windows from tests?

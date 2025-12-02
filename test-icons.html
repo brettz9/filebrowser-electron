@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Icons</title>
+</head>
+<body>
+  <h1>Testing App Icons</h1>
+  <div id="output"></div>
+  <script>
+    (async () => {
+      const output = document.getElementById('output');
+
+      // Test file path
+      const testFile = '/tmp/test.txt';
+
+      // Get apps
+      const apps = await globalThis.electronAPI.getOpenWithApps(testFile);
+      output.innerHTML += `<p>Found ${apps.length} apps</p>`;
+
+      // Get icons
+      const icons = await globalThis.electronAPI.getAppIcons(apps);
+      output.innerHTML += `<p>Got ${icons.length} icons</p>`;
+
+      // Display results
+      icons.forEach((icon, idx) => {
+        if (icon) {
+          output.innerHTML += `<p>Icon ${idx}: ${icon.substring(0, 100)}...</p>`;
+          // Try to display it
+          const img = document.createElement('img');
+          img.src = icon;
+          img.style.width = '32px';
+          img.style.height = '32px';
+          output.appendChild(img);
+        } else {
+          output.innerHTML += `<p>Icon ${idx}: null</p>`;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

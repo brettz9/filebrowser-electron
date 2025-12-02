@@ -16105,7 +16105,20 @@
                 submenu.style.position = 'fixed';
                 submenu.style.top = '10px';
                 submenu.style.bottom = 'auto';
-                submenu.style.left = submenuRect.left + 'px';
+                // Preserve horizontal position when switching to fixed
+                if (actuallyOverflowsRight && submenu.style.right === '100%') {
+                  // Submenu is on the left, keep it there with fixed pos
+                  const parentRect = parentLi.getBoundingClientRect();
+                  submenu.style.left =
+                    (parentRect.left - submenuRect.width) + 'px';
+                  submenu.style.right = 'auto';
+                } else if (actuallyOverflowsRight &&
+                           submenu.style.right === '10px') {
+                  // Submenu is pinned to right edge, keep it there
+                  submenu.style.left = 'auto';
+                } else {
+                  submenu.style.left = submenuRect.left + 'px';
+                }
               } else if (actuallyOverflowsBottom) {
                 const parentRect = parentLi.getBoundingClientRect();
                 const wouldFitOnTop = parentRect.top - submenuRect.height >= 0;
@@ -16119,7 +16132,19 @@
                   submenu.style.position = 'fixed';
                   submenu.style.top = 'auto';
                   submenu.style.bottom = '10px';
-                  submenu.style.left = submenuRect.left + 'px';
+                  // Preserve horizontal position when switching to fixed
+                  if (actuallyOverflowsRight && submenu.style.right === '100%') {
+                    // Submenu is on the left, keep it there with fixed pos
+                    submenu.style.left = (parentRect.left - submenuRect.width) +
+                      'px';
+                    submenu.style.right = 'auto';
+                  } else if (actuallyOverflowsRight &&
+                             submenu.style.right === '10px') {
+                    // Submenu is pinned to right edge, keep it there
+                    submenu.style.left = 'auto';
+                  } else {
+                    submenu.style.left = submenuRect.left + 'px';
+                  }
                 }
               }
             });
