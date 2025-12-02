@@ -64,4 +64,3 @@ done
     local sticky for root
 1. Investigate why icons on context menu are no longer visible in
     context-isolated code
-1. Why multiple items with same `data-path`?
