@@ -47,6 +47,10 @@ const stickyNotes = new StickyNote({
   }
 });
 
+const getCurrentView = () => {
+  return localStorage.getItem('view') ?? 'icon-view';
+};
+
 /**
  * @param {import('stickynote').NoteData} note
  * @param {string} pth
@@ -268,7 +272,6 @@ function setupFileWatcher (dirPath) {
 
 /**
  * Setup a parcel/watcher as fallback.
- * Used after folder operations to avoid chokidar freeze.
  *
  * @param {string} dirPath
  * @returns {Promise<void>}
@@ -566,7 +569,7 @@ async function setupNativeWatcher (dirPath) {
  * @returns {void}
  */
 function changePath () {
-  const view = localStorage.getItem('view') ?? 'icon-view';
+  const view = getCurrentView();
 
   const currentBasePath = getBasePath();
   const basePath = view === 'icon-view' ? currentBasePath : '/';
@@ -628,7 +631,7 @@ const foldersWithPendingChanges = new Set();
  * @returns {void}
  */
 function addItems (result, basePath, currentBasePath) {
-  const view = localStorage.getItem('view') ?? 'icon-view';
+  const view = getCurrentView();
 
   $('i').hidden = true;
   const ul = $('ul');
@@ -716,7 +719,9 @@ function addItems (result, basePath, currentBasePath) {
       // Use setTimeout instead of nested requestAnimationFrame to avoid freeze
       setTimeout(() => {
         // The data-path attribute uses encodeURIComponent for the folder name
-        const encodedPath = folderPath + '/' +
+        // Remove trailing slash from folderPath to avoid double slashes
+        const normalizedFolderPath = folderPath.replace(/\/+$/v, '');
+        const encodedPath = normalizedFolderPath + '/' +
           encodeURIComponent(newFolderName);
         const newFolderElement = $(
           `[data-path="${CSS.escape(encodedPath)}"]`
@@ -726,7 +731,6 @@ function addItems (result, basePath, currentBasePath) {
             // Clear flag after rename completes
             isCreating = false;
 
-            // Use native fs.watch instead of chokidar to avoid freeze
             const currentDir = getBasePath();
             if (currentDir !== '/') {
               setupNativeWatcher(currentDir);
@@ -752,7 +756,7 @@ function addItems (result, basePath, currentBasePath) {
           console.warn('Could not find new folder element');
           isCreating = false;
         }
-      }, 50);
+      }, 150);
     } catch (err) {
       isCreating = false;
       // eslint-disable-next-line no-alert -- User feedback
@@ -836,7 +840,7 @@ function addItems (result, basePath, currentBasePath) {
           // Clear the flag immediately after rename so watcher
           //   can detect change
           // In three-columns mode, manually trigger parent refresh
-          const currentView = localStorage.getItem('view') ?? 'icon-view';
+          const currentView = getCurrentView();
           // eslint-disable-next-line no-console -- Debugging
           console.log('Current view:', currentView);
           if (currentView === 'three-columns') {
@@ -981,32 +985,13 @@ function addItems (result, basePath, currentBasePath) {
                 `[data-path="${CSS.escape(encodedNewPath)}"]`
               );
               if (renamedElement) {
-                const li = renamedElement.closest('li');
-                if (li) {
-                  // Remove selection from all items
-                  $$('.miller-selected').
-                    forEach((el) => {
-                      el.classList.remove('miller-selected');
-                    });
-                  // Select the renamed item
-                  li.classList.add('miller-selected');
-
-                  // Focus the parent ul to enable keyboard navigation
-                  // without triggering folder navigation
-                  const parentUl = li.closest('ul');
-                  if (parentUl) {
-                    parentUl.setAttribute('tabindex', '0');
-                    parentUl.focus();
-                  }
-
-                  // Scroll into view
-                  requestAnimationFrame(() => {
-                    li.scrollIntoView({
-                      block: 'nearest',
-                      inline: 'nearest'
-                    });
+                // Scroll into view
+                requestAnimationFrame(() => {
+                  renamedElement.scrollIntoView({
+                    block: 'nearest',
+                    inline: 'nearest'
                   });
-                }
+                });
               }
 
               // Call completion callback after everything is done
@@ -1040,7 +1025,7 @@ function addItems (result, basePath, currentBasePath) {
         const itemPath = oldPath;
 
         // In three-columns mode, let the watcher handle refreshes
-        const currentView = localStorage.getItem('view') ?? 'icon-view';
+        const currentView = getCurrentView();
         if (currentView !== 'three-columns') {
           // For icon view, manually refresh
           changePath();
@@ -1052,26 +1037,35 @@ function addItems (result, basePath, currentBasePath) {
             `[data-path="${CSS.escape(itemPath)}"]`
           );
           if (itemElement) {
-            const li = itemElement.closest('li');
-            if (li) {
-              // Remove selection from all items
-              $$('.miller-selected').
-                forEach((el) => {
-                  el.classList.remove('miller-selected');
+            if (currentView === 'three-columns') {
+              // Find container element for three-columns
+              const container = itemElement.closest('li');
+              if (container) {
+                // Remove selection from all items
+                $$('.miller-selected').
+                  forEach((el) => {
+                    el.classList.remove('miller-selected');
+                  });
+                // Select the item
+                container.classList.add('miller-selected');
+
+                // Focus the parent ul to enable keyboard navigation
+                // without triggering folder navigation
+                const parentUl = container.closest('ul');
+                if (parentUl) {
+                  parentUl.setAttribute('tabindex', '0');
+                  parentUl.focus();
+                }
+
+                // Scroll into view
+                container.scrollIntoView({
+                  block: 'nearest',
+                  inline: 'nearest'
                 });
-              // Select the item
-              li.classList.add('miller-selected');
-
-              // Focus the parent ul to enable keyboard navigation
-              // without triggering folder navigation
-              const parentUl = li.closest('ul');
-              if (parentUl) {
-                parentUl.setAttribute('tabindex', '0');
-                parentUl.focus();
               }
-
-              // Scroll into view
-              li.scrollIntoView({
+            } else {
+              // For icon-view, just scroll into view
+              itemElement.scrollIntoView({
                 block: 'nearest',
                 inline: 'nearest'
               });
@@ -1119,6 +1113,7 @@ function addItems (result, basePath, currentBasePath) {
     e.preventDefault();
     e.stopPropagation();
     const {path: pth} = /** @type {HTMLElement} */ (e.target).dataset;
+    /* c8 ignore next 3 -- TS */
     if (!pth) {
       return;
     }
@@ -1187,6 +1182,7 @@ function addItems (result, basePath, currentBasePath) {
 
                     // Now wait for children to be built and find our file
                     const tryFindElement = (attempts = 0) => {
+                      /* c8 ignore next 8 -- Guard */
                       if (attempts > 20) {
                         // eslint-disable-next-line no-console -- Debugging
                         console.log(
@@ -1226,15 +1222,15 @@ function addItems (result, basePath, currentBasePath) {
                           startRename(/** @type {HTMLElement} */ (
                             newFileElement
                           ));
+                        /* c8 ignore next 5 -- Difficult to test: requires
+                            precise timing where DOM updates haven't
+                            completed yet */
                         } else {
-                          // Try again
                           tryFindElement(attempts + 1);
                         }
                       });
                     };
                     tryFindElement();
-                  } else {
-                    // Minimal logging on failure
                   }
                 });
               });
@@ -1300,6 +1296,8 @@ function addItems (result, basePath, currentBasePath) {
         customContextMenu.style.top =
           (viewportHeight - menuRect.height - 10) + 'px';
       }
+      /* c8 ignore next 4 -- Defensive as context menus should
+         be at positive pageX/pageY coordinates */
       if (menuRect.top < 0) {
         customContextMenu.style.top = '10px';
       }
@@ -1326,6 +1324,7 @@ function addItems (result, basePath, currentBasePath) {
     e.preventDefault();
     e.stopPropagation();
     const {path: pth} = /** @type {HTMLElement} */ (e.target).dataset;
+    /* c8 ignore next 3 -- TS */
     if (!pth) {
       return;
     }
@@ -1441,6 +1440,8 @@ function addItems (result, basePath, currentBasePath) {
         customContextMenu.style.top =
           (viewportHeight - menuRect.height - 10) + 'px';
       }
+      /* c8 ignore next 4 -- Defensive as context menus should
+         be at positive pageX/pageY coordinates */
       if (menuRect.top < 0) {
         customContextMenu.style.top = '10px';
       }
@@ -1493,6 +1494,7 @@ function addItems (result, basePath, currentBasePath) {
           ev.stopPropagation();
           customContextMenu.style.display = 'none';
           const {apppath} = /** @type {HTMLElement} */ (item).dataset;
+          /* c8 ignore next 3 -- TS */
           if (!apppath) {
             return;
           }
@@ -1540,6 +1542,9 @@ function addItems (result, basePath, currentBasePath) {
 
             // Handle vertical overflow - only reposition submenu,
             //   never main menu
+            /* c8 ignore start - Top overflow unreachable: submenu opens
+               downward at top:0 relative to parent, so rect.top < 0 would
+               require parent to be above viewport (unhoverable) */
             if (actuallyOverflowsTop) {
               // Submenu is cut off at the top, position it at viewport top
               submenu.style.position = 'fixed';
@@ -1560,6 +1565,7 @@ function addItems (result, basePath, currentBasePath) {
                 submenu.style.left = submenuRect.left + 'px';
               }
             } else if (actuallyOverflowsBottom) {
+            /* c8 ignore stop */
               const parentRect = parentLi.getBoundingClientRect();
               const wouldFitOnTop = parentRect.top - submenuRect.height >= 0;
 
@@ -1698,6 +1704,38 @@ function addItems (result, basePath, currentBasePath) {
   }
 
   if (view === 'icon-view') {
+    // Add keyboard support for icon-view
+    const iconViewTable = $('table[data-base-path]');
+    if (iconViewTable) {
+      // Make table focusable
+      iconViewTable.setAttribute('tabindex', '0');
+
+      // Remove any existing keydown listeners to avoid duplicates
+      const oldListener = iconViewTable._keydownListener;
+      if (oldListener) {
+        iconViewTable.removeEventListener('keydown', oldListener);
+      }
+
+      // Add new keydown listener
+      const keydownListener = (e) => {
+        // Cmd+Shift+N to create new folder
+        if (e.metaKey && e.shiftKey && e.key === 'n') {
+          e.preventDefault();
+          const folderPath = iconViewTable.dataset.basePath || '/';
+          createNewFolder(folderPath);
+        }
+      };
+
+      iconViewTable.addEventListener('keydown', keydownListener);
+      // Store reference for cleanup
+      // @ts-expect-error Custom property
+      iconViewTable._keydownListener = keydownListener;
+
+      // Focus the table for keyboard navigation
+      requestAnimationFrame(() => {
+        iconViewTable.focus();
+      });
+    }
     return;
   }
 
@@ -1942,7 +1980,7 @@ function addItems (result, basePath, currentBasePath) {
       parentMap.set($item[0], currentPath);
 
       // Set up watcher for this expanded folder in miller columns view
-      const currentView = localStorage.getItem('view') ?? 'icon-view';
+      const currentView = getCurrentView();
       if (currentView === 'three-columns') {
         setupFileWatcher(currentPath);
 
@@ -2170,7 +2208,7 @@ $('#three-columns').addEventListener('click', function () {
   changePath();
 });
 
-const view = localStorage.getItem('view') ?? 'icon-view';
+const view = getCurrentView();
 switch (view) {
 case 'three-columns':
 case 'icon-view':
@@ -2188,7 +2226,7 @@ $('#filebrowser').title = `
 `;
 
 $('#create-sticky').addEventListener('click', () => {
-  const currentView = localStorage.getItem('view') ?? 'icon-view';
+  const currentView = getCurrentView();
   const pth = currentView === 'icon-view'
     ? jQuery('table[data-base-path]').attr('data-base-path')
     : ($columns && $columns.find(
