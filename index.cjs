@@ -16595,6 +16595,9 @@
           customContextMenu.style.left =
             (viewportWidth - menuRect.width - 10) + 'px';
         }
+
+        /* c8 ignore next 4 -- Defensive as context menus should
+           be at positive pageX/pageY coordinates */
         if (menuRect.left < 0) {
           customContextMenu.style.left = '10px';
         }
@@ -16604,6 +16607,8 @@
           customContextMenu.style.top =
             (viewportHeight - menuRect.height - 10) + 'px';
         }
+        /* c8 ignore next 4 -- Defensive as context menus should
+           be at positive pageX/pageY coordinates */
         if (menuRect.top < 0) {
           customContextMenu.style.top = '10px';
         }

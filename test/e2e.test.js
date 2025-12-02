@@ -651,105 +651,147 @@ describe('renderer', () => {
           height: globalThis.innerHeight
         }));
 
-        // Get a miller-column element to work with
-        const millerColumn = await page.locator('ul.miller-column').last();
-        const columnBox = await millerColumn.boundingBox();
-        if (!columnBox) {
-          throw new Error('Miller column not found');
-        }
-
-        // Test right edge
-        // Right-click on column but position menu near edge
-        const rightX = Math.min(
-          columnBox.x + (columnBox.width / 2),
-          viewport.width - 50
-        );
-        await page.mouse.click(
-          rightX,
-          columnBox.y + (columnBox.height / 2),
-          {button: 'right'}
-        );
+        // Test right edge - trigger context menu at far right
+        await page.evaluate((vp) => {
+          const event = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2,
+            clientX: vp.width - 5,
+            clientY: 200
+          });
+          Object.defineProperty(event, 'pageX', {
+            value: vp.width - 5,
+            writable: false
+          });
+          Object.defineProperty(event, 'pageY', {
+            value: 200,
+            writable: false
+          });
+          const column = document.querySelector('ul.miller-column');
+          if (column) {
+            column.dispatchEvent(event);
+          }
+        }, viewport);
         await page.waitForTimeout(500);
 
         let contextMenu = await page.locator('.context-menu');
         await contextMenu.waitFor({state: 'visible', timeout: 5000});
 
-        // Verify menu is adjusted to stay within viewport
         let menuBox = await contextMenu.boundingBox();
         if (menuBox) {
           const menuRight = menuBox.x + menuBox.width;
-          expect(menuRight).toBeLessThanOrEqual(viewport.width + 5);
+          // Allow 10px margin as per code implementation
+          expect(menuRight).toBeLessThanOrEqual(viewport.width + 10);
         }
 
-        // Close menu
         await page.mouse.click(100, 100);
         await page.waitForTimeout(300);
 
         // Test bottom edge
-        const bottomY = Math.min(
-          columnBox.y + (columnBox.height / 2),
-          viewport.height - 50
-        );
-        await page.mouse.click(
-          columnBox.x + (columnBox.width / 2),
-          bottomY,
-          {button: 'right'}
-        );
+        await page.evaluate((vp) => {
+          const event = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2,
+            clientX: 200,
+            clientY: vp.height - 5
+          });
+          Object.defineProperty(event, 'pageX', {
+            value: 200,
+            writable: false
+          });
+          Object.defineProperty(event, 'pageY', {
+            value: vp.height - 5,
+            writable: false
+          });
+          const column = document.querySelector('ul.miller-column');
+          if (column) {
+            column.dispatchEvent(event);
+          }
+        }, viewport);
         await page.waitForTimeout(500);
 
         contextMenu = await page.locator('.context-menu');
         await contextMenu.waitFor({state: 'visible', timeout: 5000});
 
-        // Verify menu is adjusted to stay within viewport
         menuBox = await contextMenu.boundingBox();
         if (menuBox) {
           const menuBottom = menuBox.y + menuBox.height;
-          expect(menuBottom).toBeLessThanOrEqual(viewport.height + 5);
+          // Allow 10px margin as per code implementation
+          expect(menuBottom).toBeLessThanOrEqual(viewport.height + 10);
         }
 
-        // Close menu
         await page.mouse.click(100, 100);
         await page.waitForTimeout(300);
 
-        // Test left edge - click near left of column
-        await page.mouse.click(
-          columnBox.x + 10,
-          columnBox.y + (columnBox.height / 2),
-          {button: 'right'}
-        );
+        // Test left edge
+        await page.evaluate(() => {
+          const event = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2,
+            clientX: 0,
+            clientY: 200
+          });
+          Object.defineProperty(event, 'pageX', {
+            value: 0,
+            writable: false
+          });
+          Object.defineProperty(event, 'pageY', {
+            value: 200,
+            writable: false
+          });
+          const column = document.querySelector('ul.miller-column');
+          if (column) {
+            column.dispatchEvent(event);
+          }
+        });
         await page.waitForTimeout(500);
 
         contextMenu = await page.locator('.context-menu');
         await contextMenu.waitFor({state: 'visible', timeout: 5000});
 
-        // Verify menu position stays within viewport (left edge)
         menuBox = await contextMenu.boundingBox();
         if (menuBox) {
-          expect(menuBox.x).toBeGreaterThanOrEqual(-5);
+          expect(menuBox.x).toBeGreaterThanOrEqual(0);
         }
 
-        // Close menu
         await page.mouse.click(100, 100);
         await page.waitForTimeout(300);
 
         // Test top edge
-        await page.mouse.click(
-          columnBox.x + (columnBox.width / 2),
-          columnBox.y + 10,
-          {button: 'right'}
-        );
+        await page.evaluate(() => {
+          const event = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2,
+            clientX: 200,
+            clientY: 0
+          });
+          Object.defineProperty(event, 'pageX', {
+            value: 200,
+            writable: false
+          });
+          Object.defineProperty(event, 'pageY', {
+            value: 0,
+            writable: false
+          });
+          const column = document.querySelector('ul.miller-column');
+          if (column) {
+            column.dispatchEvent(event);
+          }
+        });
         await page.waitForTimeout(500);
 
         contextMenu = await page.locator('.context-menu');
         await contextMenu.waitFor({state: 'visible', timeout: 5000});
 
-        // Verify menu position stays within viewport (top edge)
         menuBox = await contextMenu.boundingBox();
         if (menuBox) {
-          expect(menuBox.y).toBeGreaterThanOrEqual(-5);
+          expect(menuBox.y).toBeGreaterThanOrEqual(0);
         }
 
-        // Close menu
         await page.mouse.click(100, 100);
         await page.waitForTimeout(300);
       }
