@@ -599,10 +599,19 @@ describe('renderer', () => {
       }
 
       // Explicitly select the newly created folder before deleting
-      // Use .last() to get the rightmost column's version (most recent)
+      // Filter to only non-collapsed columns to avoid stale duplicates
       const createdFolder = await page.locator(
+        '.miller-column:not(.miller-collapse) ' +
         'a[data-path*="test-folder-to-delete"]'
       ).last();
+
+      // Verify we only get active columns (not collapsed duplicates)
+      const activeCount = await page.locator(
+        '.miller-column:not(.miller-collapse) ' +
+        'a[data-path*="test-folder-to-delete"]'
+      ).count();
+      expect(activeCount).toBeLessThanOrEqual(1);
+
       await createdFolder.waitFor({state: 'visible', timeout: 2000});
 
       // Click the folder's parent li to select it
@@ -652,6 +661,7 @@ describe('renderer', () => {
 
       // Cleanup: Delete any leftover \"untitled folder\" instances
       const untitledFolders = await page.locator(
+        '.miller-column:not(.miller-collapse) ' +
         'a[data-path*="untitled folder"]'
       ).all();
       for (const folder of untitledFolders) {

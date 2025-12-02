@@ -14754,6 +14754,20 @@
     return /** @type {HTMLElement[]} */ ([...document.querySelectorAll(sel)]);
   };
 
+  /**
+   * Get elements matching selector, but only from non-collapsed columns.
+   * In three-columns view, collapsed columns contain stale copies of elements.
+   *
+   * @param {string} sel
+   */
+  const $$active = (sel) => {
+    const elements = $$(sel);
+    return elements.filter((el) => {
+      const column = el.closest('.miller-column');
+      return !column || !column.classList.contains('miller-collapse');
+    });
+  };
+
   // Ensure jamilih uses the browser's DOM instead of jsdom
   jmlExports.jml.setWindow(globalThis);
 
@@ -15000,7 +15014,7 @@
                 // Find the folder element that represents this directory
                 // We need to find an <a> tag whose data-path equals
                 //   this directory
-                const allFolders = $$('a[data-path]');
+                const allFolders = $$active('a[data-path]');
 
                 for (const folderEl of allFolders) {
                   const folderPath = decodeURIComponent(
@@ -15390,7 +15404,7 @@
               foldersWithPendingChanges.add(parentPath);
 
               // Find and click the parent folder to refresh it
-              const parentElements = $$('a[data-path]');
+              const parentElements = $$active('a[data-path]');
               let foundParent = false;
               for (const el of parentElements) {
                 const elPath = decodeURIComponent(
@@ -15720,7 +15734,7 @@
                 requestAnimationFrame(() => {
                   requestAnimationFrame(() => {
                     // Find the folder element (anchor tag with this path)
-                    const folderElement = $$('a[data-path]').find(
+                    const folderElement = $$active('a[data-path]').find(
                       /** @type {(el: Element) => boolean} */ (
                         el
                       ) => /** @type {HTMLElement} */ (el).dataset.path === pth
@@ -15755,8 +15769,8 @@
                           // Check both span and a tags (files are span,
                           //   folders are a)
                           const allElements = [
-                            ...$$('span[data-path]'),
-                            ...$$('a[data-path]')
+                            ...$$active('span[data-path]'),
+                            ...$$active('a[data-path]')
                           ];
 
                           // Find by matching the data-path attribute directly
