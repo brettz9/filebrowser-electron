@@ -361,6 +361,7 @@ describe('renderer', () => {
         await backToRootFolder.click();
 
         // Hidden as this is a local sticky
+        await noteContent.waitFor({state: 'hidden', timeout: 10000});
         expect(noteContent).toBeHidden();
 
         const appFolder = await page.locator('a[data-path="/Applications"]');
