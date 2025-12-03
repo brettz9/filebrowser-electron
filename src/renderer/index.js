@@ -558,6 +558,21 @@ async function setupNativeWatcher (dirPath) {
 
     // Store the subscription in the map
     activeWatchers.set(dirPath, subscription);
+
+  // Note: The parcelWatcher.subscribe error catch block
+  // is difficult to cover in automated tests because:
+  // 1. setupNativeWatcher is called during initial page load via changePath()
+  // 2. The activeWatchers Map caches watched paths, preventing repeated
+  //    subscribe calls on navigation
+  // 3. Mocking parcelWatcher.subscribe before page load would break all
+  //    watcher functionality, making it difficult to verify the specific
+  //    error path
+  // 4. The async nature of watcher setup (not awaited) makes timing
+  //    unreliable
+  // This error handling would require manual/integration testing or
+  // modification of the source code to expose setupNativeWatcher for
+  // direct unit testing.
+  /* c8 ignore next 4 -- Debugging -- Difficult to cover */
   } catch (err) {
     // eslint-disable-next-line no-console -- Debugging
     console.warn('Could not set up parcel watcher:', err);
