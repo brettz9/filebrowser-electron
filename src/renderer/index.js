@@ -751,6 +751,7 @@ function addItems (result, basePath, currentBasePath) {
               inputElement.select();
             }
           }, 100);
+        /* c8 ignore next 5 -- Defensive */
         } else {
           // eslint-disable-next-line no-console -- Debugging
           console.warn('Could not find new folder element');
@@ -765,7 +766,7 @@ function addItems (result, basePath, currentBasePath) {
   };
 
   /**
-   * @param {HTMLElement} textElement
+   * @param {HTMLElement} [textElement]
    * @param {(() => void)} [onComplete] - Callback when rename completes
    */
   const startRename = (textElement, onComplete) => {
@@ -852,6 +853,7 @@ function addItems (result, basePath, currentBasePath) {
             let foundParent = false;
             for (const el of parentElements) {
               const elPath = decodeURIComponent(
+                /* c8 ignore next -- TS */
                 /** @type {HTMLElement} */ (el).dataset.path || ''
               );
               if (elPath === parentPath) {
@@ -966,8 +968,6 @@ function addItems (result, basePath, currentBasePath) {
             }
 
             if (!foundParent) {
-              // eslint-disable-next-line no-console -- Debugging
-              console.log('  -> Parent not found in DOM');
               // Clear the flag if parent not found
               setTimeout(() => {
                 isCreating = false;
@@ -1105,6 +1105,14 @@ function addItems (result, basePath, currentBasePath) {
       ev.stopPropagation();
     });
   };
+
+  // Expose for testing
+  /* c8 ignore next 4 -- Test helper */
+  if (typeof globalThis !== 'undefined') {
+    /** @type {unknown} */ (globalThis).startRenameForTesting = startRename;
+    /** @type {unknown} */ (globalThis).createNewFolderForTesting =
+      createNewFolder;
+  }
 
   /**
    * @param {Event} e

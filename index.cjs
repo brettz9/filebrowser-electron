@@ -14833,7 +14833,6 @@
 
   /**
    * Setup a parcel/watcher as fallback.
-   * Used after folder operations to avoid chokidar freeze.
    *
    * @param {string} dirPath
    * @returns {Promise<void>}
@@ -15284,22 +15283,14 @@
           const normalizedFolderPath = folderPath.replace(/\/+$/v, '');
           const encodedPath = normalizedFolderPath + '/' +
             encodeURIComponent(newFolderName);
-          // eslint-disable-next-line no-console -- Debugging
-          console.log('createNewFolder: Looking for:', encodedPath);
           const newFolderElement = $(
             `[data-path="${CSS.escape(encodedPath)}"]`
-          );
-          // eslint-disable-next-line no-console -- Debugging
-          console.log(
-            'createNewFolder: Found element:',
-            Boolean(newFolderElement)
           );
           if (newFolderElement) {
             startRename(newFolderElement, () => {
               // Clear flag after rename completes
               isCreating = false;
 
-              // Use native fs.watch instead of chokidar to avoid freeze
               const currentDir = getBasePath();
               if (currentDir !== '/') {
                 setupNativeWatcher(currentDir);
@@ -15320,6 +15311,7 @@
                 inputElement.select();
               }
             }, 100);
+          /* c8 ignore next 5 -- Defensive */
           } else {
             // eslint-disable-next-line no-console -- Debugging
             console.warn('Could not find new folder element');
@@ -15334,7 +15326,7 @@
     };
 
     /**
-     * @param {HTMLElement} textElement
+     * @param {HTMLElement} [textElement]
      * @param {(() => void)} [onComplete] - Callback when rename completes
      */
     const startRename = (textElement, onComplete) => {
@@ -15421,6 +15413,7 @@
               let foundParent = false;
               for (const el of parentElements) {
                 const elPath = decodeURIComponent(
+                  /* c8 ignore next -- TS */
                   /** @type {HTMLElement} */ (el).dataset.path || ''
                 );
                 if (elPath === parentPath) {
@@ -15535,8 +15528,6 @@
               }
 
               if (!foundParent) {
-                // eslint-disable-next-line no-console -- Debugging
-                console.log('  -> Parent not found in DOM');
                 // Clear the flag if parent not found
                 setTimeout(() => {
                   isCreating = false;
@@ -15581,11 +15572,7 @@
             textElement.textContent = originalContent;
 
             // Call completion callback on error too
-            // eslint-disable-next-line no-console -- Debugging
-            console.log('Error handler: onComplete =', Boolean(onComplete));
             if (onComplete) {
-              // eslint-disable-next-line no-console -- Debugging
-              console.log('Calling onComplete in error handler');
               onComplete();
             }
           }
@@ -15678,6 +15665,14 @@
         ev.stopPropagation();
       });
     };
+
+    // Expose for testing
+    /* c8 ignore next 4 -- Test helper */
+    if (typeof globalThis !== 'undefined') {
+      /** @type {unknown} */ (globalThis).startRenameForTesting = startRename;
+      /** @type {unknown} */ (globalThis).createNewFolderForTesting =
+        createNewFolder;
+    }
 
     /**
      * @param {Event} e

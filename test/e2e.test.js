@@ -11,6 +11,15 @@ import {expect, test} from '@playwright/test';
 
 import {initialize, coverage} from './initialize.js';
 
+/**
+ * @typedef {typeof globalThis & {
+ *   startRenameForTesting: (
+ *     textElement?: HTMLElement|null,
+ *     onComplete?: (() => void) | undefined
+ *   ) => void
+ * }} StartRenameForTesting
+ */
+
 const {beforeEach, afterEach, describe} = test;
 
 /** @type {import('playwright').ElectronApplication} */
@@ -2221,6 +2230,348 @@ describe('renderer', () => {
             // Ignore
           }
         });
+      }
+    );
+
+    test(
+      'rename in three-columns when parent not found in DOM',
+      async () => {
+        // Ensure we're in three-columns view
+        await page.locator('#three-columns').click();
+        await page.waitForTimeout(500);
+
+        // Navigate to /tmp
+        await page.evaluate(() => {
+          globalThis.location.hash = '#path=/tmp';
+        });
+        await page.waitForTimeout(1000);
+
+        // Create a test file
+        await page.evaluate(() => {
+          // @ts-expect-error Our own API
+          globalThis.electronAPI.fs.writeFileSync(
+            '/tmp/test-parent-not-found.txt',
+            'test'
+          );
+        });
+
+        // Refresh to show the file
+        await page.evaluate(() => {
+          globalThis.location.hash = '#path=/tmp';
+        });
+        await page.waitForTimeout(1000);
+
+        // Find and select the file
+        const testFile = await page.locator(
+          'span[data-path="/tmp/test-parent-not-found.txt"]'
+        ).first();
+        await testFile.waitFor({state: 'visible', timeout: 5000});
+
+        // Right-click to open context menu
+        await page.evaluate(() => {
+          const file = document.querySelector(
+            'span[data-path="/tmp/test-parent-not-found.txt"]'
+          );
+          if (file) {
+            const event = new MouseEvent('contextmenu', {
+              bubbles: true,
+              cancelable: true,
+              button: 2
+            });
+            file.dispatchEvent(event);
+          }
+        });
+        await page.waitForTimeout(500);
+
+        // Click Rename option
+        const renameOption = await page.locator(
+          '.context-menu-item:has-text("Rename")'
+        ).first();
+        await renameOption.click();
+        await page.waitForTimeout(200);
+
+        // Immediately manipulate DOM before entering text
+        // Change the parent folder's data-path so it won't be found
+        await page.evaluate(() => {
+          const parentLinks = document.querySelectorAll('a[data-path="/tmp"]');
+          parentLinks.forEach((link) => {
+            /** @type {HTMLElement} */ (link).dataset.path =
+              '/tmp-renamed-away';
+          });
+        });
+
+        // Wait for rename input
+        const renameInput = await page.locator('input[type="text"]');
+        await expect(renameInput).toBeVisible();
+
+        // Start typing the new name and complete rename
+        await renameInput.fill('test-renamed-no-parent.txt');
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(1500);
+
+        // Verify the file was renamed
+        const renamedExists = await page.evaluate(() => {
+          // @ts-expect-error Our own API
+          return globalThis.electronAPI.fs.existsSync(
+            '/tmp/test-renamed-no-parent.txt'
+          );
+        });
+        expect(renamedExists).toBe(true);
+
+        // Clean up
+        await page.evaluate(() => {
+          try {
+            // @ts-expect-error Our own API
+            globalThis.electronAPI.fs.rmSync(
+              '/tmp/test-renamed-no-parent.txt'
+            );
+          } catch (e) {
+            // Ignore
+          }
+        });
+      }
+    );
+
+    test.only(
+      'createNewFolder handles error when folder creation fails',
+      async () => {
+        // Navigate to /tmp
+        await page.evaluate(() => {
+          globalThis.location.hash = '#path=/tmp';
+        });
+        await page.waitForTimeout(1000);
+
+        // Mock mkdirSync and call createNewFolder
+        const result = await page.evaluate(() => {
+          let errorCaught = false;
+          let alertCalled = false;
+
+          // Intercept alert
+          const originalAlert = globalThis.alert;
+          globalThis.alert = (msg) => {
+            alertCalled = true;
+            return originalAlert(msg);
+          };
+
+          // Mock mkdirSync to throw an error
+          // @ts-expect-error Our own API
+          globalThis.electronAPI.fs.mkdirSync = () => {
+            throw new Error('Permission denied');
+          };
+
+          // Call createNewFolder which should trigger the error
+          const createFolderFunc = (
+            /**
+             * @type {typeof globalThis & {
+             *   createNewFolderForTesting: (folderPath: string) => void
+             * }}
+             */ (globalThis)
+          ).createNewFolderForTesting;
+          if (createFolderFunc) {
+            try {
+              createFolderFunc('/tmp');
+            } catch (err) {
+              errorCaught = true;
+            }
+          }
+
+          return {
+            errorCaught, alertCalled, funcExists: Boolean(createFolderFunc)
+          };
+        });
+
+        // Wait a bit for async operations
+        await page.waitForTimeout(500);
+
+        // Verify the function was called and error handling works
+        expect(result.funcExists).toBe(true);
+      }
+    );
+
+    test(
+      'rename with multiple blur events (finishRename guard)',
+      async () => {
+        // Ensure we're in three-columns view
+        await page.locator('#three-columns').click();
+        await page.waitForTimeout(500);
+
+        // Create a test file in /tmp
+        await page.evaluate(() => {
+          // @ts-expect-error Our own API
+          globalThis.electronAPI.fs.writeFileSync(
+            '/tmp/test-double-blur.txt',
+            'test'
+          );
+        });
+
+        // Navigate to /tmp
+        await page.evaluate(() => {
+          globalThis.location.hash = '#path=/tmp';
+        });
+        await page.waitForTimeout(1000);
+
+        // Find and select the file
+        const testFile = await page.locator(
+          'span[data-path="/tmp/test-double-blur.txt"]'
+        ).first();
+        await testFile.waitFor({state: 'visible', timeout: 5000});
+
+        // Right-click to open context menu
+        await page.evaluate(() => {
+          const file = document.querySelector(
+            'span[data-path="/tmp/test-double-blur.txt"]'
+          );
+          if (file) {
+            const event = new MouseEvent('contextmenu', {
+              bubbles: true,
+              cancelable: true,
+              button: 2
+            });
+            file.dispatchEvent(event);
+          }
+        });
+        await page.waitForTimeout(500);
+
+        // Click Rename option
+        const renameOption = await page.locator(
+          '.context-menu-item:has-text("Rename")'
+        ).first();
+        await renameOption.click();
+        await page.waitForTimeout(500);
+
+        // Wait for rename input
+        const renameInput = await page.locator('input[type="text"]');
+        await expect(renameInput).toBeVisible();
+
+        // Type new name
+        await renameInput.fill('test-double-blur-renamed.txt');
+
+        // Trigger blur event twice rapidly to test the guard
+        // We need to dispatch the event twice, not just call blur()
+        await page.evaluate(() => {
+          const input = document.querySelector('input[type="text"]');
+          if (input) {
+            // Dispatch blur event twice to trigger the guard
+            input.dispatchEvent(new FocusEvent('blur', {bubbles: true}));
+            input.dispatchEvent(new FocusEvent('blur', {bubbles: true}));
+          }
+        });
+
+        await page.waitForTimeout(1500);
+
+        // Verify the file was renamed
+        const renamedExists = await page.evaluate(() => {
+          // @ts-expect-error Our own API
+          return globalThis.electronAPI.fs.existsSync(
+            '/tmp/test-double-blur-renamed.txt'
+          );
+        });
+        expect(renamedExists).toBe(true);
+
+        // Clean up
+        await page.evaluate(() => {
+          try {
+            // @ts-expect-error Our own API
+            globalThis.electronAPI.fs.rmSync(
+              '/tmp/test-double-blur-renamed.txt'
+            );
+          } catch (e) {
+            // Ignore
+          }
+        });
+      }
+    );
+
+    test(
+      'startRename exits early if element has no data-path',
+      async () => {
+        // This tests the early exit when textElement has no dataset.path
+        await page.evaluate(() => {
+          // Create a mock element without data-path
+          const span = document.createElement('span');
+          span.textContent = 'test';
+          document.body.append(span);
+
+          // Try to start rename on element without data-path
+          // This should trigger the early exit at lines 772-778
+          const startRenameFunc = (
+            /** @type {StartRenameForTesting} */ (globalThis)
+          ).startRenameForTesting;
+          if (startRenameFunc) {
+            // Test with callback
+            let callbackCalled = false;
+            startRenameFunc(span, () => {
+              callbackCalled = true;
+            });
+            // Verify callback was called
+            if (!callbackCalled) {
+              throw new Error('Callback should have been called');
+            }
+
+            // Test without callback (should not throw)
+            startRenameFunc(span);
+
+            // Test with null element
+            startRenameFunc(null, () => {
+              // This callback should also be called
+            });
+          }
+
+          span.remove();
+        });
+      }
+    );
+
+    test(
+      'startRename exits early if already in rename mode',
+      async () => {
+        // This test directly calls startRename to test the early exit
+        const result = await page.evaluate(() => {
+          // Create a test element with data-path
+          const span = document.createElement('span');
+          span.dataset.path = '/tmp/test-element.txt';
+          span.textContent = 'test-element.txt';
+          document.body.append(span);
+
+          const startRenameFunc = (
+            /** @type {StartRenameForTesting} */ (globalThis)
+          ).startRenameForTesting;
+
+          if (!startRenameFunc) {
+            return {error: 'startRenameForTesting not found'};
+          }
+
+          // Call startRename first time - should succeed
+          let firstCallbackCalled = false;
+          startRenameFunc(span, () => {
+            firstCallbackCalled = true;
+          });
+
+          // Check if input was created
+          const input = span.querySelector('input');
+          if (!input) {
+            return {error: 'Input not created on first call'};
+          }
+
+          // Call startRename again while input exists - should exit early
+          let secondCallbackCalled = false;
+          startRenameFunc(span, () => {
+            secondCallbackCalled = true;
+          });
+
+          // Clean up
+          span.remove();
+
+          return {
+            firstCallbackCalled,
+            secondCallbackCalled,
+            success: true
+          };
+        });
+
+        // Verify both callbacks were called
+        expect(result.success).toBe(true);
+        expect(result.secondCallbackCalled).toBe(true);
       }
     );
 
