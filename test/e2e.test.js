@@ -2388,14 +2388,6 @@ describe('renderer', () => {
       }
     );
 
-    // Note: Delete error handling (lines 767-770 in src/renderer/index.js)
-    // is difficult to test via mocking because rmSync is destructured at
-    // module load time, preventing runtime mocking. This would require
-    // either modifying the source to use property access instead of
-    // destructuring, or creating actual filesystem permission errors which
-    // is complex and platform-dependent. These lines are marked as
-    // difficult to cover and require manual/integration testing.
-
     test(
       'folder creation focuses and selects rename input',
       async () => {

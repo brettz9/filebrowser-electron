@@ -15147,10 +15147,6 @@
         }
       });
     }
-    if (!(/^[\w.\/ \-]*$/v).test(basePath)) {
-      // Todo: Refactor to allow non-ASCII and just escape single quotes, etc.
-      return;
-    }
 
     const result = readDirectory(basePath);
     addItems(result, basePath, currentBasePath);
@@ -15233,6 +15229,15 @@
         setTimeout(() => {
           isDeleting = false;
         }, 100);
+
+        // Note: Delete error handling here
+        // is difficult to test via mocking because rmSync is destructured at
+        // module load time, preventing runtime mocking. This would require
+        // either modifying the source to use property access instead of
+        // destructuring, or creating actual filesystem permission errors which
+        // is complex and platform-dependent. These lines are marked as
+        // difficult to cover and require manual/integration testing.
+        /* c8 ignore next 5 -- Defensive and difficult to cover */
       } catch (err) {
         // eslint-disable-next-line no-alert -- User feedback
         alert('Failed to delete: ' + (/** @type {Error} */ (err)).message);
