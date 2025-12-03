@@ -2332,7 +2332,7 @@ describe('renderer', () => {
       }
     );
 
-    test.only(
+    test(
       'createNewFolder handles error when folder creation fails',
       async () => {
         // Navigate to /tmp
@@ -2385,6 +2385,96 @@ describe('renderer', () => {
 
         // Verify the function was called and error handling works
         expect(result.funcExists).toBe(true);
+      }
+    );
+
+    // Note: Delete error handling (lines 767-770 in src/renderer/index.js)
+    // is difficult to test via mocking because rmSync is destructured at
+    // module load time, preventing runtime mocking. This would require
+    // either modifying the source to use property access instead of
+    // destructuring, or creating actual filesystem permission errors which
+    // is complex and platform-dependent. These lines are marked as
+    // difficult to cover and require manual/integration testing.
+
+    test(
+      'folder creation focuses and selects rename input',
+      async () => {
+        // Ensure we're in three-columns view
+        await page.locator('#three-columns').click();
+        await page.waitForTimeout(500);
+
+        // Navigate to /tmp
+        await page.evaluate(() => {
+          globalThis.location.hash = '#path=/tmp';
+        });
+        await page.waitForTimeout(1000);
+
+        // Dispatch Cmd+Shift+N to create new folder
+        await page.evaluate(() => {
+          const millerColumns = document.querySelector('div.miller-columns');
+          if (millerColumns) {
+            const event = new KeyboardEvent('keydown', {
+              key: 'n',
+              code: 'KeyN',
+              metaKey: true,
+              shiftKey: true,
+              bubbles: true,
+              cancelable: true
+            });
+            millerColumns.dispatchEvent(event);
+          }
+        });
+
+        // Wait for folder creation and all setTimeout callbacks to complete
+        // Need to wait: changePath, setTimeout(150ms), setTimeout(100ms)
+        await page.waitForTimeout(1000);
+
+        // Verify input exists, is focused, and text is selected
+        const inputState = await page.evaluate(() => {
+          const input = document.querySelector('input[type="text"]');
+          if (!input) {
+            return {exists: false};
+          }
+          const {activeElement} = document;
+          const isFocused = activeElement === input;
+          // Check if text is selected
+          const inputEl = /** @type {HTMLInputElement} */ (input);
+          const hasSelection =
+            inputEl.selectionStart === 0 &&
+            inputEl.selectionEnd === inputEl.value.length;
+
+          // Also check if element is in view (scrollIntoView was called)
+          const rect = inputEl.getBoundingClientRect();
+          const isInView =
+            rect.top >= 0 &&
+            rect.left >= 0 &&
+            rect.bottom <= window.innerHeight &&
+            rect.right <= window.innerWidth;
+
+          return {
+            exists: true, isFocused, hasSelection, isInView
+          };
+        });
+
+        expect(inputState.exists).toBe(true);
+        expect(inputState.isFocused).toBe(true);
+        expect(inputState.hasSelection).toBe(true);
+
+        // Cancel and clean up
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(500);
+
+        await page.evaluate(() => {
+          try {
+            // @ts-expect-error Our own API
+            globalThis.electronAPI.fs.rmSync(
+              '/tmp/untitled folder',
+              {recursive: true}
+            );
+          } catch (e) {
+            // Ignore
+          }
+        });
       }
     );
 
