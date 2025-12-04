@@ -10,7 +10,7 @@ import addMillerColumnPlugin from 'miller-columns';
 const {
   fs: {
     mkdirSync, readdirSync, writeFileSync, existsSync, renameSync,
-    lstatSync, rmSync
+    lstatSync, rmSync, realpathSync
   },
   path,
   // eslint-disable-next-line no-shadow -- Different process
@@ -286,12 +286,21 @@ async function setupNativeWatcher (dirPath) {
     return;
   }
 
+  // Resolve symlinks to get the real path (e.g., /tmp -> /private/tmp on macOS)
+  let resolvedDirPath;
+  try {
+    resolvedDirPath = realpathSync(dirPath);
+  } catch {
+    // If path doesn't exist or can't be resolved, use original
+    resolvedDirPath = dirPath;
+  }
+
   let debounceTimer = /** @type {NodeJS.Timeout | null} */ (null);
 
   try {
     // Use @parcel/watcher which is more efficient and tracks subdirectories
     const subscription = await parcelWatcher.subscribe(
-      dirPath,
+      resolvedDirPath,
       (err, events) => {
         if (err) {
           // eslint-disable-next-line no-console -- Debugging
@@ -302,7 +311,7 @@ async function setupNativeWatcher (dirPath) {
         // Filter events to include direct children and first-level
         // subdirectories (depth 0 and depth 1 only)
         const relevantEvents = events.filter((evt) => {
-          const relativePath = evt.path.slice(dirPath.length + 1);
+          const relativePath = evt.path.slice(resolvedDirPath.length + 1);
           // Count slashes to determine depth
           const slashCount = (relativePath.match(/\//gv) || []).length;
           // Include depth 0 (direct children) and depth 1
@@ -331,6 +340,9 @@ async function setupNativeWatcher (dirPath) {
         let changeInVisibleArea = false;
         const columnsToRefresh = new Set();
 
+        // Get current base path being viewed
+        const currentBasePath = getBasePath();
+
         // Check each event against the watched folder
         for (const evt of relevantEvents) {
           const eventPath = evt.path;
@@ -344,19 +356,51 @@ async function setupNativeWatcher (dirPath) {
           // Track this folder as having pending changes
           foldersWithPendingChanges.add(eventDir);
 
+          // Check if change is in the current base path (root being viewed)
+          // Normalize paths for comparison (currentBasePath has trailing slash)
+          // Also resolve symlinks (macOS /tmp -> /private/tmp)
+          const normalizedEventDir = path.normalize(eventDir + '/');
+          try {
+            const resolvedEventDir = realpathSync(normalizedEventDir);
+            const resolvedCurrentBasePath = realpathSync(currentBasePath);
+            if (resolvedEventDir === resolvedCurrentBasePath) {
+              changeInVisibleArea = true;
+              columnsToRefresh.add(currentBasePath);
+            }
+          } catch {
+            // If realpathSync fails (e.g., path doesn't exist), fall back to
+            // simple string comparison
+            if (normalizedEventDir === currentBasePath) {
+              changeInVisibleArea = true;
+              columnsToRefresh.add(currentBasePath);
+            }
+          }
+
           // Check if change affects visible columns
           if (selectedPath) {
             const decodedSelectedPath = decodeURIComponent(selectedPath);
             const selectedDir = path.dirname(decodedSelectedPath);
 
+            // Resolve symlinks for path comparison
+            let resolvedEventDir = eventDir;
+            let resolvedSelectedDir = selectedDir;
+            let resolvedDecodedSelectedPath = decodedSelectedPath;
+            try {
+              resolvedEventDir = realpathSync(eventDir);
+              resolvedSelectedDir = realpathSync(selectedDir);
+              resolvedDecodedSelectedPath = realpathSync(decodedSelectedPath);
+            } catch {
+              // If resolution fails, use original paths
+            }
+
             // Case 1: Change in selected folder's children (if folder)
-            if (decodedSelectedPath === eventDir) {
+            if (resolvedDecodedSelectedPath === resolvedEventDir) {
               changeInSelectedFolder = true;
               changeInVisibleArea = true;
             }
 
             // Case 2: Change in selected item's siblings (same parent)
-            if (selectedDir === eventDir) {
+            if (resolvedSelectedDir === resolvedEventDir) {
               changeInVisibleArea = true;
               columnsToRefresh.add(selectedDir);
             }
@@ -367,7 +411,14 @@ async function setupNativeWatcher (dirPath) {
             while (
               ancestorPath && ancestorPath !== '/' && ancestorPath !== '.'
             ) {
-              if (ancestorPath === eventDir) {
+              let resolvedAncestorPath = ancestorPath;
+              try {
+                resolvedAncestorPath = realpathSync(ancestorPath);
+              } catch {
+                // Use original if resolution fails
+              }
+
+              if (resolvedAncestorPath === resolvedEventDir) {
                 changeInVisibleArea = true;
                 columnsToRefresh.add(eventDir);
                 break;
@@ -414,7 +465,6 @@ async function setupNativeWatcher (dirPath) {
 
             // Check if any changed paths are the current base path
             // (root directory being viewed)
-            const currentBasePath = getBasePath();
             const rootChanged = columnsToRefresh.has(currentBasePath);
 
             if (rootChanged) {
@@ -444,7 +494,8 @@ async function setupNativeWatcher (dirPath) {
               // Special case: if the changed path is an ancestor of current
               // path but not directly visible as a folder element, we need to
               // rebuild the leftmost column that shows this path's contents
-              if (currentBasePath.startsWith(columnPath + '/')) {
+              if (currentBasePath.startsWith(columnPath + '/') &&
+                  currentBasePath !== columnPath + '/') {
                 // The changed directory is an ancestor
                 // We need to reload the entire view to refresh it
                 setTimeout(changePath, 150);
@@ -614,6 +665,20 @@ function changePath () {
   }
 
   setupFileWatcher(currentBasePath);
+
+  // In three-columns view, also set up watchers for all ancestor directories
+  // to detect sibling changes
+  if (view === 'three-columns') {
+    let ancestorPath = path.dirname(currentBasePath);
+    while (ancestorPath && ancestorPath !== '/' && ancestorPath !== '.') {
+      setupFileWatcher(ancestorPath);
+      const nextAncestor = path.dirname(ancestorPath);
+      if (nextAncestor === ancestorPath) {
+        break;
+      }
+      ancestorPath = nextAncestor;
+    }
+  }
 }
 
 /**

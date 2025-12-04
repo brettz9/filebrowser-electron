@@ -28,7 +28,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         isFile: () => stat.isFile()
       };
     },
-    rmSync: (...args) => fs.rmSync(...args)
+    rmSync: (...args) => fs.rmSync(...args),
+    realpathSync: (...args) => fs.realpathSync(...args)
   },
   path: {
     join: (...args) => path.join(...args),

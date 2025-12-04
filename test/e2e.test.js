@@ -2651,6 +2651,11 @@ describe('renderer', () => {
           };
         });
 
+        // Check for errors first
+        if (result.error) {
+          throw new Error(`Test error: ${result.error}`);
+        }
+
         // Verify both callbacks were called
         expect(result.success).toBe(true);
         expect(result.secondCallbackCalled).toBe(true);
