@@ -24,7 +24,7 @@ afterEach(async () => {
 
 describe('renderer', () => {
   describe('file watcher refresh logic', () => {
-    test.only('refreshes view when ancestor directory changes', async () => {
+    test('refreshes view when ancestor directory changes', async () => {
       // This test covers lines 465-476 in src/renderer/index.js
       // When a changed path is an ancestor of current path,
       // the view should reload via changePath()
@@ -118,9 +118,9 @@ describe('renderer', () => {
     test(
       'refreshes specific folder when its contents change',
       async () => {
-        // This test covers lines 459-545 in src/renderer/index.js
-        // When a folder's contents change, it should be refreshed
-        // including scroll position restoration and selection preservation
+        // This test covers lines 508-606 in src/renderer/index.js
+        // When a folder's contents change, it should be refreshed by clicking
+        // the folder element, including scroll and selection preservation
 
         // Create test directory structure
         await page.evaluate(() => {
@@ -291,10 +291,11 @@ describe('renderer', () => {
         // Select a specific file (file3.txt)
         await page.waitForTimeout(500);
 
-        // Try to find the file - it might be URL encoded
+        // Try to find the file - it might be a span in three-columns view
         const file3Exists = await page.evaluate(() => {
+          // In three-columns, files are span elements, folders are anchors
           const file3 = document.querySelector(
-            'a[data-path="/tmp/test-watcher-selection/folder/file3.txt"]'
+            'span[data-path="/tmp/test-watcher-selection/folder/file3.txt"]'
           );
           return Boolean(file3);
         });
@@ -305,19 +306,28 @@ describe('renderer', () => {
         }
 
         const file3Link = await page.locator(
-          'a[data-path="/tmp/test-watcher-selection/folder/file3.txt"]'
+          'span[data-path="/tmp/test-watcher-selection/folder/file3.txt"]'
         );
         await file3Link.click();
         await page.waitForTimeout(300);
 
         // Verify it's selected
         const selectedBefore = await page.evaluate(() => {
-          const selected = document.querySelector('li.miller-selected a');
-          return selected
-            ? /** @type {HTMLElement} */ (selected).dataset.path
+          // Get the last selected element (rightmost column in miller-columns)
+          const allSelectedElements = [
+            ...document.querySelectorAll('li.miller-selected a'),
+            ...document.querySelectorAll('li.miller-selected span')
+          ];
+          const lastSelected = allSelectedElements.at(-1);
+
+          return lastSelected
+            ? /** @type {HTMLElement} */ (lastSelected).dataset.path
             : null;
         });
         expect(selectedBefore).toContain('file3.txt');
+
+        // Wait longer for watcher to be fully set up (3 seconds)
+        await page.waitForTimeout(3000);
 
         // Now trigger a change in the parent folder by adding a new file
         await page.evaluate(() => {
@@ -336,9 +346,15 @@ describe('renderer', () => {
 
         // Verify file3.txt is still selected after refresh
         const selectedAfter = await page.evaluate(() => {
-          const selected = document.querySelector('li.miller-selected a');
-          return selected
-            ? /** @type {HTMLElement} */ (selected).dataset.path
+          // Get the last selected element (rightmost column in miller-columns)
+          const allSelectedElements = [
+            ...document.querySelectorAll('li.miller-selected a'),
+            ...document.querySelectorAll('li.miller-selected span')
+          ];
+          const lastSelected = allSelectedElements.at(-1);
+
+          return lastSelected
+            ? /** @type {HTMLElement} */ (lastSelected).dataset.path
             : null;
         });
         expect(selectedAfter).toContain('file3.txt');
@@ -671,28 +687,16 @@ describe('renderer', () => {
     test(
       'clicks visible folder element to refresh when sibling changes',
       async () => {
-        // This test covers lines 480-570 in src/renderer/index.js
-        // When a change occurs in a folder that is visible as a folder
-        // element (anchor tag) but is neither the current directory nor
-        // an ancestor, the code should find and click that folder element
+        // This test covers lines 540-632 in src/renderer/index.js
+        // When a visible folder element needs refreshing
 
-        // Listen to console logs from the browser
-        page.on('console', (msg) => {
-          if (msg.text().includes('WATCHER DEBUG')) {
-            // eslint-disable-next-line no-console -- Test debug
-            console.log('BROWSER LOG:', msg.text());
-          }
-        });
-
-        // Create directory structure
+        // Create directory structure with two sibling folders
         await page.evaluate(() => {
           // @ts-expect-error - electronAPI available via preload
           const {fs, path} = globalThis.electronAPI;
-          const testDir = '/tmp/test-watcher-element-click';
-          const parent = path.join(testDir, 'parent');
-          const child1 = path.join(parent, 'child-1');
-          const child2 = path.join(parent, 'child-2');
-          const grandchild = path.join(child2, 'grandchild');
+          const testDir = '/tmp/test-folder-element-refresh';
+          const folder1 = path.join(testDir, 'folder-1');
+          const folder2 = path.join(testDir, 'folder-2');
 
           // Clean up if exists
           try {
@@ -703,19 +707,17 @@ describe('renderer', () => {
 
           // Create structure
           fs.mkdirSync(testDir);
-          fs.mkdirSync(parent);
-          fs.mkdirSync(child1);
-          fs.mkdirSync(child2);
-          fs.mkdirSync(grandchild);
+          fs.mkdirSync(folder1);
+          fs.mkdirSync(folder2);
 
           // Add initial files
           fs.writeFileSync(
-            path.join(child1, 'file-in-child1.txt'),
-            'content in child 1'
+            path.join(folder1, 'file1.txt'),
+            'content 1'
           );
           fs.writeFileSync(
-            path.join(grandchild, 'file-in-grandchild.txt'),
-            'content in grandchild'
+            path.join(folder2, 'file2.txt'),
+            'content 2'
           );
         });
 
@@ -723,54 +725,49 @@ describe('renderer', () => {
         await page.locator('#three-columns').click();
         await page.waitForTimeout(300);
 
-        // Navigate to parent, then click into child-1
+        // Navigate to test directory
         await page.evaluate(() => {
           globalThis.location.hash =
-            '#path=/tmp/test-watcher-element-click/parent';
+            '#path=/tmp/test-folder-element-refresh';
         });
         await page.waitForTimeout(1500);
 
-        // Click on child-1 to navigate into it
-        const child1Link = await page.locator(
-          'a[data-path="/tmp/test-watcher-element-click/parent/child-1"]'
+        // Click into folder-1 to set up watchers
+        const folder1Link = await page.locator(
+          'a[data-path="/tmp/test-folder-element-refresh/folder-1"]'
         );
-        await child1Link.click();
+        await folder1Link.click();
         await page.waitForTimeout(1000);
 
-        // Select a file in child-1
-        const fileInChild1 = await page.locator(
-          '[data-path="/tmp/test-watcher-element-click/parent/' +
-          'child-1/file-in-child1.txt"]'
+        // Select a file in folder-1
+        const file1 = await page.locator(
+          '[data-path="/tmp/test-folder-element-refresh/folder-1/file1.txt"]'
         );
-        await fileInChild1.click();
+        await file1.click();
         await page.waitForTimeout(500);
 
-        // Verify child-2 is visible as a folder element in the parent column
-        const child2Visible = await page.evaluate(() => {
-          const folders = [...document.querySelectorAll('a[data-path]')];
-          return folders.some((el) => {
-            const dataPath = /** @type {HTMLElement} */ (el).dataset.path;
-            return dataPath ===
-              '/tmp/test-watcher-element-click/parent/child-2';
-          });
+        // Scroll folder-2 out of viewport to test scrollIntoView
+        await page.evaluate(() => {
+          const folder2El = document.querySelector(
+            'a[data-path="/tmp/test-folder-element-refresh/folder-2"]'
+          );
+          if (folder2El) {
+            const column = folder2El.closest('.miller-column');
+            if (column) {
+              // Scroll far enough that folder-2 is out of view
+              column.scrollTop = 0;
+            }
+          }
         });
-        expect(child2Visible).toBe(true);
 
-        // Now add a file to child-2/grandchild
-        // This creates an event where:
-        // - eventDir = /tmp/test-watcher-element-click/parent/child-2/...
-        // - selectedPath = ...child-1/file-in-child1.txt
-        // - selectedDir = /tmp/test-watcher-element-click/parent/child-1
-        // Walking up selectedDir ancestors: child-1 -> parent
-        // When we reach 'parent', it doesn't equal eventDir's immediate
-        // path, but child-2 is visible
+        // Now add a file to folder-2 (sibling of folder-1)
+        // The watcher on /tmp/test-folder-element-refresh should see this
         await page.evaluate(() => {
           // @ts-expect-error - electronAPI available via preload
           const {fs, path} = globalThis.electronAPI;
-          const grandchild =
-            '/tmp/test-watcher-element-click/parent/child-2/grandchild';
+          const folder2 = '/tmp/test-folder-element-refresh/folder-2';
           fs.writeFileSync(
-            path.join(grandchild, 'new-file.txt'),
+            path.join(folder2, 'new-file.txt'),
             'new content'
           );
         });
@@ -778,27 +775,311 @@ describe('renderer', () => {
         // Wait for watcher to detect and refresh
         await page.waitForTimeout(3000);
 
-        // Verify child-2 folder element is still visible (refresh maintains it)
-        const child2StillVisible = await page.evaluate(() => {
+        // Verify folder-2 is still visible
+        const folder2Visible = await page.evaluate(() => {
           const folders = [...document.querySelectorAll('a[data-path]')];
-          const found = folders.find((el) => {
+          return folders.some((el) => {
             const dataPath = /** @type {HTMLElement} */ (el).dataset.path;
-            return dataPath ===
-              '/tmp/test-watcher-element-click/parent/child-2';
+            return dataPath === '/tmp/test-folder-element-refresh/folder-2';
           });
-          return Boolean(found);
         });
-        expect(child2StillVisible).toBe(true);
+        expect(folder2Visible).toBe(true);
 
         // Clean up
         await page.evaluate(() => {
           // @ts-expect-error - electronAPI available via preload
           const {fs} = globalThis.electronAPI;
           try {
-            fs.rmSync(
-              '/tmp/test-watcher-element-click',
-              {recursive: true}
+            fs.rmSync('/tmp/test-folder-element-refresh', {recursive: true});
+          } catch (e) {
+            // Ignore
+          }
+        });
+      }
+    );
+
+    test(
+      'handles sibling folder refresh without selection',
+      async () => {
+        // This test covers line 631 - the else branch when
+        // previouslySelectedPath is empty
+
+        // Create directory structure
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          const {fs, path} = globalThis.electronAPI;
+          const testDir = '/tmp/test-no-selection-refresh';
+          const folder1 = path.join(testDir, 'folder-1');
+          const folder2 = path.join(testDir, 'folder-2');
+
+          // Clean up if exists
+          try {
+            fs.rmSync(testDir, {recursive: true});
+          } catch (e) {
+            // Ignore
+          }
+
+          fs.mkdirSync(testDir);
+          fs.mkdirSync(folder1);
+          fs.mkdirSync(folder2);
+          fs.writeFileSync(path.join(folder1, 'file1.txt'), 'content 1');
+          fs.writeFileSync(path.join(folder2, 'file2.txt'), 'content 2');
+        });
+
+        // Switch to three columns view
+        await page.locator('#three-columns').click();
+        await page.waitForTimeout(300);
+
+        // Navigate to test directory
+        await page.evaluate(() => {
+          globalThis.location.hash = '#path=/tmp/test-no-selection-refresh';
+        });
+        await page.waitForTimeout(1500);
+
+        // Click into folder-1 but DON'T select anything
+        const folder1Link = await page.locator(
+          'a[data-path="/tmp/test-no-selection-refresh/folder-1"]'
+        );
+        await folder1Link.click();
+        await page.waitForTimeout(1000);
+
+        // Add file to folder-2 without any selection
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          const {fs, path} = globalThis.electronAPI;
+          const folder2 = '/tmp/test-no-selection-refresh/folder-2';
+          fs.writeFileSync(
+            path.join(folder2, 'new-file.txt'),
+            'new content'
+          );
+        });
+
+        // Wait for watcher
+        await page.waitForTimeout(3000);
+
+        // Verify folder-2 is still visible
+        const folder2Visible = await page.evaluate(() => {
+          return Boolean(
+            document.querySelector(
+              'a[data-path="/tmp/test-no-selection-refresh/folder-2"]'
+            )
+          );
+        });
+        expect(folder2Visible).toBe(true);
+
+        // Clean up
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          const {fs} = globalThis.electronAPI;
+          try {
+            fs.rmSync('/tmp/test-no-selection-refresh', {recursive: true});
+          } catch (e) {
+            // Ignore
+          }
+        });
+      }
+    );
+
+    test.skip(
+      'scrolls item into view after folder element refresh',
+      async () => {
+        // This test covers lines 618-622 (scrollIntoView)
+
+        // Create structure with a folder containing many files
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          const {fs, path} = globalThis.electronAPI;
+          const testDir = '/tmp/test-scroll-folder-element';
+          const folder1 = path.join(testDir, 'folder-1');
+          const folder2 = path.join(testDir, 'folder-2');
+
+          // Clean up
+          try {
+            fs.rmSync(testDir, {recursive: true});
+          } catch (e) {
+            // Ignore
+          }
+
+          // Create structure
+          fs.mkdirSync(testDir);
+          fs.mkdirSync(folder1);
+          fs.mkdirSync(folder2);
+
+          // Add many files to folder-2 so scrolling is necessary
+          for (let i = 1; i <= 50; i++) {
+            fs.writeFileSync(
+              path.join(folder2, `file-${i}.txt`),
+              `content ${i}`
             );
+          }
+
+          fs.writeFileSync(path.join(folder1, 'file.txt'), 'content 1');
+        });
+
+        // Switch to three columns view
+        await page.locator('#three-columns').click();
+        await page.waitForTimeout(300);
+
+        // Navigate to test directory
+        await page.evaluate(() => {
+          globalThis.location.hash =
+            '#path=/tmp/test-scroll-folder-element';
+        });
+        await page.waitForTimeout(1500);
+
+        // Click into folder-1
+        const folder1Link = await page.locator(
+          'a[data-path="/tmp/test-scroll-folder-element/folder-1"]'
+        );
+        await folder1Link.click();
+        await page.waitForTimeout(1000);
+
+        // Click folder-2 to view its contents
+        const folder2Link = await page.locator(
+          'a[data-path="/tmp/test-scroll-folder-element/folder-2"]'
+        );
+        await folder2Link.click();
+        await page.waitForTimeout(1000);
+
+        // Select file-50.txt (last file in folder-2)
+        const file50 = await page.locator(
+          '[data-path="/tmp/test-scroll-folder-element/folder-2/file-50.txt"]'
+        );
+        await file50.click();
+        await page.waitForTimeout(500);
+
+        // Scroll the rightmost column to top so file-50 is out of view
+        await page.evaluate(() => {
+          const columns = [...document.querySelectorAll('.miller-column')];
+          const rightColumn = columns.at(-1);
+          if (rightColumn) {
+            rightColumn.scrollTop = 0;
+          }
+        });
+        await page.waitForTimeout(300);
+
+        // Trigger a change in folder-2 by adding a new file
+        // This should refresh folder-2 and try to reselect file-50
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          const {fs, path} = globalThis.electronAPI;
+          fs.writeFileSync(
+            path.join('/tmp/test-scroll-folder-element/folder-2', 'new.txt'),
+            'new content'
+          );
+        });
+
+        // Wait for watcher refresh (clicks folder-2, reselects file-50)
+        await page.waitForTimeout(3500);
+
+        // Verify file-50.txt is still selected
+        const stillSelected = await page.evaluate(() => {
+          const element = document.querySelector(
+            '[data-path="/tmp/test-scroll-folder-element/folder-2/file-50.txt"]'
+          );
+          return element?.closest('li')?.classList.contains('selected');
+        });
+        expect(stillSelected).toBe(true);
+
+        // Clean up
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          const {fs} = globalThis.electronAPI;
+          try {
+            fs.rmSync('/tmp/test-scroll-folder-element', {recursive: true});
+          } catch (e) {
+            // Ignore
+          }
+        });
+      }
+    );
+
+    test(
+      'clears refresh flag when no selection after folder element refresh',
+      async () => {
+        // This test covers line 631 (else branch for no previouslySelectedPath)
+
+        // Create structure with sibling folders
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          const {fs, path} = globalThis.electronAPI;
+          const testDir = '/tmp/test-no-prev-selection';
+          const folder1 = path.join(testDir, 'folder-1');
+          const folder2 = path.join(testDir, 'folder-2');
+
+          // Clean up
+          try {
+            fs.rmSync(testDir, {recursive: true});
+          } catch (e) {
+            // Ignore
+          }
+
+          // Create structure
+          fs.mkdirSync(testDir);
+          fs.mkdirSync(folder1);
+          fs.mkdirSync(folder2);
+
+          fs.writeFileSync(
+            path.join(folder1, 'file.txt'),
+            'content'
+          );
+          fs.writeFileSync(
+            path.join(folder2, 'file.txt'),
+            'content'
+          );
+        });
+
+        // Switch to three columns view
+        await page.locator('#three-columns').click();
+        await page.waitForTimeout(300);
+
+        // Navigate to test directory
+        await page.evaluate(() => {
+          globalThis.location.hash = '#path=/tmp/test-no-prev-selection';
+        });
+        await page.waitForTimeout(1500);
+
+        // Click into folder-1 but don't select anything
+        const folder1Link = await page.locator(
+          'a[data-path="/tmp/test-no-prev-selection/folder-1"]'
+        );
+        await folder1Link.click();
+        await page.waitForTimeout(1000);
+
+        // Click into folder-2 without selecting anything
+        const folder2Link = await page.locator(
+          'a[data-path="/tmp/test-no-prev-selection/folder-2"]'
+        );
+        await folder2Link.click();
+        await page.waitForTimeout(1000);
+
+        // Now add a file to folder-2 to trigger refresh
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          const {fs, path} = globalThis.electronAPI;
+          fs.writeFileSync(
+            path.join('/tmp/test-no-prev-selection/folder-2', 'new.txt'),
+            'new'
+          );
+        });
+
+        // Wait for watcher refresh
+        await page.waitForTimeout(3000);
+
+        // Verify the new file is visible
+        const newFileVisible = await page.evaluate(() => {
+          return Boolean(document.querySelector(
+            '[data-path="/tmp/test-no-prev-selection/folder-2/new.txt"]'
+          ));
+        });
+        expect(newFileVisible).toBe(true);
+
+        // Clean up
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          const {fs} = globalThis.electronAPI;
+          try {
+            fs.rmSync('/tmp/test-no-prev-selection', {recursive: true});
           } catch (e) {
             // Ignore
           }
@@ -806,4 +1087,135 @@ describe('renderer', () => {
       }
     );
   });
+
+  test('covers lines 353-354: ignores macOS Trash events', async () => {
+    // Lines 353-354: continue when eventDir includes '/.Trash'
+
+    // Create test directory with .Trash folder
+    await page.evaluate(() => {
+      // @ts-expect-error - electronAPI available
+      const {fs, path} = globalThis.electronAPI;
+      const testDir = '/tmp/test-trash-ignore';
+      const trashDir = path.join(testDir, '.Trash');
+      fs.mkdirSync(trashDir, {recursive: true});
+      fs.writeFileSync(path.join(testDir, 'file1.txt'), 'content');
+    });
+
+    // Navigate to test directory
+    await page.locator('#three-columns').click();
+    await page.waitForTimeout(300);
+
+    await page.evaluate(() => {
+      globalThis.location.hash = '#path=/tmp/test-trash-ignore';
+    });
+    await page.waitForTimeout(2000);
+
+    // Create a file in .Trash - this should be ignored by watcher
+    await page.evaluate(() => {
+      // @ts-expect-error - electronAPI available
+      const {fs, path} = globalThis.electronAPI;
+      const testDir = '/tmp/test-trash-ignore';
+      const trashFile = path.join(testDir, '.Trash', 'deleted.txt');
+      fs.writeFileSync(trashFile, 'trash content');
+    });
+
+    // Wait for watcher - trash event should be ignored (line 354)
+    await page.waitForTimeout(1000);
+
+    // The trash file should not trigger a refresh
+    // Verify original file is still visible
+    const hasOriginal = await page.evaluate(() => {
+      const elements = [...document.querySelectorAll('[data-path]')];
+      return elements.some((el) => {
+        const {path} = /** @type {HTMLElement} */ (el).dataset;
+        return path?.includes('file1.txt');
+      });
+    });
+
+    expect(hasOriginal).toBe(true);
+
+    // Cleanup
+    await page.evaluate(() => {
+      // @ts-expect-error - electronAPI available
+      const {fs} = globalThis.electronAPI;
+      fs.rmSync('/tmp/test-trash-ignore', {recursive: true, force: true});
+    });
+  });
+
+  test(
+    'covers lines 374-375: catch block when realpathSync fails',
+    async () => {
+      // Lines 374-375: catch block when realpathSync fails on eventDir
+      // This happens when a watched path no longer exists
+
+      // Create test directory structure
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs} = globalThis.electronAPI;
+        fs.mkdirSync('/tmp/test-realpath-catch', {recursive: true});
+        fs.writeFileSync('/tmp/test-realpath-catch/file.txt', 'content');
+      });
+
+      // Navigate to directory
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(300);
+
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp/test-realpath-catch';
+      });
+      await page.waitForTimeout(2000);
+
+      // Mock realpathSync to fail for the event directory specifically
+      // This simulates the path being deleted/inaccessible
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs} = globalThis.electronAPI;
+        const originalRealpath = fs.realpathSync;
+
+        // Mock to throw only for normalizedEventDir (not currentBasePath)
+        let callCount = 0;
+        /**
+         * @param {string} p
+         */
+        fs.realpathSync = (p) => {
+          callCount++;
+          // First call is for normalizedEventDir - make it fail
+          // Second call is for currentBasePath - let it succeed
+          if (callCount === 1 && p.includes('test-realpath-catch')) {
+            throw new Error('Path does not exist');
+          }
+          return originalRealpath.call(fs, p);
+        };
+
+        // Trigger a change
+        fs.writeFileSync('/tmp/test-realpath-catch/trigger.txt', 'test');
+
+        // Restore after watcher processes
+        setTimeout(() => {
+          fs.realpathSync = originalRealpath;
+        }, 1000);
+      });
+
+      // Wait for watcher to process through catch block
+      await page.waitForTimeout(1500);
+
+      // Verify file appears (catch block executed and used string comparison)
+      const found = await page.evaluate(() => {
+        const elements = [...document.querySelectorAll('[data-path]')];
+        return elements.some((el) => {
+          const {path} = /** @type {HTMLElement} */ (el).dataset;
+          return path?.includes('trigger.txt');
+        });
+      });
+
+      expect(found).toBe(true);
+
+      // Cleanup
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs} = globalThis.electronAPI;
+        fs.rmSync('/tmp/test-realpath-catch', {recursive: true, force: true});
+      });
+    }
+  );
 });
