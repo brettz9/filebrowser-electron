@@ -231,92 +231,141 @@ describe('renderer', () => {
       expect(noteContentRefreshed).toBeVisible();
     });
 
-    test('covers lines 155-160: collapse/expand global sticky', async () => {
-      // Lines 155-160: titleObserver callback for global sticky notes
-      // This is triggered when the sticky note title class changes (collapse)
+    test('covers lines 155-160: collapse/expand global sticky',
+      async () => {
+        // Lines 155-160: titleObserver callback for global sticky notes
+        // This is triggered when the sticky note title class changes (collapse)
 
-      // Wait for app to be ready
-      await page.locator('i').waitFor({state: 'hidden', timeout: 10000});
+        // Wait for app to be ready
+        await page.locator('i').waitFor({state: 'hidden', timeout: 10000});
 
-      // Initialize view
-      await page.locator('#three-columns').click();
-      await page.waitForTimeout(300);
+        // Initialize view
+        await page.locator('#three-columns').click();
+        await page.waitForTimeout(300);
 
-      // Create a global sticky note
-      const createButton = await page.locator('button#create-global-sticky');
-      await createButton.waitFor({state: 'visible', timeout: 5000});
-      await createButton.click();
-      const noteContent = await page.locator('.sticky-note-content');
-      await noteContent.waitFor({state: 'visible', timeout: 5000});
-      await noteContent.fill('Test collapse');
-      await page.waitForTimeout(300);
+        // Clean up any existing notes from previous tests recursively
+        const cleanupNotes = async () => {
+          const noteCount = await page.locator('.sticky-note').count();
+          if (noteCount === 0) {
+            return;
+          }
+          const deleteBtn = await page.locator(
+            '.sticky-note .sticky-note-btn[title="Delete note"]'
+          ).first();
+          await deleteBtn.click();
+          const confirmBtn = await page.locator(
+            '.sticky-note-confirm-btn.sticky-note-confirm-btn-yes'
+          );
+          await confirmBtn.waitFor({state: 'visible', timeout: 2000});
+          await confirmBtn.click();
+          await page.waitForTimeout(200);
+          await cleanupNotes(); // Recursive call
+        };
+        await cleanupNotes();
 
-      // Edit the title to trigger titleObserver (lines 155-160)
-      // Click the edit title button (pencil icon)
-      const editTitleBtn = await page.locator(
-        '.sticky-note .sticky-note-btn[title="Edit title"]'
-      );
-      await editTitleBtn.click();
-      await page.waitForTimeout(200);
+        // Create a global sticky note
+        const createButton = await page.locator('button#create-global-sticky');
+        await createButton.waitFor({state: 'visible', timeout: 5000});
+        await createButton.click();
+        const noteContent = await page.locator('.sticky-note-content');
+        await noteContent.waitFor({state: 'visible', timeout: 5000});
+        await noteContent.fill('Test collapse');
+        await page.waitForTimeout(300);
 
-      // Now the title is editable - type in it
-      const noteTitle = await page.locator('.sticky-note-title.editing');
-      await noteTitle.fill('My Title');
+        // Edit the title to trigger titleObserver (lines 155-160)
+        // Click the edit title button (pencil icon)
+        const editTitleBtn = await page.locator(
+          '.sticky-note .sticky-note-btn[title="Edit title"]'
+        );
+        await editTitleBtn.click();
+        await page.waitForTimeout(200);
 
-      // Click the edit button again to finish editing (or click outside)
-      await editTitleBtn.click();
-      await page.waitForTimeout(300);
+        // Now the title is editable - type in it
+        const noteTitle = await page.locator('.sticky-note-title.editing');
+        await noteTitle.fill('My Title');
 
-      // Verify saveNotes was called by checking localStorage was updated
-      const savedAfterTitleEdit = await page.evaluate(() => {
-        // @ts-expect-error - electronAPI available via preload
-        return globalThis.electronAPI.storage.getItem('stickyNotes-global');
+        // Click the edit button again to finish editing (or click outside)
+        await editTitleBtn.click();
+        await page.waitForTimeout(300);
+
+        // Verify saveNotes was called by checking localStorage was updated
+        const savedAfterTitleEdit = await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          return globalThis.electronAPI.storage.getItem('stickyNotes-global');
+        });
+        expect(savedAfterTitleEdit).toBeTruthy();
+
+        // Get the header element for double-clicking
+        const noteHeader = await page.locator('.sticky-note-header');
+
+        // Double-click the header to collapse the note
+        await noteHeader.dblclick();
+        await page.waitForTimeout(500);
+
+        // Verify the note is collapsed (has collapsed class)
+        const isCollapsed =
+          await page.locator('.sticky-note').evaluate((el) => {
+            return el.classList.contains('collapsed');
+          });
+        expect(isCollapsed).toBe(true);
+
+        // Wait for MutationObserver to fire and save
+        await page.waitForTimeout(300);
+
+        // Verify saveNotes was called by checking localStorage was updated
+        const savedAfterCollapse = await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          return globalThis.electronAPI.storage.getItem('stickyNotes-global');
+        });
+        expect(savedAfterCollapse).toBeTruthy();
+        const notesAfterCollapse = JSON.parse(savedAfterCollapse);
+        expect(notesAfterCollapse.length).toBeGreaterThan(0);
+
+        // Double-click again to expand
+        await noteHeader.dblclick();
+        await page.waitForTimeout(500);
+
+        // Verify the note is expanded (no collapsed class)
+        const isExpanded = await page.locator('.sticky-note').evaluate((el) => {
+          return !el.classList.contains('collapsed');
+        });
+        expect(isExpanded).toBe(true);
+
+        // Get note count before deletion
+        const savedBeforeDelete = await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          return globalThis.electronAPI.storage.getItem('stickyNotes-global');
+        });
+        const countBefore = savedBeforeDelete
+          ? JSON.parse(savedBeforeDelete).length
+          : 0;
+
+        // Clean up - note is already expanded from previous step
+        const deleteBtn = await page.locator(
+          '.sticky-note .sticky-note-btn[title="Delete note"]'
+        );
+        await deleteBtn.waitFor({state: 'visible', timeout: 5000});
+        await deleteBtn.click();
+
+        // Click the confirmation button
+        const confirmBtn = await page.locator(
+          '.sticky-note-confirm-btn.sticky-note-confirm-btn-yes'
+        );
+        await confirmBtn.waitFor({state: 'visible', timeout: 5000});
+        await confirmBtn.click();
+        await page.waitForTimeout(500);
+
+        // Verify onDelete callback (lines 33-47) ran by checking localStorage
+        const savedAfterDelete = await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          return globalThis.electronAPI.storage.getItem('stickyNotes-global');
+        });
+        const countAfter = savedAfterDelete
+          ? JSON.parse(savedAfterDelete).length
+          : 0;
+        // Count should have decreased by 1
+        expect(countAfter).toBe(countBefore - 1);
       });
-      expect(savedAfterTitleEdit).toBeTruthy();
-
-      // Get the header element for double-clicking
-      const noteHeader = await page.locator('.sticky-note-header');
-
-      // Double-click the header to collapse the note
-      await noteHeader.dblclick();
-      await page.waitForTimeout(500);
-
-      // Verify the note is collapsed (has collapsed class)
-      const isCollapsed = await page.locator('.sticky-note').evaluate((el) => {
-        return el.classList.contains('collapsed');
-      });
-      expect(isCollapsed).toBe(true);
-
-      // Wait for MutationObserver to fire and save
-      await page.waitForTimeout(300);
-
-      // Verify saveNotes was called by checking localStorage was updated
-      const savedAfterCollapse = await page.evaluate(() => {
-        // @ts-expect-error - electronAPI available via preload
-        return globalThis.electronAPI.storage.getItem('stickyNotes-global');
-      });
-      expect(savedAfterCollapse).toBeTruthy();
-      const notesAfterCollapse = JSON.parse(savedAfterCollapse);
-      expect(notesAfterCollapse.length).toBeGreaterThan(0);
-
-      // Double-click again to expand
-      await noteHeader.dblclick();
-      await page.waitForTimeout(500);
-
-      // Verify the note is expanded (no collapsed class)
-      const isExpanded = await page.locator('.sticky-note').evaluate((el) => {
-        return !el.classList.contains('collapsed');
-      });
-      expect(isExpanded).toBe(true);
-
-      // Clean up - note is already expanded from previous step
-      const deleteBtn = await page.locator(
-        '.sticky-note .sticky-note-btn[title="Delete note"]'
-      );
-      await deleteBtn.waitFor({state: 'visible', timeout: 5000});
-      await deleteBtn.click();
-      await page.waitForTimeout(300);
-    });
   });
 
   describe('stickies (local)', () => {
@@ -603,12 +652,101 @@ describe('renderer', () => {
       });
       expect(isExpanded).toBe(true);
 
-      // Clean up - note is already expanded from previous step
+      // Create a second note to test filter logic (lines 35-36)
+      // The filter must keep notes at the same path when one is deleted
+      const createButton2 = await page.locator('button#create-sticky');
+      await createButton2.click();
+      await page.waitForTimeout(300);
+
+      // Verify we have 2 notes in the DOM
+      const domNoteCount = await page.locator('.sticky-note').count();
+      expect(domNoteCount).toBe(2);
+
+      // Get all sticky note elements and extract their data to save
+      const notesData = await page.evaluate(() => {
+        const stickyElements = document.querySelectorAll('.sticky-note');
+        /** @type {object[]} */
+        const notes = [];
+        stickyElements.forEach((el, index) => {
+          // Create a minimal note structure
+          notes.push({
+            id: `note-${Date.now()}-${index}`,
+            content: el.querySelector('.sticky-note-content')?.textContent ||
+              '',
+            title: el.querySelector('.sticky-note-title')?.textContent ||
+              'Sticky Note',
+            colorIndex: 0,
+            position: {x: 100 + (index * 20), y: 100 + (index * 20)},
+            metadata: {
+              type: 'local',
+              path: '/Users'
+            }
+          });
+        });
+        // Save using electronAPI
+        // @ts-expect-error - electronAPI available via preload
+        globalThis.electronAPI.storage.setItem(
+          'stickyNotes-local-/Users',
+          JSON.stringify(notes)
+        );
+        return notes.length;
+      });
+      expect(notesData).toBe(2);
+      await page.waitForTimeout(300);
+
+      // Get note count before deletion to test onDelete callback filter
+      const savedBeforeDelete = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available via preload
+        return globalThis.electronAPI.storage.getItem(
+          'stickyNotes-local-/Users'
+        );
+      });
+      const countBefore = savedBeforeDelete
+        ? JSON.parse(savedBeforeDelete).length
+        : 0;
+      expect(countBefore).toBe(2);
+
+      // Delete the note
       const deleteBtn = await page.locator(
         '.sticky-note .sticky-note-btn[title="Delete note"]'
-      );
+      ).first();
       await deleteBtn.waitFor({state: 'visible', timeout: 5000});
       await deleteBtn.click();
+
+      // Click the confirmation button
+      const confirmBtn = await page.locator(
+        '.sticky-note-confirm-btn.sticky-note-confirm-btn-yes'
+      );
+      await confirmBtn.waitFor({state: 'visible', timeout: 5000});
+      await confirmBtn.click();
+      await page.waitForTimeout(500);
+
+      // Verify onDelete callback (lines 33-47) ran by checking localStorage
+      const savedAfterDelete = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available via preload
+        return globalThis.electronAPI.storage.getItem(
+          'stickyNotes-local-/Users'
+        );
+      });
+      const countAfter = savedAfterDelete
+        ? JSON.parse(savedAfterDelete).length
+        : 0;
+      // Count should have decreased by 1 (tests filter logic in lines 35-36)
+      expect(countAfter).toBe(countBefore - 1);
+      expect(countAfter).toBe(1); // Should be 1 note remaining
+
+      // Clean up the remaining note
+      const deleteBtn2 = await page.locator(
+        '.sticky-note .sticky-note-btn[title="Delete note"]'
+      );
+      await deleteBtn2.waitFor({state: 'visible', timeout: 5000});
+      await deleteBtn2.click();
+
+      const confirmBtn2 = await page.locator(
+        '.sticky-note-confirm-btn.sticky-note-confirm-btn-yes'
+      );
+      await confirmBtn2.waitFor({state: 'visible', timeout: 5000});
+      await confirmBtn2.click();
       await page.waitForTimeout(300);
     });
   });
