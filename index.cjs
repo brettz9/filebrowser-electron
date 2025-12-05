@@ -15327,6 +15327,10 @@
   let isCreating = false;
   let isWatcherRefreshing = false;
 
+  // Clipboard for copy/paste operations
+  /** @type {{path: string, isCopy: boolean} | null} */
+  let clipboard = null;
+
   // Map of directory paths to their watcher subscriptions
   // eslint-disable-next-line jsdoc/reject-any-type -- Watcher type
   /** @type {Map<string, any>} */
@@ -15397,6 +15401,46 @@
         // eslint-disable-next-line no-alert -- User feedback
         alert('Failed to delete: ' + (/** @type {Error} */ (err)).message);
         isDeleting = false;
+      }
+    };
+
+    /**
+     * @param {string} sourcePath
+     * @param {string} targetDir
+     * @param {boolean} isCopy
+     */
+    const copyOrMoveItem = (sourcePath, targetDir, isCopy) => {
+      const decodedSource = decodeURIComponent(sourcePath);
+      const itemName = path.basename(decodedSource);
+      const targetPath = path.join(targetDir, itemName);
+
+      // Check if target already exists
+      if (existsSync(targetPath)) {
+        // eslint-disable-next-line no-alert -- User feedback
+        alert(`"${itemName}" already exists in the destination.`);
+        return;
+      }
+
+      try {
+        if (isCopy) {
+          // Copy operation using cp -R for recursive copy
+          const cpResult = spawnSync('cp', ['-R', decodedSource, targetPath]);
+          if (cpResult.error || cpResult.status !== 0) {
+            throw new Error(cpResult.stderr?.toString() || 'Copy failed');
+          }
+        } else {
+          // Move operation
+          renameSync(decodedSource, targetPath);
+        }
+
+        // Refresh the view
+        changePath();
+      } catch (err) {
+        // eslint-disable-next-line no-alert -- User feedback
+        alert(
+          `Failed to ${isCopy ? 'copy' : 'move'}: ` +
+          (/** @type {Error} */ (err)).message
+        );
       }
     };
 
@@ -16444,6 +16488,47 @@
           iconViewTable.removeEventListener('keydown', oldListener);
         }
 
+        // Add drag-and-drop support to all cells
+        const cells = iconViewTable.querySelectorAll('td.list-item');
+        cells.forEach((cell) => {
+          const cellEl = /** @type {HTMLElement} */ (cell);
+          const link = cellEl.querySelector('a, span');
+          if (link) {
+            const linkEl = /** @type {HTMLElement} */ (link);
+            const itemPath = linkEl.dataset.path;
+            if (itemPath) {
+              cellEl.setAttribute('draggable', 'true');
+
+              cellEl.addEventListener('dragstart', (e) => {
+                if (e.dataTransfer) {
+                  e.dataTransfer.effectAllowed = 'copyMove';
+                  e.dataTransfer.setData('text/plain', itemPath);
+                }
+              });
+
+              // Only allow drop on folders
+              if (linkEl.tagName === 'A') {
+                cellEl.addEventListener('dragover', (e) => {
+                  e.preventDefault();
+                  if (e.dataTransfer) {
+                    e.dataTransfer.dropEffect = e.altKey ? 'copy' : 'move';
+                  }
+                });
+
+                cellEl.addEventListener('drop', (e) => {
+                  e.preventDefault();
+                  const sourcePath = e.dataTransfer?.getData('text/plain');
+                  const targetPath = linkEl.dataset.path;
+                  if (sourcePath && targetPath) {
+                    const targetDir = decodeURIComponent(targetPath);
+                    copyOrMoveItem(sourcePath, targetDir, e.altKey);
+                  }
+                });
+              }
+            }
+          }
+        });
+
         // Add new keydown listener
         const keydownListener = (e) => {
           // Cmd+Shift+N to create new folder
@@ -16452,6 +16537,28 @@
             /* c8 ignore next -- TS */
             const folderPath = iconViewTable.dataset.basePath || '/';
             createNewFolder(folderPath);
+          }
+
+          // Cmd+C to copy selected item
+          if (e.metaKey && e.key === 'c') {
+            const selectedRow = iconViewTable.querySelector('tbody tr.selected');
+            if (selectedRow) {
+              e.preventDefault();
+              const selectedEl = /** @type {HTMLElement} */ (selectedRow);
+              const itemPath = selectedEl.dataset.path;
+              if (itemPath) {
+                clipboard = {path: itemPath, isCopy: true};
+              }
+            }
+          }
+
+          // Cmd+V to paste (copy) to current directory
+          if (e.metaKey && e.key === 'v' && clipboard) {
+            e.preventDefault();
+            /* c8 ignore next -- TS */
+            const targetDir = iconViewTable.dataset.basePath || '/';
+            copyOrMoveItem(clipboard.path, targetDir, clipboard.isCopy);
+            clipboard = null;
           }
         };
 
@@ -16911,6 +17018,99 @@
         if (millerColumnsDiv) {
           millerColumnsDiv.setAttribute('tabindex', '0');
           millerColumnsDiv.focus();
+
+          // Add keyboard shortcuts for miller columns
+          const keydownListener = (e) => {
+            // Cmd+Shift+N to create new folder
+            if (e.metaKey && e.shiftKey && e.key === 'n') {
+              e.preventDefault();
+              const selected = millerColumnsDiv.querySelector(
+                '.list-item.selected a'
+              );
+              if (selected) {
+                const selectedEl = /** @type {HTMLElement} */ (selected);
+                const folderPath = selectedEl.dataset.path;
+                if (folderPath) {
+                  createNewFolder(decodeURIComponent(folderPath));
+                }
+              }
+            }
+
+            // Cmd+C to copy selected item
+            if (e.metaKey && e.key === 'c') {
+              const selected = millerColumnsDiv.querySelector(
+                '.list-item.selected a, .list-item.selected span'
+              );
+              if (selected) {
+                e.preventDefault();
+                const selectedEl = /** @type {HTMLElement} */ (selected);
+                const itemPath = selectedEl.dataset.path;
+                if (itemPath) {
+                  clipboard = {path: itemPath, isCopy: true};
+                }
+              }
+            }
+
+            // Cmd+V to paste to the currently displayed folder
+            if (e.metaKey && e.key === 'v' && clipboard) {
+              e.preventDefault();
+              const currentPath = getBasePath();
+              copyOrMoveItem(clipboard.path, currentPath, clipboard.isCopy);
+              clipboard = null;
+            }
+          };
+
+          // Remove any existing keydown listeners to avoid duplicates
+          const oldListener = millerColumnsDiv._keydownListener;
+          if (oldListener) {
+            millerColumnsDiv.removeEventListener('keydown', oldListener);
+          }
+          millerColumnsDiv.addEventListener('keydown', keydownListener);
+          // @ts-expect-error Custom property
+          millerColumnsDiv._keydownListener = keydownListener;
+
+          // Add drag-and-drop support to all list items
+          const columnListItems = millerColumnsDiv.querySelectorAll(
+            '.list-item'
+          );
+          columnListItems.forEach((item) => {
+            const itemEl = /** @type {HTMLElement} */ (item);
+            const link = itemEl.querySelector('a, span');
+            if (link) {
+              const linkEl = /** @type {HTMLElement} */ (link);
+              const itemPath = linkEl.dataset.path;
+              if (itemPath) {
+                itemEl.setAttribute('draggable', 'true');
+
+                itemEl.addEventListener('dragstart', (e) => {
+                  if (e.dataTransfer) {
+                    e.dataTransfer.effectAllowed = 'copyMove';
+                    e.dataTransfer.setData('text/plain', itemPath);
+                  }
+                });
+
+                // Only allow drop on folders (a elements)
+                if (linkEl.tagName === 'A') {
+                  itemEl.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer) {
+                      e.dataTransfer.dropEffect = e.altKey ? 'copy' : 'move';
+                    }
+                  });
+
+                  itemEl.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const sourcePath = e.dataTransfer?.getData('text/plain');
+                    const targetPath = linkEl.dataset.path;
+                    if (sourcePath && targetPath) {
+                      const targetDir = decodeURIComponent(targetPath);
+                      copyOrMoveItem(sourcePath, targetDir, e.altKey);
+                    }
+                  });
+                }
+              }
+            }
+          });
         }
       });
     }
