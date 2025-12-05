@@ -38,10 +38,13 @@ done
 ## To-dos
 
 1. Smoke testing
-  1. For file watching in icon view
+    1. For file watching in icon view
 1. Moving/Copying
+1. Views
+    1. List view/Gallery view
+    1. Ideally would allow separate windows and tabs
 1. Preview/Editing Metadata/File
-1. List view/Gallery view
+
 1. Demo with file handler web apps
 1. Build/set icon:
     <https://stackoverflow.com/questions/31529772/how-to-set-app-icon-for-electron-atom-shell-app>
@@ -51,7 +54,6 @@ done
     allowed overriding browser's `file:///` browser (not only for
     directories, but also to allow injecting a button to allow editing
     browsed files as well)
-1. Ideally would allow separate windows and tabs
 
 ## Misc. to-dos
 
