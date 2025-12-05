@@ -1,4 +1,15 @@
 /* eslint-disable n/no-sync -- Needed for performance */
+import {emit} from '../events/eventBus.js';
+import {$, $$, $$active} from '../utils/dom.js';
+import {getBasePath} from '../utils/path.js';
+import {
+  isDeleting,
+  isCreating,
+  isWatcherRefreshing,
+  setIsWatcherRefreshing
+} from '../state/flags.js';
+import jQuery from 'jquery';
+
 // Get Node APIs from the preload script
 const {
   fs: {realpathSync},
@@ -14,30 +25,15 @@ export const activeWatchers = new Map();
 export const foldersWithPendingChanges = new Set();
 
 /**
- * @typedef WatcherDeps
- * @property {() => void} changePath
- * @property {() => string} getBasePath
- * @property {import('../utils/dom.js').$} $
- * @property {import('../utils/dom.js').$$} $$
- * @property {import('../utils/dom.js').$$active} $$active
- * @property {(value: boolean) => void} setIsWatcherRefreshing
- * @property {boolean} isDeleting
- * @property {boolean} isCreating
- * @property {boolean} isWatcherRefreshing
- * @property {typeof import('jquery')} jQuery
- */
-
-/**
  * Setup file system watcher for a directory.
  * Now uses parcel watcher exclusively.
  *
  * @param {string} dirPath
- * @param {WatcherDeps} deps
  * @returns {void}
  */
-export function setupFileWatcher (dirPath, deps) {
+export function setupFileWatcher (dirPath) {
   // Don't recreate watcher during external refresh
-  if (deps.isWatcherRefreshing) {
+  if (isWatcherRefreshing) {
     return;
   }
 
@@ -52,22 +48,16 @@ export function setupFileWatcher (dirPath, deps) {
   }
 
   // Use parcel watcher for all cases
-  setupNativeWatcher(dirPath, deps);
+  setupNativeWatcher(dirPath);
 }
 
 /**
  * Setup a parcel/watcher as fallback.
  *
  * @param {string} dirPath
- * @param {WatcherDeps} deps
  * @returns {Promise<void>}
  */
-async function setupNativeWatcher (dirPath, deps) {
-  const {
-    changePath, getBasePath, $, $$, $$active, setIsWatcherRefreshing,
-    isDeleting, isCreating, isWatcherRefreshing, jQuery
-  } = deps;
-
+async function setupNativeWatcher (dirPath) {
   /* c8 ignore next 3 - Unreachable: setupFileWatcher filters root first */
   if (dirPath === '/') {
     return;
@@ -295,7 +285,7 @@ async function setupNativeWatcher (dirPath, deps) {
               // Preserve selection if something was selected
               const previouslySelectedPath = selectedPath;
               setTimeout(() => {
-                changePath();
+                emit('refreshView');
 
                 // After refresh, re-select the previously selected item
                 if (previouslySelectedPath) {
@@ -356,7 +346,7 @@ async function setupNativeWatcher (dirPath, deps) {
               ) {
                 // The changed directory is an ancestor
                 // We need to reload the entire view to refresh it
-                setTimeout(changePath, 150);
+                setTimeout(() => emit('refreshView'), 150);
                 clearRefreshFlag();
                 refreshHandled = true;
                 break;
@@ -491,7 +481,7 @@ async function setupNativeWatcher (dirPath, deps) {
 
   // Note: The parcelWatcher.subscribe error catch block
   // is difficult to cover in automated tests because:
-  // 1. setupNativeWatcher is called during initial page load via changePath()
+  // 1. setupNativeWatcher is called during initial page load via refreshView
   // 2. The activeWatchers Map caches watched paths, preventing repeated
   //    subscribe calls on navigation
   // 3. Mocking parcelWatcher.subscribe before page load would break all

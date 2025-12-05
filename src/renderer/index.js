@@ -35,6 +35,10 @@ import {
   deleteItem as deleteItemOp,
   copyOrMoveItem as copyOrMoveItemOp
 } from './fileSystem/operations.js';
+import {
+  activeWatchers as watcherActiveWatchers,
+  foldersWithPendingChanges as watcherFoldersWithPendingChanges
+} from './fileSystem/watcher.js';
 import {on} from './events/eventBus.js';
 
 // Get Node APIs from the preload script
@@ -586,11 +590,9 @@ const performUndo = () => performUndoOp(changePath);
 const performRedo = () => performRedoOp(changePath);
 
 // Map of directory paths to their watcher subscriptions
-// eslint-disable-next-line jsdoc/reject-any-type -- Watcher type
-/** @type {Map<string, any>} */
-const activeWatchers = new Map();
-/** @type {Set<string>} */
-const foldersWithPendingChanges = new Set();
+// Use imported from watcher module
+const activeWatchers = watcherActiveWatchers;
+const foldersWithPendingChanges = watcherFoldersWithPendingChanges;
 
 /**
  *
