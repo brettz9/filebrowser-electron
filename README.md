@@ -54,7 +54,11 @@ done
     directories, but also to allow injecting a button to allow editing
     browsed files as well)
 
-## Misc. to-dos
+## Misc. features
+
+1. Option to drag-and-drop files onto bash or JavaScript files
+
+## Misc. bugs
 
 1. After deleting an external file, prompting a refresh, let the scroll be back
     to the exact coordinates as before if that is in the viewport
