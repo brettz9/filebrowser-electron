@@ -1,15 +1,37 @@
 /* eslint-disable n/no-sync,
   promise/prefer-await-to-then,
   promise/catch-or-return -- Needed for performance */
-import {StickyNote} from 'stickynote';
 import {jml} from 'jamilih';
 import jQuery from 'jquery';
 import addMillerColumnPlugin from 'miller-columns';
 import {chunk} from './utils/array.js';
 import {$, $$, $$active} from './utils/dom.js';
-// eslint-disable-next-line no-shadow -- Importing storage as localStorage
+// eslint-disable-next-line no-shadow -- Importing storage as `localStorage`
 import {localStorage} from './utils/storage.js';
 import {getBasePath, readDirectory} from './utils/path.js';
+import {getCurrentView} from './utils/view.js';
+import {
+  stickyNotes,
+  addLocalStickyInputListeners,
+  addGlobalStickyInputListeners
+} from './stickyNotes/manager.js';
+import {getClipboard, setClipboard} from './state/clipboard.js';
+import {
+  $columns,
+  set$columns,
+  isDeleting,
+  setIsDeleting,
+  isCreating,
+  setIsCreating,
+  isRefreshing,
+  isWatcherRefreshing,
+  setIsWatcherRefreshing
+} from './state/flags.js';
+import {
+  pushUndo,
+  performUndo as performUndoOp,
+  performRedo as performRedoOp
+} from './history/undoRedo.js';
 
 // Get Node APIs from the preload script
 const {
@@ -27,147 +49,6 @@ const {
   parcelWatcher,
   getIconDataURLForFile
 } = globalThis.electronAPI;
-
-const stickyNotes = new StickyNote({
-  colors: ['#fff740', '#ff7eb9', '#7afcff', '#feff9c', '#a7ffeb', '#c7ceea'],
-  onDelete (note) {
-    const notes = stickyNotes.getAllNotes(({metadata}) => {
-      return metadata.type === 'local' &&
-        metadata.path === note.metadata.path;
-    });
-    if (note.metadata.type === 'local') {
-      localStorage.setItem(
-        `stickyNotes-local-${note.metadata.path}`, JSON.stringify(notes)
-      );
-    } else {
-      localStorage.setItem(
-        `stickyNotes-global`, JSON.stringify(notes)
-      );
-    }
-  }
-});
-
-const getCurrentView = () => {
-  return localStorage.getItem('view') ?? 'icon-view';
-};
-
-/**
- * @param {import('stickynote').NoteData} note
- * @param {string} pth
- */
-const addLocalStickyInputListeners = (note, pth) => {
-  const saveNotes = () => {
-    const notes = stickyNotes.getAllNotes(({metadata}) => {
-      return metadata.type === 'local' &&
-        metadata.path === note.metadata.path;
-    });
-    localStorage.setItem(
-      `stickyNotes-local-${pth}`, JSON.stringify(notes)
-    );
-  };
-  note.content.addEventListener('input', () => {
-    saveNotes();
-  });
-
-  const noteElement = note.element;
-  let saveTimeout;
-  const noteObserver = new MutationObserver(function (mutationsList) {
-    for (const mutation of mutationsList) {
-      if (mutation.attributeName === 'class' ||
-        mutation.attributeName === 'data-color-index'
-      ) {
-        // mutation.target.classList.contains('collapsed')
-        saveNotes();
-      } else if (mutation.attributeName === 'style') {
-        // Debounce style changes (position during drag)
-        clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(saveNotes, 300);
-      }
-    }
-  });
-  if (noteElement) {
-    const config = {
-      attributes: true,
-      attributeFilter: ['class', 'data-color-index', 'style']
-    };
-    noteObserver.observe(noteElement, config);
-  }
-
-  const titleObserver = new MutationObserver(function (mutationsList) {
-    for (const mutation of mutationsList) {
-      if (mutation.attributeName === 'class') {
-        // mutation.target.classList.contains('collapsed')
-        saveNotes();
-      }
-    }
-  });
-  const titleElement = note.title;
-  if (titleElement) {
-    const config = {attributes: true, attributeFilter: ['class']};
-    titleObserver.observe(titleElement, config);
-  }
-
-  // To stop observing later:
-  // noteObserver.disconnect();
-};
-
-/**
- * @param {import('stickynote').NoteData} note
- */
-const addGlobalStickyInputListeners = (note) => {
-  const saveNotes = () => {
-    const notes = stickyNotes.getAllNotes(({metadata}) => {
-      return metadata.type === 'global';
-    });
-    localStorage.setItem(
-      `stickyNotes-global`, JSON.stringify(notes)
-    );
-  };
-  note.content.addEventListener('input', () => {
-    saveNotes();
-  });
-
-  const noteElement = note.element;
-  let saveTimeout;
-  const noteObserver = new MutationObserver(function (mutationsList) {
-    for (const mutation of mutationsList) {
-      if (mutation.attributeName === 'class' ||
-        mutation.attributeName === 'data-color-index'
-      ) {
-        // mutation.target.classList.contains('collapsed')
-        saveNotes();
-      } else if (mutation.attributeName === 'style') {
-        // Debounce style changes (position during drag)
-        clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(saveNotes, 300);
-      }
-    }
-  });
-  if (noteElement) {
-    const config = {
-      attributes: true,
-      attributeFilter: ['class', 'data-color-index', 'style']
-    };
-    noteObserver.observe(noteElement, config);
-  }
-
-  const titleObserver = new MutationObserver(function (mutationsList) {
-    for (const mutation of mutationsList) {
-      if (mutation.attributeName === 'class') {
-        // mutation.target.classList.contains('collapsed')
-        saveNotes();
-      }
-    }
-  });
-  const titleElement = note.title;
-  if (titleElement) {
-    const config = {attributes: true, attributeFilter: ['class']};
-    titleObserver.observe(titleElement, config);
-  }
-
-  // To stop observing later:
-  // noteObserver.disconnect();
-};
 
 // Ensure jamilih uses the browser's DOM instead of jsdom
 jml.setWindow(globalThis);
@@ -393,7 +274,7 @@ async function setupNativeWatcher (dirPath) {
           // Refresh visible changes
           if (changeInVisibleArea) {
             // Set flag to prevent concurrent refreshes
-            isWatcherRefreshing = true;
+            setIsWatcherRefreshing(true);
 
             // If change was in selected folder's children, refresh it
             if (changeInSelectedFolder && selectedPath) {
@@ -436,12 +317,12 @@ async function setupNativeWatcher (dirPath) {
                         }
                       }
 
-                      isWatcherRefreshing = false;
+                      setIsWatcherRefreshing(false);
                     });
                   });
                 /* c8 ignore next 3 -- Difficult to cover? */
                 } else {
-                  isWatcherRefreshing = false;
+                  setIsWatcherRefreshing(false);
                 }
               }, 150);
               refreshHandled = true;
@@ -453,7 +334,7 @@ async function setupNativeWatcher (dirPath) {
              */
             const clearRefreshFlag = () => {
               setTimeout(() => {
-                isWatcherRefreshing = false;
+                setIsWatcherRefreshing(false);
               }, 300);
             };
 
@@ -600,7 +481,7 @@ async function setupNativeWatcher (dirPath) {
              * to columnsToRefresh, which would set refreshHandled=true.
              * This is defensive code in case the logic changes. */
             if (!refreshHandled) {
-              isWatcherRefreshing = false;
+              setIsWatcherRefreshing(false);
             }
             /* c8 ignore stop */
           }
@@ -688,181 +569,9 @@ function changePath () {
  * @typedef {[isDir: boolean, childDir: string, title: string]} Result
  */
 
-/** @type {JQuery} */
-let $columns;
-let isDeleting = false;
-let isCreating = false;
-const isRefreshing = false;
-let isWatcherRefreshing = false;
-
-// Clipboard for copy/paste operations
-/** @type {{path: string, isCopy: boolean} | null} */
-let clipboard = null;
-
-// Expose clipboard for testing via getter/setter
-Object.defineProperty(globalThis, 'clipboard', {
-  get () {
-    return clipboard;
-  },
-  set (value) {
-    clipboard = value;
-  }
-});
-
-// Undo/Redo system
-/**
- * @typedef UndoAction
- * @property {'create'|'delete'|'rename'|'move'|'copy'} type
- * @property {string} path - The path involved in the operation
- * @property {string} [oldPath] - For rename/move operations
- * @property {string} [newPath] - For rename/move operations
- * @property {boolean} [wasDirectory] - For delete operations
- * @property {string} [backupPath] - For delete operations (temp backup)
- */
-
-/** @type {UndoAction[]} */
-const undoStack = [];
-/** @type {UndoAction[]} */
-const redoStack = [];
-const MAX_UNDO_STACK_SIZE = 50;
-
-// Expose for testing
-globalThis.undoStack = undoStack;
-globalThis.redoStack = redoStack;
-
-/**
- * Add an action to the undo stack.
- * @param {UndoAction} action
- */
-const pushUndo = (action) => {
-  undoStack.push(action);
-  if (undoStack.length > MAX_UNDO_STACK_SIZE) {
-    undoStack.shift();
-  }
-  // Clear redo stack when a new action is performed
-  redoStack.length = 0;
-};
-
-/**
- * Perform undo operation.
- */
-const performUndo = () => {
-  const action = undoStack.pop();
-  if (!action) {
-    return;
-  }
-
-  try {
-    switch (action.type) {
-    case 'copy':
-    case 'create': {
-      // Undo create/copy: delete the created/copied item
-      if (existsSync(action.path)) {
-        rmSync(action.path, {recursive: true, force: true});
-        redoStack.push(action);
-      }
-      break;
-    }
-    case 'delete': {
-      // Undo delete: restore from backup
-      if (action.backupPath && existsSync(action.backupPath)) {
-        const cpResult = spawnSync(
-          'cp',
-          ['-R', action.backupPath, action.path]
-        );
-        if (cpResult.status === 0) {
-          // Clean up backup
-          rmSync(action.backupPath, {recursive: true, force: true});
-          redoStack.push({...action, backupPath: undefined});
-        }
-      }
-      break;
-    }
-    case 'rename':
-    case 'move': {
-      // Undo rename/move: move back to old location
-      if (action.newPath && action.oldPath && existsSync(action.newPath)) {
-        renameSync(action.newPath, action.oldPath);
-        redoStack.push(action);
-      }
-      break;
-    }
-    /* c8 ignore next 3 -- Guard */
-    default:
-      throw new Error('Unexpected undo operation');
-    }
-    changePath();
-  } catch (err) {
-    // eslint-disable-next-line no-alert -- User feedback
-    alert('Failed to undo: ' + (/** @type {Error} */ (err)).message);
-  }
-};
-
-/**
- * Perform redo operation.
- */
-const performRedo = () => {
-  const action = redoStack.pop();
-  if (!action) {
-    return;
-  }
-
-  try {
-    switch (action.type) {
-    case 'create': {
-      // Redo create: recreate the item
-      if (!existsSync(action.path)) {
-        if (action.wasDirectory) {
-          mkdirSync(action.path);
-        } else {
-          writeFileSync(action.path, '');
-        }
-        undoStack.push(action);
-      }
-      break;
-    }
-    case 'delete': {
-      // Redo delete: delete again
-      if (existsSync(action.path)) {
-        // Create backup for potential undo
-        const backupPath = action.path + '.undo-backup-' + Date.now();
-        const cpResult = spawnSync('cp', ['-R', action.path, backupPath]);
-        if (cpResult.status === 0) {
-          rmSync(action.path, {recursive: true, force: true});
-          undoStack.push({...action, backupPath});
-        }
-      }
-      break;
-    }
-    case 'rename':
-    case 'move': {
-      // Redo rename/move: move forward again
-      if (action.oldPath && action.newPath && existsSync(action.oldPath)) {
-        renameSync(action.oldPath, action.newPath);
-        undoStack.push(action);
-      }
-      break;
-    }
-    case 'copy': {
-      // Redo copy: copy again
-      if (action.oldPath && !existsSync(action.path)) {
-        const cpResult = spawnSync('cp', ['-R', action.oldPath, action.path]);
-        if (cpResult.status === 0) {
-          undoStack.push(action);
-        }
-      }
-      break;
-    }
-    /* c8 ignore next 3 -- Guard */
-    default:
-      throw new Error('Unexpected redo operation');
-    }
-    changePath();
-  } catch (err) {
-    // eslint-disable-next-line no-alert -- User feedback
-    alert('Failed to redo: ' + (/** @type {Error} */ (err)).message);
-  }
-};
+// Create wrapper functions that pass changePath
+const performUndo = () => performUndoOp(changePath);
+const performRedo = () => performRedoOp(changePath);
 
 // Map of directory paths to their watcher subscriptions
 // eslint-disable-next-line jsdoc/reject-any-type -- Watcher type
@@ -896,7 +605,7 @@ function addItems (result, basePath, currentBasePath) {
       return;
     }
 
-    isDeleting = true;
+    setIsDeleting(true);
 
     const decodedPath = decodeURIComponent(itemPath);
     const itemName = path.basename(decodedPath);
@@ -905,7 +614,7 @@ function addItems (result, basePath, currentBasePath) {
     const confirmed = confirm(`Are you sure you want to delete "${itemName}"?`);
 
     if (!confirmed) {
-      isDeleting = false;
+      setIsDeleting(false);
       return;
     }
 
@@ -939,7 +648,7 @@ function addItems (result, basePath, currentBasePath) {
 
       // Reset flag after a delay to allow view to update
       setTimeout(() => {
-        isDeleting = false;
+        setIsDeleting(false);
       }, 100);
 
       // Note: Delete error handling here
@@ -953,7 +662,7 @@ function addItems (result, basePath, currentBasePath) {
     } catch (err) {
       // eslint-disable-next-line no-alert -- User feedback
       alert('Failed to delete: ' + (/** @type {Error} */ (err)).message);
-      isDeleting = false;
+      setIsDeleting(false);
     }
   };
 
@@ -1020,7 +729,7 @@ function addItems (result, basePath, currentBasePath) {
     }
 
     // Set flag to prevent watcher from interfering
-    isCreating = true;
+    setIsCreating(true);
 
     // Find an available "untitled folder" name
     const baseName = 'untitled folder';
@@ -1066,7 +775,7 @@ function addItems (result, basePath, currentBasePath) {
         if (newFolderElement) {
           startRename(newFolderElement, () => {
             // Clear flag after rename completes
-            isCreating = false;
+            setIsCreating(false);
 
             const currentDir = getBasePath();
             if (currentDir !== '/') {
@@ -1092,11 +801,11 @@ function addItems (result, basePath, currentBasePath) {
         } else {
           // eslint-disable-next-line no-console -- Debugging
           console.warn('Could not find new folder element');
-          isCreating = false;
+          setIsCreating(false);
         }
       }, 150);
     } catch (err) {
-      isCreating = false;
+      setIsCreating(false);
       // eslint-disable-next-line no-alert -- User feedback
       alert('Failed to create folder: ' + (/** @type {Error} */ (err)).message);
     }
@@ -1168,7 +877,7 @@ function addItems (result, basePath, currentBasePath) {
           // eslint-disable-next-line no-console -- Debugging
           console.log('Starting rename from', oldName, 'to', newName);
           // Set flag to prevent watcher from interfering during rename
-          isCreating = true;
+          setIsCreating(true);
 
           renameSync(decodeURIComponent(oldPath), newPath);
 
@@ -1243,7 +952,6 @@ function addItems (result, basePath, currentBasePath) {
                   jQuery(li).trigger('click');
 
                   // After refresh, find and select the renamed item
-                  // eslint-disable-next-line no-loop-func -- Loop breaks after
                   setTimeout(() => {
                     const encodedNewPath = parentPath + '/' +
                       encodeURIComponent(newName);
@@ -1297,7 +1005,7 @@ function addItems (result, basePath, currentBasePath) {
 
                           // Clear the flag well after watcher debounce
                           setTimeout(() => {
-                            isCreating = false;
+                            setIsCreating(false);
                           }, 600);
                         }, 100);
                       }
@@ -1315,7 +1023,7 @@ function addItems (result, basePath, currentBasePath) {
             if (!foundParent) {
               // Clear the flag if parent not found
               setTimeout(() => {
-                isCreating = false;
+                setIsCreating(false);
               }, 800);
             }
           } else {
@@ -1345,7 +1053,7 @@ function addItems (result, basePath, currentBasePath) {
               } else {
                 // If no callback, just clear the flag after a delay
                 setTimeout(() => {
-                  isCreating = false;
+                  setIsCreating(false);
                 }, 250);
               }
             }, 100);
@@ -2139,17 +1847,18 @@ function addItems (result, basePath, currentBasePath) {
             const selectedEl = /** @type {HTMLElement} */ (selectedRow);
             const itemPath = selectedEl.dataset.path;
             if (itemPath) {
-              clipboard = {path: itemPath, isCopy: true};
+              setClipboard({path: itemPath, isCopy: true});
             }
           }
 
         // Cmd+V to paste (copy) to current directory
-        } else if (e.metaKey && e.key === 'v' && clipboard) {
+        } else if (e.metaKey && e.key === 'v' && getClipboard()) {
           e.preventDefault();
           /* c8 ignore next -- TS */
           const targetDir = iconViewTable.dataset.basePath || '/';
-          copyOrMoveItem(clipboard.path, targetDir, clipboard.isCopy);
-          clipboard = null;
+          const clip = getClipboard();
+          copyOrMoveItem(clip.path, targetDir, clip.isCopy);
+          setClipboard(null);
         }
       };
 
@@ -2169,7 +1878,7 @@ function addItems (result, basePath, currentBasePath) {
   const millerColumns = jQuery('div.miller-columns');
   const parentMap = new WeakMap();
   const childMap = new WeakMap();
-  $columns = millerColumns.millerColumns({
+  const columnsInstance = millerColumns.millerColumns({
     // Options:
     // preview () {
     //   return 'preview placeholder';
@@ -2427,6 +2136,8 @@ function addItems (result, basePath, currentBasePath) {
     }
   });
 
+  set$columns(columnsInstance);
+
   $columns.on('dblclick', (e) => {
     if (e.target.dataset.path) {
       shell.openPath(e.target.dataset.path);
@@ -2635,15 +2346,16 @@ function addItems (result, basePath, currentBasePath) {
               const selectedEl = /** @type {HTMLElement} */ (selected);
               const itemPath = selectedEl.dataset.path;
               if (itemPath) {
-                clipboard = {path: itemPath, isCopy: true};
+                setClipboard({path: itemPath, isCopy: true});
               }
             }
           // Cmd+V to paste to the currently displayed folder
-          } else if (e.metaKey && e.key === 'v' && clipboard) {
+          } else if (e.metaKey && e.key === 'v' && getClipboard()) {
             e.preventDefault();
             const currentPath = getBasePath();
-            copyOrMoveItem(clipboard.path, currentPath, clipboard.isCopy);
-            clipboard = null;
+            const clip = getClipboard();
+            copyOrMoveItem(clip.path, currentPath, clip.isCopy);
+            setClipboard(null);
           }
         };
 
