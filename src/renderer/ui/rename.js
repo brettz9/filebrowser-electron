@@ -354,6 +354,8 @@ export function startRename (
       input.blur();
     } else if (ev.key === 'Escape') {
       ev.preventDefault();
+      // Remove blur listener to prevent it from firing after we remove input
+      input.removeEventListener('blur', finishRename);
       input.remove();
       textElement.textContent = originalContent;
 

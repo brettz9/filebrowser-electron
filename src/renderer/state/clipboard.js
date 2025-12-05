@@ -8,6 +8,7 @@ Object.defineProperty(globalThis, 'clipboard', {
     return clipboard;
   },
   set (value) {
+    /* c8 ignore next 2 -- Provided for completeness */
     clipboard = value;
   }
 });

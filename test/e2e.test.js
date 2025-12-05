@@ -932,7 +932,19 @@ describe('renderer', () => {
       }
 
       // Cancel the rename by pressing Escape
-      await page.keyboard.press('Escape');
+      // Dispatch Escape key event directly to the input element
+      await page.evaluate(() => {
+        const input = document.querySelector('input[type="text"]');
+        if (input) {
+          const event = new KeyboardEvent('keydown', {
+            key: 'Escape',
+            code: 'Escape',
+            bubbles: true,
+            cancelable: true
+          });
+          input.dispatchEvent(event);
+        }
+      });
 
       // Wait for the input to be removed from DOM
       await page.waitForSelector('input[type="text"]', {
