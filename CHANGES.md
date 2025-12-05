@@ -1,5 +1,12 @@
 # CHANGES to filebrowser-electron
 
+## 0.8.0
+
+- Switch to AGPL-3.0-only
+- feat: context isolation (though not sandboxed for performance)
+- fix: misc. bug fixes
+- test: complete coverage
+
 ## 0.7.1
 
 - fix: fuller file/folder change detection
