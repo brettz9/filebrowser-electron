@@ -1,4 +1,7 @@
 /* eslint-disable n/no-sync -- Needed for performance */
+import {emit} from '../events/eventBus.js';
+import {isDeleting, setIsDeleting} from '../state/flags.js';
+
 // Get Node APIs from the preload script
 const {
   fs: {existsSync, lstatSync, rmSync, renameSync},
@@ -13,15 +16,8 @@ const {
 /**
  * Delete a file or directory.
  * @param {string} itemPath
- * @param {object} deps - Dependencies
- * @param {boolean} deps.isDeleting
- * @param {(value: boolean) => void} deps.setIsDeleting
- * @param {(action: UndoAction) => void} deps.pushUndo
- * @param {() => void} deps.changePath
  */
-export function deleteItem (itemPath, deps) {
-  const {isDeleting, setIsDeleting, pushUndo, changePath} = deps;
-
+export function deleteItem (itemPath) {
   // Prevent multiple simultaneous deletions
   if (isDeleting) {
     return;
@@ -57,8 +53,8 @@ export function deleteItem (itemPath, deps) {
     //   and directories
     rmSync(decodedPath, {recursive: true, force: true});
 
-    // Add to undo stack
-    pushUndo({
+    // Add to undo stack via event
+    emit('pushUndo', {
       type: 'delete',
       path: decodedPath,
       wasDirectory,
@@ -66,7 +62,7 @@ export function deleteItem (itemPath, deps) {
     });
 
     // Refresh the view to reflect deletion
-    changePath();
+    emit('refreshView');
 
     // Reset flag after a delay to allow view to update
     setTimeout(() => {
@@ -93,13 +89,8 @@ export function deleteItem (itemPath, deps) {
  * @param {string} sourcePath
  * @param {string} targetDir
  * @param {boolean} isCopy
- * @param {object} deps - Dependencies
- * @param {(action: UndoAction) => void} deps.pushUndo
- * @param {() => void} deps.changePath
  */
-export function copyOrMoveItem (sourcePath, targetDir, isCopy, deps) {
-  const {pushUndo, changePath} = deps;
-
+export function copyOrMoveItem (sourcePath, targetDir, isCopy) {
   const decodedSource = decodeURIComponent(sourcePath);
   const itemName = path.basename(decodedSource);
   const targetPath = path.join(targetDir, itemName);
@@ -118,8 +109,8 @@ export function copyOrMoveItem (sourcePath, targetDir, isCopy, deps) {
       if (cpResult.error || cpResult.status !== 0) {
         throw new Error(cpResult.stderr?.toString() || 'Copy failed');
       }
-      // Add to undo stack
-      pushUndo({
+      // Add to undo stack via event
+      emit('pushUndo', {
         type: 'copy',
         path: targetPath,
         oldPath: decodedSource
@@ -127,8 +118,8 @@ export function copyOrMoveItem (sourcePath, targetDir, isCopy, deps) {
     } else {
       // Move operation
       renameSync(decodedSource, targetPath);
-      // Add to undo stack
-      pushUndo({
+      // Add to undo stack via event
+      emit('pushUndo', {
         type: 'move',
         path: targetPath,
         oldPath: decodedSource,
@@ -137,7 +128,7 @@ export function copyOrMoveItem (sourcePath, targetDir, isCopy, deps) {
     }
 
     // Refresh the view
-    changePath();
+    emit('refreshView');
   } catch (err) {
     // eslint-disable-next-line no-alert -- User feedback
     alert(

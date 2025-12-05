@@ -20,7 +20,6 @@ import {
   $columns,
   set$columns,
   isDeleting,
-  setIsDeleting,
   isCreating,
   setIsCreating,
   isRefreshing,
@@ -36,6 +35,7 @@ import {
   deleteItem as deleteItemOp,
   copyOrMoveItem as copyOrMoveItemOp
 } from './fileSystem/operations.js';
+import {on} from './events/eventBus.js';
 
 // Get Node APIs from the preload script
 const {
@@ -56,6 +56,14 @@ const {
 
 // Ensure jamilih uses the browser's DOM instead of jsdom
 jml.setWindow(globalThis);
+
+// Set up event bus listeners for decoupled module communication
+on('pushUndo', (action) => {
+  pushUndo(action);
+});
+on('refreshView', () => {
+  changePath();
+});
 
 /**
  * Setup file system watcher for a directory.
@@ -604,12 +612,7 @@ function addItems (result, basePath, currentBasePath) {
    * @param {string} itemPath
    */
   const deleteItem = (itemPath) => {
-    deleteItemOp(itemPath, {
-      isDeleting,
-      setIsDeleting,
-      pushUndo,
-      changePath
-    });
+    deleteItemOp(itemPath);
   };
 
   /**
@@ -618,10 +621,7 @@ function addItems (result, basePath, currentBasePath) {
    * @param {boolean} isCopy
    */
   const copyOrMoveItem = (sourcePath, targetDir, isCopy) => {
-    copyOrMoveItemOp(sourcePath, targetDir, isCopy, {
-      pushUndo,
-      changePath
-    });
+    copyOrMoveItemOp(sourcePath, targetDir, isCopy);
   };
 
   /**
