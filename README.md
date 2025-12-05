@@ -37,9 +37,9 @@ done
 
 ## To-dos
 
-1. Add Playwright tests
-  1. Testing for better listening for external changes; release
-  1. Fix/test for file watching in icon view
+1. Smoke testing
+  1. For better listening for external changes; release
+  1. For file watching in icon view
 1. Moving/Copying
 1. Preview/Editing Metadata/File
 1. List view/Gallery view
