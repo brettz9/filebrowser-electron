@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fs: {
     mkdirSync: (...args) => fs.mkdirSync(...args),
     readdirSync: (...args) => fs.readdirSync(...args),
+    readFileSync: (...args) => fs.readFileSync(...args),
     writeFileSync: (...args) => fs.writeFileSync(...args),
     existsSync: (...args) => fs.existsSync(...args),
     renameSync: (...args) => fs.renameSync(...args),

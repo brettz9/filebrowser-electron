@@ -771,6 +771,171 @@ let isWatcherRefreshing = false;
 /** @type {{path: string, isCopy: boolean} | null} */
 let clipboard = null;
 
+// Expose clipboard for testing via getter/setter
+Object.defineProperty(globalThis, 'clipboard', {
+  get () {
+    return clipboard;
+  },
+  set (value) {
+    clipboard = value;
+  }
+});
+
+// Undo/Redo system
+/**
+ * @typedef UndoAction
+ * @property {'create'|'delete'|'rename'|'move'|'copy'} type
+ * @property {string} path - The path involved in the operation
+ * @property {string} [oldPath] - For rename/move operations
+ * @property {string} [newPath] - For rename/move operations
+ * @property {boolean} [wasDirectory] - For delete operations
+ * @property {string} [backupPath] - For delete operations (temp backup)
+ */
+
+/** @type {UndoAction[]} */
+const undoStack = [];
+/** @type {UndoAction[]} */
+const redoStack = [];
+const MAX_UNDO_STACK_SIZE = 50;
+
+// Expose for testing
+globalThis.undoStack = undoStack;
+globalThis.redoStack = redoStack;
+
+/**
+ * Add an action to the undo stack.
+ * @param {UndoAction} action
+ */
+const pushUndo = (action) => {
+  undoStack.push(action);
+  if (undoStack.length > MAX_UNDO_STACK_SIZE) {
+    undoStack.shift();
+  }
+  // Clear redo stack when a new action is performed
+  redoStack.length = 0;
+};
+
+/**
+ * Perform undo operation.
+ */
+const performUndo = () => {
+  const action = undoStack.pop();
+  if (!action) {
+    return;
+  }
+
+  try {
+    switch (action.type) {
+    case 'copy':
+    case 'create': {
+      // Undo create/copy: delete the created/copied item
+      if (existsSync(action.path)) {
+        rmSync(action.path, {recursive: true, force: true});
+        redoStack.push(action);
+      }
+      break;
+    }
+    case 'delete': {
+      // Undo delete: restore from backup
+      if (action.backupPath && existsSync(action.backupPath)) {
+        const cpResult = spawnSync(
+          'cp',
+          ['-R', action.backupPath, action.path]
+        );
+        if (cpResult.status === 0) {
+          // Clean up backup
+          rmSync(action.backupPath, {recursive: true, force: true});
+          redoStack.push({...action, backupPath: undefined});
+        }
+      }
+      break;
+    }
+    case 'rename':
+    case 'move': {
+      // Undo rename/move: move back to old location
+      if (action.newPath && action.oldPath && existsSync(action.newPath)) {
+        renameSync(action.newPath, action.oldPath);
+        redoStack.push(action);
+      }
+      break;
+    }
+    /* c8 ignore next 3 -- Guard */
+    default:
+      throw new Error('Unexpected undo operation');
+    }
+    changePath();
+  } catch (err) {
+    // eslint-disable-next-line no-alert -- User feedback
+    alert('Failed to undo: ' + (/** @type {Error} */ (err)).message);
+  }
+};
+
+/**
+ * Perform redo operation.
+ */
+const performRedo = () => {
+  const action = redoStack.pop();
+  if (!action) {
+    return;
+  }
+
+  try {
+    switch (action.type) {
+    case 'create': {
+      // Redo create: recreate the item
+      if (!existsSync(action.path)) {
+        if (action.wasDirectory) {
+          mkdirSync(action.path);
+        } else {
+          writeFileSync(action.path, '');
+        }
+        undoStack.push(action);
+      }
+      break;
+    }
+    case 'delete': {
+      // Redo delete: delete again
+      if (existsSync(action.path)) {
+        // Create backup for potential undo
+        const backupPath = action.path + '.undo-backup-' + Date.now();
+        const cpResult = spawnSync('cp', ['-R', action.path, backupPath]);
+        if (cpResult.status === 0) {
+          rmSync(action.path, {recursive: true, force: true});
+          undoStack.push({...action, backupPath});
+        }
+      }
+      break;
+    }
+    case 'rename':
+    case 'move': {
+      // Redo rename/move: move forward again
+      if (action.oldPath && action.newPath && existsSync(action.oldPath)) {
+        renameSync(action.oldPath, action.newPath);
+        undoStack.push(action);
+      }
+      break;
+    }
+    case 'copy': {
+      // Redo copy: copy again
+      if (action.oldPath && !existsSync(action.path)) {
+        const cpResult = spawnSync('cp', ['-R', action.oldPath, action.path]);
+        if (cpResult.status === 0) {
+          undoStack.push(action);
+        }
+      }
+      break;
+    }
+    /* c8 ignore next 3 -- Guard */
+    default:
+      throw new Error('Unexpected redo operation');
+    }
+    changePath();
+  } catch (err) {
+    // eslint-disable-next-line no-alert -- User feedback
+    alert('Failed to redo: ' + (/** @type {Error} */ (err)).message);
+  }
+};
+
 // Map of directory paths to their watcher subscriptions
 // eslint-disable-next-line jsdoc/reject-any-type -- Watcher type
 /** @type {Map<string, any>} */
@@ -817,9 +982,29 @@ function addItems (result, basePath, currentBasePath) {
     }
 
     try {
+      // Create a backup before deleting for undo support
+      const backupPath = decodedPath + '.undo-backup-' + Date.now();
+      const cpResult = spawnSync('cp', ['-R', decodedPath, backupPath]);
+
+      if (cpResult.error || cpResult.status !== 0) {
+        throw new Error('Failed to create backup for undo');
+      }
+
+      // Check if it's a directory
+      const stats = lstatSync(decodedPath);
+      const wasDirectory = stats.isDirectory();
+
       // rmSync with recursive and force options to handle both files
       //   and directories
       rmSync(decodedPath, {recursive: true, force: true});
+
+      // Add to undo stack
+      pushUndo({
+        type: 'delete',
+        path: decodedPath,
+        wasDirectory,
+        backupPath
+      });
 
       // Refresh the view to reflect deletion
       changePath();
@@ -868,9 +1053,22 @@ function addItems (result, basePath, currentBasePath) {
         if (cpResult.error || cpResult.status !== 0) {
           throw new Error(cpResult.stderr?.toString() || 'Copy failed');
         }
+        // Add to undo stack
+        pushUndo({
+          type: 'copy',
+          path: targetPath,
+          oldPath: decodedSource
+        });
       } else {
         // Move operation
         renameSync(decodedSource, targetPath);
+        // Add to undo stack
+        pushUndo({
+          type: 'move',
+          path: targetPath,
+          oldPath: decodedSource,
+          newPath: targetPath
+        });
       }
 
       // Refresh the view
@@ -914,6 +1112,13 @@ function addItems (result, basePath, currentBasePath) {
 
       // Create the directory
       mkdirSync(newFolderPath);
+
+      // Add to undo stack
+      pushUndo({
+        type: 'create',
+        path: newFolderPath,
+        wasDirectory: true
+      });
 
       // Refresh the view to show the new folder
       // Watcher setup will be skipped due to isCreating flag
@@ -1038,6 +1243,14 @@ function addItems (result, basePath, currentBasePath) {
           isCreating = true;
 
           renameSync(decodeURIComponent(oldPath), newPath);
+
+          // Add to undo stack
+          pushUndo({
+            type: 'rename',
+            path: newPath,
+            oldPath: decodeURIComponent(oldPath),
+            newPath
+          });
 
           // eslint-disable-next-line no-console -- Debugging
           console.log('Rename completed');
@@ -1298,6 +1511,11 @@ function addItems (result, basePath, currentBasePath) {
         ev.preventDefault();
         input.remove();
         textElement.textContent = originalContent;
+
+        // Call onComplete to clear isCreating flag
+        if (onComplete) {
+          onComplete();
+        }
       }
     });
 
@@ -1372,6 +1590,13 @@ function addItems (result, basePath, currentBasePath) {
             try {
               // Create empty file
               writeFileSync(tempFilePath, '');
+
+              // Add to undo stack
+              pushUndo({
+                type: 'create',
+                path: tempFilePath,
+                wasDirectory: false
+              });
 
               // Refresh the view to show the new file
               changePath();
@@ -1977,11 +2202,10 @@ function addItems (result, basePath, currentBasePath) {
           /* c8 ignore next -- TS */
           const folderPath = iconViewTable.dataset.basePath || '/';
           createNewFolder(folderPath);
-        }
 
         // Cmd+C to copy selected item
-        if (e.metaKey && e.key === 'c') {
-          const selectedRow = iconViewTable.querySelector('tbody tr.selected');
+        } else if (e.metaKey && e.key === 'c') {
+          const selectedRow = iconViewTable.querySelector('tr.selected');
           if (selectedRow) {
             e.preventDefault();
             const selectedEl = /** @type {HTMLElement} */ (selectedRow);
@@ -1990,10 +2214,9 @@ function addItems (result, basePath, currentBasePath) {
               clipboard = {path: itemPath, isCopy: true};
             }
           }
-        }
 
         // Cmd+V to paste (copy) to current directory
-        if (e.metaKey && e.key === 'v' && clipboard) {
+        } else if (e.metaKey && e.key === 'v' && clipboard) {
           e.preventDefault();
           /* c8 ignore next -- TS */
           const targetDir = iconViewTable.dataset.basePath || '/';
@@ -2474,10 +2697,8 @@ function addItems (result, basePath, currentBasePath) {
                 createNewFolder(decodeURIComponent(folderPath));
               }
             }
-          }
-
           // Cmd+C to copy selected item
-          if (e.metaKey && e.key === 'c') {
+          } else if (e.metaKey && e.key === 'c') {
             const selected = millerColumnsDiv.querySelector(
               '.list-item.selected a, .list-item.selected span'
             );
@@ -2489,10 +2710,8 @@ function addItems (result, basePath, currentBasePath) {
                 clipboard = {path: itemPath, isCopy: true};
               }
             }
-          }
-
           // Cmd+V to paste to the currently displayed folder
-          if (e.metaKey && e.key === 'v' && clipboard) {
+          } else if (e.metaKey && e.key === 'v' && clipboard) {
             e.preventDefault();
             const currentPath = getBasePath();
             copyOrMoveItem(clipboard.path, currentPath, clipboard.isCopy);
@@ -2557,6 +2776,26 @@ function addItems (result, basePath, currentBasePath) {
 }
 
 globalThis.addEventListener('hashchange', changePath);
+
+// Add global keyboard handler for undo/redo
+document.addEventListener('keydown', (e) => {
+  // Only handle if not typing in an input field
+  const {target} = e;
+  const el = /** @type {Element} */ (target);
+  if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+    return;
+  }
+
+  // Cmd+Z for undo
+  if (e.metaKey && e.key === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    performUndo();
+  } else if (e.metaKey && e.shiftKey && e.key === 'z') {
+    // Cmd+Shift+Z for redo
+    e.preventDefault();
+    performRedo();
+  }
+});
 
 $('#icon-view').addEventListener('click', function () {
   $$('nav button').forEach((button) => {

@@ -35,15 +35,42 @@ done
 
 1. Invoke like such: `npm run start -- --path /Users/brett`
 
+## Features
+
+### File Operations
+- **Create**: Create new folders and text files
+- **Delete**: Delete files and folders with confirmation
+- **Rename**: Rename files and folders in place
+- **Copy/Move**:
+  - Drag-and-drop files/folders (hold **Option/Alt** key to copy instead of move)
+  - Keyboard shortcuts: **Cmd+C** to copy, **Cmd+V** to paste
+
+### Undo/Redo
+- **Cmd+Z**: Undo the last file operation (create, delete, rename, move, or copy)
+- **Cmd+Shift+Z**: Redo a previously undone operation
+- Maintains up to 50 operations in the undo history
+- Works across all operation types including:
+  - Folder/file creation
+  - File/folder deletion (with automatic backup)
+  - Rename operations
+  - Move/copy operations
+
+### Views
+- **Icon View**: Grid-based layout with file icons
+- **Three Column View**: Miller columns browser for hierarchical navigation
+
+### Sticky Notes
+- Create global and local (folder-specific) sticky notes
+- Edit, collapse/expand, and delete notes
+- Notes persist across sessions
+
 ## To-dos
 
-1. Moving/Copying
 1. Views
     1. List view/Gallery view
-    1. Ideally would allow separate windows and tabs
+    1. Ideally would allow separate windows and tabs, with menu bar
 1. Preview/Editing Metadata/File
 
-1. Add undo history
 1. Demo with file handler web apps
 1. Build/set icon:
     <https://stackoverflow.com/questions/31529772/how-to-set-app-icon-for-electron-atom-shell-app>
@@ -69,3 +96,4 @@ done
     local sticky for root
 1. Add breadcrumbs for both views
 1. Way to clean up opened Finder windows from tests?
+1. Ensure copy-paste in context menu
