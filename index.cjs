@@ -14567,6 +14567,107 @@
     return $;
   }
 
+  /* eslint-disable jsdoc/reject-any-type -- Generic */
+  /**
+   * Split an array into chunks of a specified size.
+   * @param {any[]} arr
+   * @param {number} n
+   * @returns {any[][]}
+   */
+  const chunk = (arr, n) => Array.from({
+    length: Math.ceil(arr.length / n)
+  }, (_, i) => arr.slice(n * i, n + (n * i)));
+  /* eslint-enable jsdoc/reject-any-type -- Generic */
+
+  /**
+   * Query selector that returns a single element.
+   * @param {string} sel
+   * @returns {HTMLElement}
+   */
+  const $ = (sel) => {
+    return /** @type {HTMLElement} */ (document.querySelector(sel));
+  };
+
+  /**
+   * Query selector that returns all matching elements.
+   * @param {string} sel
+   * @returns {HTMLElement[]}
+   */
+  const $$ = (sel) => {
+    return /** @type {HTMLElement[]} */ ([...document.querySelectorAll(sel)]);
+  };
+
+  /**
+   * Get elements matching selector, but only from non-collapsed columns.
+   * In three-columns view, collapsed columns contain stale copies of elements.
+   *
+   * @param {string} sel
+   * @returns {HTMLElement[]}
+   */
+  const $$active = (sel) => {
+    const elements = $$(sel);
+    return elements.filter((el) => {
+      const column = el.closest('.miller-column');
+      return !column || !column.classList.contains('miller-collapse');
+    });
+  };
+
+  // Get Node APIs from the preload script
+  const {storage} = globalThis.electronAPI;
+
+  // Use persistent storage instead of localStorage (synchronous via IPC)
+  // eslint-disable-next-line no-shadow -- Intentionally shadowing global
+  const localStorage = storage;
+
+  // Get Node APIs from the preload script
+  const {
+    fs: {readdirSync, lstatSync: lstatSync$1},
+    path: path$1,
+    // eslint-disable-next-line no-shadow -- Different process
+    process: process$1
+  } = globalThis.electronAPI;
+
+  /**
+   * Get the base path from URL hash or command line arguments.
+   * @returns {string}
+   */
+  function getBasePath () {
+    if (!location.hash.length && process$1.argv.length) {
+      const idx = process$1.argv.findIndex((arg) => {
+        return arg === '--path' || arg === 'p';
+      });
+      /* c8 ignore next -- App with arguments */
+      return idx === -1 ? '/' : process$1.argv[idx + 1];
+    }
+
+    const params = new URLSearchParams(location.hash.slice(1));
+    return path$1.normalize(
+      params.has('path') ? params.get('path') + '/' : '/'
+    );
+  }
+
+  /**
+   * @typedef {[isDir: boolean, childDir: string, title: string]} Result
+   */
+
+  /**
+   * Read a directory and return sorted entries.
+   * @param {string} basePath
+   * @returns {Result[]}
+   */
+  function readDirectory (basePath) {
+    // eslint-disable-next-line n/no-sync -- Needed for performance
+    return readdirSync(basePath).map((fileOrDir) => {
+      // eslint-disable-next-line n/no-sync -- Needed for performance
+      const stat = lstatSync$1(path$1.join(basePath, fileOrDir));
+      return /** @type {Result} */ (
+        [stat.isDirectory() || stat.isSymbolicLink(), basePath, fileOrDir]
+      );
+    }).toSorted(([, , a], [, , b]) => {
+      return a.localeCompare(b, undefined, {sensitivity: 'base'});
+    });
+  }
+
   /* eslint-disable n/no-sync,
     promise/prefer-await-to-then,
     promise/catch-or-return -- Needed for performance */
@@ -14574,7 +14675,7 @@
   // Get Node APIs from the preload script
   const {
     fs: {
-      mkdirSync, readdirSync, writeFileSync, existsSync, renameSync,
+      mkdirSync, writeFileSync, existsSync, renameSync,
       lstatSync, rmSync, realpathSync
     },
     path,
@@ -14585,13 +14686,8 @@
     getOpenWithApps,
     getAppIcons,
     parcelWatcher,
-    getIconDataURLForFile,
-    storage
+    getIconDataURLForFile
   } = globalThis.electronAPI;
-
-  // Use persistent storage instead of localStorage (synchronous via IPC)
-  // eslint-disable-next-line no-shadow -- Intentionally shadowing global
-  const localStorage = storage;
 
   const stickyNotes = new StickyNote({
     colors: ['#fff740', '#ff7eb9', '#7afcff', '#feff9c', '#a7ffeb', '#c7ceea'],
@@ -14734,80 +14830,8 @@
     // noteObserver.disconnect();
   };
 
-  /* eslint-disable jsdoc/reject-any-type -- Generic */
-  /**
-   * @param {any[]} arr
-   * @param {number} n
-   */
-  const chunk = (arr, n) => Array.from({
-    length: Math.ceil(arr.length / n)
-  }, (_, i) => arr.slice(n * i, n + (n * i)));
-  /* eslint-enable jsdoc/reject-any-type -- Generic */
-
-  /**
-   * @param {string} sel
-   */
-  const $ = (sel) => {
-    return /** @type {HTMLElement} */ (document.querySelector(sel));
-  };
-
-  /**
-   * @param {string} sel
-   */
-  const $$ = (sel) => {
-    return /** @type {HTMLElement[]} */ ([...document.querySelectorAll(sel)]);
-  };
-
-  /**
-   * Get elements matching selector, but only from non-collapsed columns.
-   * In three-columns view, collapsed columns contain stale copies of elements.
-   *
-   * @param {string} sel
-   */
-  const $$active = (sel) => {
-    const elements = $$(sel);
-    return elements.filter((el) => {
-      const column = el.closest('.miller-column');
-      return !column || !column.classList.contains('miller-collapse');
-    });
-  };
-
   // Ensure jamilih uses the browser's DOM instead of jsdom
   jmlExports.jml.setWindow(globalThis);
-
-  /**
-   *
-   * @returns {string}
-   */
-  function getBasePath () {
-    if (!location.hash.length && process.argv.length) {
-      const idx = process.argv.findIndex((arg) => {
-        return arg === '--path' || arg === 'p';
-      });
-      /* c8 ignore next -- App with arguments */
-      return idx === -1 ? '/' : process.argv[idx + 1];
-    }
-
-    const params = new URLSearchParams(location.hash.slice(1));
-    return path.normalize(
-      params.has('path') ? params.get('path') + '/' : '/'
-    );
-  }
-
-  /**
-   * @param {string} basePath
-   * @returns {Result[]}
-   */
-  function readDirectory (basePath) {
-    return readdirSync(basePath).map((fileOrDir) => {
-      const stat = lstatSync(path.join(basePath, fileOrDir));
-      return /** @type {Result} */ (
-        [stat.isDirectory() || stat.isSymbolicLink(), basePath, fileOrDir]
-      );
-    }).toSorted(([, , a], [, , b]) => {
-      return a.localeCompare(b, undefined, {sensitivity: 'base'});
-    });
-  }
 
   /**
    * Setup file system watcher for a directory.
@@ -16762,10 +16786,9 @@
             /* c8 ignore next -- TS */
             const folderPath = iconViewTable.dataset.basePath || '/';
             createNewFolder(folderPath);
-          }
 
           // Cmd+C to copy selected item
-          if (e.metaKey && e.key === 'c') {
+          } else if (e.metaKey && e.key === 'c') {
             const selectedRow = iconViewTable.querySelector('tr.selected');
             if (selectedRow) {
               e.preventDefault();
@@ -16775,10 +16798,9 @@
                 clipboard = {path: itemPath, isCopy: true};
               }
             }
-          }
 
           // Cmd+V to paste (copy) to current directory
-          if (e.metaKey && e.key === 'v' && clipboard) {
+          } else if (e.metaKey && e.key === 'v' && clipboard) {
             e.preventDefault();
             /* c8 ignore next -- TS */
             const targetDir = iconViewTable.dataset.basePath || '/';
@@ -17259,10 +17281,8 @@
                   createNewFolder(decodeURIComponent(folderPath));
                 }
               }
-            }
-
             // Cmd+C to copy selected item
-            if (e.metaKey && e.key === 'c') {
+            } else if (e.metaKey && e.key === 'c') {
               const selected = millerColumnsDiv.querySelector(
                 '.list-item.selected a, .list-item.selected span'
               );
@@ -17274,10 +17294,8 @@
                   clipboard = {path: itemPath, isCopy: true};
                 }
               }
-            }
-
             // Cmd+V to paste to the currently displayed folder
-            if (e.metaKey && e.key === 'v' && clipboard) {
+            } else if (e.metaKey && e.key === 'v' && clipboard) {
               e.preventDefault();
               const currentPath = getBasePath();
               copyOrMoveItem(clipboard.path, currentPath, clipboard.isCopy);

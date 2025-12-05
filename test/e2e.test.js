@@ -1117,6 +1117,20 @@ describe('renderer', () => {
     });
 
     test('undo and redo copy operation', async () => {
+      // Clean up any leftover files from previous runs
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        try {
+          fs.rmSync(path.join('/tmp', 'test-copy-source.txt'), {force: true});
+          fs.rmSync(path.join('/tmp', 'test-copy-dest'), {
+            recursive: true, force: true
+          });
+        } catch {
+          // Ignore cleanup errors
+        }
+      });
+
       // Create a test file in /tmp
       await page.evaluate(() => {
         // @ts-expect-error - electronAPI available
@@ -1136,7 +1150,7 @@ describe('renderer', () => {
       await page.evaluate(() => {
         globalThis.location.hash = '#path=/tmp';
       });
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(1500);
 
       // Switch to icon view
       const iconViewBtn = await page.locator('#icon-view');
@@ -1336,12 +1350,12 @@ describe('renderer', () => {
       await page.evaluate(() => {
         globalThis.location.hash = '#path=/tmp';
       });
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(1500);
 
       // Switch to three-columns view for context menu
       const threeColBtn = await page.locator('#three-columns');
       await threeColBtn.click();
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(1000);
 
       // Find /tmp folder in the columns
       const tmpFolder = await page.locator(
@@ -1597,20 +1611,45 @@ describe('renderer', () => {
     });
 
     test('Cmd+Backspace deletes selected item', async () => {
+      // Clean up any leftover test folders and backup files
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const homeDir = '/Users/brett';
+        try {
+          const files = fs.readdirSync(homeDir);
+          files.forEach((/** @type {string} */ file) => {
+            if (file.includes('test-folder-to-delete') ||
+              file.includes('.undo-backup-')
+            ) {
+              try {
+                fs.rmSync(path.join(homeDir, file), {
+                  recursive: true, force: true
+                });
+              } catch {
+                // Ignore cleanup errors
+              }
+            }
+          });
+        } catch {
+          // Ignore if directory doesn't exist
+        }
+      });
+
       await page.locator('#three-columns').click();
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(1000);
 
       // Navigate to /Users
       const usersFolder = await page.locator('a[data-path="/Users"]');
       await usersFolder.click();
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(1000);
 
       // Click on the current user's home folder (brett in this case)
       const homeFolder = await page.locator(
         'a[data-path*="/Users/brett"]'
       ).first();
       await homeFolder.click();
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(1000);
 
       // First, create a test folder that we can safely delete
       // Dispatch Cmd+Shift+N to create new folder
@@ -1629,7 +1668,7 @@ describe('renderer', () => {
         }
       });
 
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(2500);
 
       // Check if folder was created with rename input
       const renameInput = await page.locator('input[type="text"]');
@@ -1698,11 +1737,14 @@ describe('renderer', () => {
         }
       });
 
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(1500);
 
       // Verify the folder was deleted (no longer in the list)
-      const deletedFolder = page.locator(
-        'a[data-path*="test-folder-to-delete"]'
+      // Filter out backup files which might still exist
+      const deletedFolder = await page.locator(
+        '.miller-column:not(.miller-collapse) ' +
+        'a[data-path*="test-folder-to-delete"]:' +
+          'not([data-path*=".undo-backup-"])'
       );
       await expect(deletedFolder).toBeHidden();
 
