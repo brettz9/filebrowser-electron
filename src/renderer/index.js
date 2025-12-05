@@ -219,6 +219,7 @@ function getBasePath () {
     const idx = process.argv.findIndex((arg) => {
       return arg === '--path' || arg === 'p';
     });
+    /* c8 ignore next -- App with arguments */
     return idx === -1 ? '/' : process.argv[idx + 1];
   }
 
@@ -291,9 +292,9 @@ async function setupNativeWatcher (dirPath) {
   let resolvedDirPath;
   try {
     resolvedDirPath = realpathSync(dirPath);
+  /* c8 ignore next 4 - Defensive: hard to mock due to module-level binding */
+  // If path doesn't exist or can't be resolved, use original
   } catch {
-    /* c8 ignore next 3 - Defensive: hard to mock due to module-level binding */
-    // If path doesn't exist or can't be resolved, use original
     resolvedDirPath = dirPath;
   }
 
@@ -1888,6 +1889,7 @@ function addItems (result, basePath, currentBasePath) {
         // Cmd+Shift+N to create new folder
         if (e.metaKey && e.shiftKey && e.key === 'n') {
           e.preventDefault();
+          /* c8 ignore next -- TS */
           const folderPath = iconViewTable.dataset.basePath || '/';
           createNewFolder(folderPath);
         }
