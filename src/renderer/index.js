@@ -32,12 +32,16 @@ import {
   performUndo as performUndoOp,
   performRedo as performRedoOp
 } from './history/undoRedo.js';
+import {
+  deleteItem as deleteItemOp,
+  copyOrMoveItem as copyOrMoveItemOp
+} from './fileSystem/operations.js';
 
 // Get Node APIs from the preload script
 const {
   fs: {
     mkdirSync, writeFileSync, existsSync, renameSync,
-    lstatSync, rmSync, realpathSync
+    realpathSync
   },
   path,
   // eslint-disable-next-line no-shadow -- Different process
@@ -600,70 +604,12 @@ function addItems (result, basePath, currentBasePath) {
    * @param {string} itemPath
    */
   const deleteItem = (itemPath) => {
-    // Prevent multiple simultaneous deletions
-    if (isDeleting) {
-      return;
-    }
-
-    setIsDeleting(true);
-
-    const decodedPath = decodeURIComponent(itemPath);
-    const itemName = path.basename(decodedPath);
-
-    // eslint-disable-next-line no-alert -- User confirmation
-    const confirmed = confirm(`Are you sure you want to delete "${itemName}"?`);
-
-    if (!confirmed) {
-      setIsDeleting(false);
-      return;
-    }
-
-    try {
-      // Create a backup before deleting for undo support
-      const backupPath = decodedPath + '.undo-backup-' + Date.now();
-      const cpResult = spawnSync('cp', ['-R', decodedPath, backupPath]);
-
-      if (cpResult.error || cpResult.status !== 0) {
-        throw new Error('Failed to create backup for undo');
-      }
-
-      // Check if it's a directory
-      const stats = lstatSync(decodedPath);
-      const wasDirectory = stats.isDirectory();
-
-      // rmSync with recursive and force options to handle both files
-      //   and directories
-      rmSync(decodedPath, {recursive: true, force: true});
-
-      // Add to undo stack
-      pushUndo({
-        type: 'delete',
-        path: decodedPath,
-        wasDirectory,
-        backupPath
-      });
-
-      // Refresh the view to reflect deletion
-      changePath();
-
-      // Reset flag after a delay to allow view to update
-      setTimeout(() => {
-        setIsDeleting(false);
-      }, 100);
-
-      // Note: Delete error handling here
-      // is difficult to test via mocking because rmSync is destructured at
-      // module load time, preventing runtime mocking. This would require
-      // either modifying the source to use property access instead of
-      // destructuring, or creating actual filesystem permission errors which
-      // is complex and platform-dependent. These lines are marked as
-      // difficult to cover and require manual/integration testing.
-      /* c8 ignore next 5 -- Defensive and difficult to cover */
-    } catch (err) {
-      // eslint-disable-next-line no-alert -- User feedback
-      alert('Failed to delete: ' + (/** @type {Error} */ (err)).message);
-      setIsDeleting(false);
-    }
+    deleteItemOp(itemPath, {
+      isDeleting,
+      setIsDeleting,
+      pushUndo,
+      changePath
+    });
   };
 
   /**
@@ -672,51 +618,10 @@ function addItems (result, basePath, currentBasePath) {
    * @param {boolean} isCopy
    */
   const copyOrMoveItem = (sourcePath, targetDir, isCopy) => {
-    const decodedSource = decodeURIComponent(sourcePath);
-    const itemName = path.basename(decodedSource);
-    const targetPath = path.join(targetDir, itemName);
-
-    // Check if target already exists
-    if (existsSync(targetPath)) {
-      // eslint-disable-next-line no-alert -- User feedback
-      alert(`"${itemName}" already exists in the destination.`);
-      return;
-    }
-
-    try {
-      if (isCopy) {
-        // Copy operation using cp -R for recursive copy
-        const cpResult = spawnSync('cp', ['-R', decodedSource, targetPath]);
-        if (cpResult.error || cpResult.status !== 0) {
-          throw new Error(cpResult.stderr?.toString() || 'Copy failed');
-        }
-        // Add to undo stack
-        pushUndo({
-          type: 'copy',
-          path: targetPath,
-          oldPath: decodedSource
-        });
-      } else {
-        // Move operation
-        renameSync(decodedSource, targetPath);
-        // Add to undo stack
-        pushUndo({
-          type: 'move',
-          path: targetPath,
-          oldPath: decodedSource,
-          newPath: targetPath
-        });
-      }
-
-      // Refresh the view
-      changePath();
-    } catch (err) {
-      // eslint-disable-next-line no-alert -- User feedback
-      alert(
-        `Failed to ${isCopy ? 'copy' : 'move'}: ` +
-        (/** @type {Error} */ (err)).message
-      );
-    }
+    copyOrMoveItemOp(sourcePath, targetDir, isCopy, {
+      pushUndo,
+      changePath
+    });
   };
 
   /**
