@@ -87,6 +87,7 @@ done
 
 ## Misc. bugs
 
+1. cmd-x cut missing for move
 1. After deleting an external file, prompting a refresh, let the scroll be back
     to the exact coordinates as before if that is in the viewport
 1. Retain z-index of stickies

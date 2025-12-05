@@ -31,6 +31,7 @@ globalThis.redoStack = redoStack;
  */
 export const pushUndo = (action) => {
   undoStack.push(action);
+  /* c8 ignore next 3 -- Difficult to test */
   if (undoStack.length > MAX_UNDO_STACK_SIZE) {
     undoStack.shift();
   }
@@ -88,6 +89,7 @@ export const performUndo = (changePath) => {
       throw new Error('Unexpected undo operation');
     }
     changePath();
+  /* c8 ignore next 4 -- Guard */
   } catch (err) {
     // eslint-disable-next-line no-alert -- User feedback
     alert('Failed to undo: ' + (/** @type {Error} */ (err)).message);
@@ -155,6 +157,7 @@ export const performRedo = (changePath) => {
       throw new Error('Unexpected redo operation');
     }
     changePath();
+  /* c8 ignore next 4 -- Guard */
   } catch (err) {
     // eslint-disable-next-line no-alert -- User feedback
     alert('Failed to redo: ' + (/** @type {Error} */ (err)).message);

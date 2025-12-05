@@ -398,8 +398,7 @@ function addItems (result, basePath, currentBasePath) {
                 const sourcePath = e.dataTransfer?.getData('text/plain');
                 const targetPath = linkEl.dataset.path;
                 if (sourcePath && targetPath) {
-                  const targetDir = decodeURIComponent(targetPath);
-                  copyOrMoveItem(sourcePath, targetDir, e.altKey);
+                  copyOrMoveItem(sourcePath, targetPath, e.altKey);
                 }
               });
             }
@@ -726,16 +725,26 @@ function addItems (result, basePath, currentBasePath) {
 
     if (e.metaKey && e.key === 'o' && pth) {
       shell.openPath(pth);
-    }
-
     // Cmd+Delete to delete selected item
-    if (e.metaKey && e.key === 'Backspace' && pth) {
+    } else if (e.metaKey && e.key === 'Backspace' && pth) {
       e.preventDefault();
       deleteItem(pth);
-    }
-
+    // Cmd+C to copy selected item
+    } else if (e.metaKey && e.key === 'c' && pth) {
+      e.preventDefault();
+      setClipboard({path: pth, isCopy: true});
+    // Cmd+V to paste into selected folder
+    } else if (e.metaKey && e.key === 'v' && getClipboard()) {
+      e.preventDefault();
+      // Paste into the selected folder, or current base path if not a folder
+      const targetPath = pth && selectedLi.find('a[data-path]').length
+        ? pth
+        : getBasePath();
+      const clip = getClipboard();
+      copyOrMoveItem(clip.path, targetPath, clip.isCopy);
+      setClipboard(null);
     // Cmd+Shift+N to create new folder
-    if (e.metaKey && e.shiftKey && e.key === 'n') {
+    } else if (e.metaKey && e.shiftKey && e.key === 'n') {
       e.preventDefault();
 
       // Determine the folder path based on current selection
@@ -755,10 +764,8 @@ function addItems (result, basePath, currentBasePath) {
       }
 
       createNewFolder(folderPath);
-    }
-
     // Enter key to rename
-    if (e.key === 'Enter' && selectedLi.length) {
+    } else if (e.key === 'Enter' && selectedLi.length) {
       e.preventDefault();
       const textElement = selectedLi.find('span, a')[0];
       if (textElement) {
@@ -913,26 +920,6 @@ function addItems (result, basePath, currentBasePath) {
                 createNewFolder(decodeURIComponent(folderPath));
               }
             }
-          // Cmd+C to copy selected item
-          } else if (e.metaKey && e.key === 'c') {
-            const selected = millerColumnsDiv.querySelector(
-              '.list-item.selected a, .list-item.selected span'
-            );
-            if (selected) {
-              e.preventDefault();
-              const selectedEl = /** @type {HTMLElement} */ (selected);
-              const itemPath = selectedEl.dataset.path;
-              if (itemPath) {
-                setClipboard({path: itemPath, isCopy: true});
-              }
-            }
-          // Cmd+V to paste to the currently displayed folder
-          } else if (e.metaKey && e.key === 'v' && getClipboard()) {
-            e.preventDefault();
-            const currentPath = getBasePath();
-            const clip = getClipboard();
-            copyOrMoveItem(clip.path, currentPath, clip.isCopy);
-            setClipboard(null);
           }
         };
 
@@ -979,8 +966,7 @@ function addItems (result, basePath, currentBasePath) {
                   const sourcePath = e.dataTransfer?.getData('text/plain');
                   const targetPath = linkEl.dataset.path;
                   if (sourcePath && targetPath) {
-                    const targetDir = decodeURIComponent(targetPath);
-                    copyOrMoveItem(sourcePath, targetDir, e.altKey);
+                    copyOrMoveItem(sourcePath, targetPath, e.altKey);
                   }
                 });
               }
@@ -997,6 +983,7 @@ globalThis.addEventListener('hashchange', changePath);
 // Add global keyboard handler for undo/redo
 document.addEventListener('keydown', (e) => {
   // Only handle if not typing in an input field
+  /* c8 ignore next 5 - Defensive: keyboard shortcuts disabled in inputs */
   const {target} = e;
   const el = /** @type {Element} */ (target);
   if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {

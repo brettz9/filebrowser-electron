@@ -1043,6 +1043,7 @@ describe('renderer', () => {
         const folder1Link = await page.locator(
           'a[data-path="/tmp/test-no-prev-selection/folder-1"]'
         );
+        await folder1Link.waitFor({state: 'visible', timeout: 10000});
         await folder1Link.click();
         await page.waitForTimeout(1000);
 

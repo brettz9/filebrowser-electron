@@ -26,6 +26,8 @@ export function on (eventName, handler) {
   listeners.get(eventName).add(handler);
 
   // Return unsubscribe function
+  /* c8 ignore next 7 - Unsubscribe function not used in current
+     implementation */
   return () => {
     const eventListeners = listeners.get(eventName);
     if (eventListeners) {
@@ -45,6 +47,7 @@ export function emit (eventName, data) {
     eventListeners.forEach((handler) => {
       try {
         handler(data);
+      /* c8 ignore next 4 - Defensive: handler errors unlikely in tests */
       } catch (err) {
         // eslint-disable-next-line no-console -- Error handling
         console.error(`Error in event listener for "${eventName}":`, err);

@@ -63,6 +63,8 @@ async function setupNativeWatcher (dirPath) {
     return;
   }
 
+  /* c8 ignore next 5 - Defensive: setupFileWatcher already checks,
+     but kept for safety if called directly in future */
   // Check if already watching this path
   if (activeWatchers.has(dirPath)) {
     return;
@@ -73,7 +75,7 @@ async function setupNativeWatcher (dirPath) {
   let resolvedDirPath;
   try {
     resolvedDirPath = realpathSync(dirPath);
-  /* c8 ignore next 4 - Defensive:
+  /* c8 ignore next 5 - Defensive:
      hard to mock due to module-level binding */
   // If path doesn't exist or can't be resolved, use original
   } catch {

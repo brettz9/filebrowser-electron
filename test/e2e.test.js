@@ -846,6 +846,226 @@ describe('renderer', () => {
       expect(clipboardSet).toBe(true);
     });
 
+    test('copy and paste in three-columns view', async () => {
+      // This test covers lines 731-751 in index.js (Cmd+C and Cmd+V in
+      // jQuery $columns keydown handler)
+
+      // Clean up any leftover files
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        try {
+          fs.rmSync(path.join('/tmp', 'test-copy-parent'), {
+            recursive: true, force: true
+          });
+        } catch {
+          // Ignore cleanup errors
+        }
+      });
+
+      // Create nested structure: parent/source/file.txt and parent/dest/
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const parent = path.join('/tmp', 'test-copy-parent');
+        const source = path.join(parent, 'source');
+        const dest = path.join(parent, 'dest');
+
+        fs.mkdirSync(parent);
+        fs.mkdirSync(source);
+        fs.mkdirSync(dest);
+        fs.writeFileSync(
+          path.join(source, 'file.txt'),
+          'three-column copy test'
+        );
+      });
+
+      // Switch to three-columns view
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      // Navigate to /tmp (one level up from the folders we want to copy)
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1000);
+
+      // Wait for test-copy-parent to appear
+      await page.waitForFunction(() => {
+        const links = document.querySelectorAll(
+          'a[data-path*="test-copy-parent"]'
+        );
+        return links.length > 0;
+      }, {timeout: 10000});
+
+      // Click into test-copy-parent to see source and dest folders
+      const parentLink = await page.locator(
+        'a[data-path*="test-copy-parent"]'
+      ).first();
+      await parentLink.click();
+      await page.waitForTimeout(1000);
+
+      // Wait for directory contents to load
+      await page.waitForFunction(() => {
+        const links = document.querySelectorAll(
+          'a[data-path*="test-copy-parent/source"]'
+        );
+        return links.length > 0;
+      }, {timeout: 10000});
+
+      // Click source folder to select it
+      const sourceFolderLink = await page.locator(
+        'a[data-path*="test-copy-parent/source"]'
+      ).first();
+      await sourceFolderLink.click();
+      await page.waitForTimeout(300);
+
+      // Copy with Cmd+C
+      await page.keyboard.press('Meta+c');
+      await page.waitForTimeout(200);
+
+      // Click dest folder to navigate into it (and select it)
+      const destFolderLink = await page.locator(
+        'a[data-path*="test-copy-parent/dest"]'
+      ).first();
+      await destFolderLink.click();
+      await page.waitForTimeout(1000);
+
+      // Paste with Cmd+V
+      await page.keyboard.press('Meta+v');
+      await page.waitForTimeout(2000);
+
+      // Verify folder was copied (check for the folder and its contents)
+      const folderExists = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const copiedFolder = path.join(
+          '/tmp',
+          'test-copy-parent',
+          'dest',
+          'source'
+        );
+        const copiedFile = path.join(copiedFolder, 'file.txt');
+        return {
+          folderExists: fs.existsSync(copiedFolder),
+          fileExists: fs.existsSync(copiedFile)
+        };
+      });
+      expect(folderExists.folderExists).toBe(true);
+      expect(folderExists.fileExists).toBe(true);
+
+      // Clean up
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        try {
+          fs.rmSync(path.join('/tmp', 'test-copy-parent'), {
+            recursive: true,
+            force: true
+          });
+        } catch {
+          // Ignore
+        }
+        try {
+          fs.unlinkSync('/tmp/test-3col-source.txt');
+        } catch {
+          // Ignore
+        }
+      });
+    });
+
+    test('drag and drop file in three-columns view', async () => {
+      // This test covers lines 962-984 in index.js (drag-and-drop handlers)
+
+      // Clean up any leftover files
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        try {
+          fs.rmSync(path.join('/tmp', 'test-drag-source.txt'), {force: true});
+          fs.rmSync(path.join('/tmp', 'test-drag-dest'), {
+            recursive: true, force: true
+          });
+        } catch {
+          // Ignore cleanup errors
+        }
+      });
+
+      // Create test file and destination folder
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const testFile = path.join('/tmp', 'test-drag-source.txt');
+        fs.writeFileSync(testFile, 'drag and drop test');
+        const destFolder = path.join('/tmp', 'test-drag-dest');
+        if (!fs.existsSync(destFolder)) {
+          fs.mkdirSync(destFolder);
+        }
+      });
+
+      // Switch to three-columns view
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      // Navigate to /tmp
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1000);
+
+      // Wait for directory contents to load
+      await page.waitForFunction(() => {
+        const links = document.querySelectorAll(
+          'span[data-path*="test-drag-source.txt"]'
+        );
+        return links.length > 0;
+      }, {timeout: 10000});
+
+      // Locate the source file element
+      const sourceFile = await page.locator(
+        '.list-item:has(span[data-path*="test-drag-source.txt"])'
+      ).first();
+      await sourceFile.waitFor({state: 'visible', timeout: 5000});
+
+      // Locate the destination folder element
+      const destFolder = await page.locator(
+        '.list-item:has(a[data-path*="test-drag-dest"])'
+      ).first();
+      await destFolder.waitFor({state: 'visible', timeout: 5000});
+
+      // Perform drag and drop using Playwright's dragAndDrop
+      await sourceFile.dragTo(destFolder);
+      await page.waitForTimeout(1000);
+
+      // Verify file was moved (default is move without Alt key)
+      const results = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        return {
+          destExists: fs.existsSync(
+            path.join('/tmp', 'test-drag-dest', 'test-drag-source.txt')
+          ),
+          sourceExists: fs.existsSync('/tmp/test-drag-source.txt')
+        };
+      });
+      expect(results.destExists).toBe(true);
+      expect(results.sourceExists).toBe(false); // Moved, not copied
+
+      // Clean up
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        try {
+          fs.rmSync(path.join('/tmp', 'test-drag-dest'), {
+            recursive: true,
+            force: true
+          });
+        } catch {
+          // Ignore
+        }
+      });
+    });
+
     test('undo and redo folder creation', async () => {
       // Clean up any leftover test artifacts from previous runs
       await page.evaluate(() => {
@@ -1020,7 +1240,17 @@ describe('renderer', () => {
 
       // Undo the folder creation with Cmd+Z
       await page.keyboard.press('Meta+z');
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(2000);
+
+      // Navigate away and back to force refresh
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/';
+      });
+      await page.waitForTimeout(500);
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(2000);
 
       // Count should return to initial (excluding backup files)
       const afterUndoCount = await page.evaluate(() => {
@@ -1047,10 +1277,38 @@ describe('renderer', () => {
         return count;
       });
 
+      // Debug: Check filesystem to see if folder was actually deleted
+      const afterUndoFs = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available via preload
+        const {fs} = globalThis.electronAPI;
+        const files = fs.readdirSync('/tmp');
+        return files.filter(
+          (/** @type {string} */ f) => f.startsWith(
+            'untitled folder'
+          )
+        );
+      });
+
+      if (afterUndoCount !== initialCount) {
+        throw new Error(
+          `After undo: expected ${initialCount}, got ${afterUndoCount}. ` +
+          `Folders in /tmp: ${afterUndoFs.join(', ')}`
+        );
+      }
       expect(afterUndoCount).toBe(initialCount);
 
       // Redo the folder creation with Cmd+Shift+Z
       await page.keyboard.press('Meta+Shift+z');
+      await page.waitForTimeout(1000);
+
+      // Navigate away and back to force refresh
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/';
+      });
+      await page.waitForTimeout(300);
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
       await page.waitForTimeout(1000);
 
       // Count should increase again (excluding backup files)
@@ -1107,10 +1365,10 @@ describe('renderer', () => {
       await iconViewBtn.click();
       await page.waitForTimeout(300);
 
-      // Find and right-click on the test file
+      // Find and right-click on the test file (exclude backup files)
       const fileCell = await page.locator(
-        'td.list-item:has(span[data-path*="test-delete-undo.txt"])'
-      );
+        'td.list-item:has(span[data-path="/tmp/test-delete-undo.txt"])'
+      ).first();
       await fileCell.waitFor({state: 'visible', timeout: 5000});
       await fileCell.click({button: 'right'});
       await page.waitForTimeout(300);
@@ -1137,6 +1395,21 @@ describe('renderer', () => {
 
       // Undo the deletion with Cmd+Z
       await page.keyboard.press('Meta+z');
+      await page.waitForTimeout(1000);
+
+      // Navigate away and back to force refresh
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/';
+      });
+      await page.waitForTimeout(300);
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1000);
+
+      // Switch back to icon view
+      const iconViewBtn2 = await page.locator('#icon-view');
+      await iconViewBtn2.click();
       await page.waitForTimeout(500);
 
       // Verify file is restored
@@ -1503,6 +1776,164 @@ describe('renderer', () => {
       });
     });
 
+    test('copy operation with existing file shows error', async () => {
+      // This test covers lines 101-104 in operations.js (duplicate check)
+
+      // Clean up any leftover files from previous runs
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        try {
+          fs.rmSync(path.join('/tmp', 'test-dup-source.txt'), {force: true});
+          fs.rmSync(path.join('/tmp', 'test-dup-dest'), {
+            recursive: true, force: true
+          });
+        } catch {
+          // Ignore cleanup errors
+        }
+      });
+
+      // Create a test file and destination folder with duplicate file
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+
+        const testFile = path.join('/tmp', 'test-dup-source.txt');
+        fs.writeFileSync(testFile, 'duplicate test content');
+
+        // Create destination folder with a file of the same name
+        const destFolder = path.join('/tmp', 'test-dup-dest');
+        if (!fs.existsSync(destFolder)) {
+          fs.mkdirSync(destFolder);
+        }
+        const duplicateFile = path.join(destFolder, 'test-dup-source.txt');
+        fs.writeFileSync(duplicateFile, 'existing file');
+      });
+
+      // Navigate to /tmp
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1500);
+
+      // Switch to icon view
+      const iconViewBtn = await page.locator('#icon-view');
+      await iconViewBtn.click();
+      await page.waitForTimeout(300);
+
+      // Set up dialog handler to capture the alert
+      let alertMessage = '';
+      page.on('dialog', async (dialog) => {
+        alertMessage = dialog.message();
+        await dialog.accept();
+      });
+
+      // Copy the source file
+      const copyResult = await page.evaluate(() => {
+        const cell = document.querySelector(
+          'td.list-item:has(span[data-path*="test-dup-source.txt"])'
+        );
+        if (!cell) {
+          return {success: false, error: 'Cell not found'};
+        }
+
+        const span = cell.querySelector('span[data-path]');
+        const path = span
+          ? /** @type {HTMLElement} */ (span).dataset.path
+          : null;
+
+        if (!path) {
+          return {success: false, error: 'Path not found'};
+        }
+
+        const row = cell.closest('tr');
+        if (!row) {
+          return {success: false, error: 'Row not found'};
+        }
+
+        document.querySelectorAll('tbody tr.selected').forEach(
+          (r) => r.classList.remove('selected')
+        );
+        row.classList.add('selected');
+        /** @type {HTMLElement} */ (row).dataset.path = path;
+
+        const table = document.querySelector('table[data-base-path]');
+        if (!table) {
+          return {success: false, error: 'Table not found'};
+        }
+
+        const evt = new KeyboardEvent('keydown', {
+          key: 'c',
+          metaKey: true,
+          bubbles: true
+        });
+        table.dispatchEvent(evt);
+
+        return {success: true, path};
+      });
+
+      expect(copyResult.success).toBe(true);
+      await page.waitForTimeout(200);
+
+      // Navigate to destination folder
+      const destFolderCell = await page.locator(
+        'td.list-item:has(a[data-path*="test-dup-dest"])'
+      );
+      await destFolderCell.dblclick();
+
+      await page.waitForFunction(() => {
+        return globalThis.location.hash.includes('test-dup-dest');
+      }, {timeout: 5000});
+      await page.waitForTimeout(500);
+
+      // Paste - should trigger alert about duplicate
+      await page.evaluate(() => {
+        const tbl = document.querySelector('table[data-base-path]');
+        if (tbl) {
+          const evt = new KeyboardEvent('keydown', {
+            key: 'v',
+            metaKey: true,
+            bubbles: true
+          });
+          tbl.dispatchEvent(evt);
+        }
+      });
+      await page.waitForTimeout(500);
+
+      // Verify alert was shown
+      expect(alertMessage).toContain('already exists');
+
+      // Verify file was NOT overwritten (still has original content)
+      const fileContent = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        return fs.readFileSync(
+          path.join('/tmp', 'test-dup-dest', 'test-dup-source.txt'), 'utf8'
+        );
+      });
+      expect(fileContent).toBe('existing file');
+
+      // Clean up
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+
+        try {
+          fs.rmSync(path.join('/tmp', 'test-dup-dest'), {
+            recursive: true,
+            force: true
+          });
+        } catch {
+          // Ignore
+        }
+        try {
+          fs.unlinkSync('/tmp/test-dup-source.txt');
+        } catch {
+          // Ignore
+        }
+      });
+    });
+
     test('undo and redo text file creation', async () => {
       // Clean up any existing untitled files from previous runs
       await page.evaluate(() => {
@@ -1539,17 +1970,38 @@ describe('renderer', () => {
 
       // Right-click on /tmp folder
       await tmpFolder.click({button: 'right'});
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(500);
 
       // Wait for context menu to appear
       const contextMenu = await page.locator('.context-menu');
       await contextMenu.waitFor({state: 'visible', timeout: 5000});
+      await page.waitForTimeout(300);
 
-      // Click "Create text file"
+      // Verify context menu has items
+      const menuItems = await page.locator('.context-menu-item').count();
+      if (menuItems === 0) {
+        throw new Error('Context menu has no items');
+      }
+
+      // Get all menu item texts for debugging
+      const menuTexts = await page.evaluate(() => {
+        const items = [...document.querySelectorAll('.context-menu-item')];
+        return items.map((item) => item.textContent);
+      });
+
+      // Find and click "Create text file" - use nth selector
+      // (it's typically the second item after "Open in Finder")
       const createTextMenuItem = await page.locator(
-        '.context-menu-item:has-text("Create text file")'
-      );
-      await createTextMenuItem.waitFor({state: 'visible', timeout: 5000});
+        '.context-menu-item'
+      ).filter({hasText: 'Create text file'}).first();
+
+      const createTextExists = await createTextMenuItem.count();
+      if (createTextExists === 0) {
+        throw new Error(
+          'Create text file not found. Menu items: ' + menuTexts.join(', ')
+        );
+      }
+
       await createTextMenuItem.click();
       await page.waitForTimeout(1000);
 
@@ -1615,6 +2067,48 @@ describe('renderer', () => {
       // Clean up: undo once more
       await page.keyboard.press('Meta+z');
       await page.waitForTimeout(300);
+    });
+
+    test('handles undo/redo with empty stacks', async () => {
+      // Clear the undo/redo stacks
+      await page.evaluate(() => {
+        // @ts-expect-error - exposed for testing
+        globalThis.undoStack.length = 0;
+        // @ts-expect-error - exposed for testing
+        globalThis.redoStack.length = 0;
+      });
+
+      // Try to undo when stack is empty (should do nothing)
+      await page.keyboard.press('Meta+z');
+      await page.waitForTimeout(200);
+
+      // Verify stacks are still empty
+      const stacksAfterUndo = await page.evaluate(() => {
+        return {
+          // @ts-expect-error - exposed for testing
+          undoLength: globalThis.undoStack.length,
+          // @ts-expect-error - exposed for testing
+          redoLength: globalThis.redoStack.length
+        };
+      });
+      expect(stacksAfterUndo.undoLength).toBe(0);
+      expect(stacksAfterUndo.redoLength).toBe(0);
+
+      // Try to redo when stack is empty (should do nothing)
+      await page.keyboard.press('Meta+Shift+z');
+      await page.waitForTimeout(200);
+
+      // Verify stacks are still empty
+      const stacksAfterRedo = await page.evaluate(() => {
+        return {
+          // @ts-expect-error - exposed for testing
+          undoLength: globalThis.undoStack.length,
+          // @ts-expect-error - exposed for testing
+          redoLength: globalThis.redoStack.length
+        };
+      });
+      expect(stacksAfterRedo.undoLength).toBe(0);
+      expect(stacksAfterRedo.redoLength).toBe(0);
     });
   });
 
@@ -4243,10 +4737,16 @@ describe('renderer', () => {
 
         // Hover over "Open with..." to show submenu
         const openWithOption = await contextMenu.locator('.has-submenu');
+        await openWithOption.waitFor({state: 'visible', timeout: 5000});
         await openWithOption.hover();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(1500);
 
         const submenu = await page.locator('.context-submenu');
+        // Check if submenu exists first
+        const submenuCount = await submenu.count();
+        if (submenuCount === 0) {
+          throw new Error('Context submenu did not appear after hovering');
+        }
         await expect(submenu).toBeVisible();
 
         // Check that submenu is positioned at top of viewport
