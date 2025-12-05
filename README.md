@@ -37,8 +37,6 @@ done
 
 ## To-dos
 
-1. Smoke testing
-    1. For file watching in icon view
 1. Moving/Copying
 1. Views
     1. List view/Gallery view
