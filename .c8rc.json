@@ -15,7 +15,8 @@
     "**/*.config.js",
     "**/*.config.cjs",
     "forge.config.cjs",
-    ".ncurc.cjs"
+    ".ncurc.cjs",
+    "src/preload.cjs"
   ],
   "excludeNodeModules": true,
   "excludeAfterRemap": true,

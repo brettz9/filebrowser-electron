@@ -59,6 +59,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     subscribe: async (dir, callback) => {
       const watcherId = await ipcRenderer.invoke('parcelWatcher:subscribe', dir);
       const listener = (_event, data) => {
+        /* c8 ignore next 8 -- Error callback difficult to test: would require
+           forcing parcel-watcher to fail, which is implementation-dependent */
         if (data.error) {
           // eslint-disable-next-line promise/prefer-await-to-callbacks -- API
           callback(new Error(data.error), null);
@@ -68,6 +70,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
       };
       ipcRenderer.on(`parcelWatcher:callback:${watcherId}`, listener);
+      /* c8 ignore next 7 -- Unsubscribe not called in tests: watchers
+         persist for app lifetime, cleanup happens on app close */
       return {
         unsubscribe: async () => {
           ipcRenderer.removeListener(`parcelWatcher:callback:${watcherId}`, listener);

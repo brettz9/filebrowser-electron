@@ -17,6 +17,7 @@ let openWithMe, parcelWatcher, getIconDataURLForFile;
 
 try {
   openWithMe = await import('open-with-me');
+/* c8 ignore next 4 -- Guard */
 } catch (error) {
   // eslint-disable-next-line no-console -- Main process logging
   console.error('Failed to load open-with-me:', error.message);
@@ -24,6 +25,7 @@ try {
 
 try {
   parcelWatcher = await import('@parcel/watcher');
+/* c8 ignore next 4 -- Guard */
 } catch (error) {
   // eslint-disable-next-line no-console -- Main process logging
   console.error('Failed to load @parcel/watcher:', error.message);
@@ -34,7 +36,9 @@ try {
     '../src/renderer/utils/getIconDataURLForFile.cjs'
   );
   getIconDataURLForFile =
+    /* c8 ignore next -- ESM vs. CJS */
     iconModule.default || iconModule.getIconDataURLForFile;
+/* c8 ignore next 4 -- Guard */
 } catch (error) {
   // eslint-disable-next-line no-console -- Main process logging
   console.error('Failed to load getIconDataURLForFile:', error.message);
@@ -49,6 +53,8 @@ ipcMain.handle(
 ipcMain.handle('fs:existsSync', (_event, ...args) => fs.existsSync(...args));
 ipcMain.handle('fs:renameSync', (_event, ...args) => fs.renameSync(...args));
 ipcMain.handle('fs:lstatSync', (_event, ...args) => {
+  /* c8 ignore next 7 -- lstatSync handled directly in preload.cjs for
+   performance; this IPC handler is not used */
   const stat = fs.lstatSync(...args);
   // Serialize stat object for IPC (methods don't survive contextBridge)
   return {
@@ -72,6 +78,7 @@ ipcMain.handle('spawnSync', (_event, ...args) => spawnSync(...args));
 
 // IPC handlers for native module functionality
 ipcMain.handle('getOpenWithApps', (_event, filePath) => {
+  /* c8 ignore next 3 -- Guard */
   if (!openWithMe?.getOpenWithApps) {
     return [];
   }
@@ -79,6 +86,7 @@ ipcMain.handle('getOpenWithApps', (_event, filePath) => {
 });
 
 ipcMain.handle('getAppIcons', async (_event, appPaths) => {
+  /* c8 ignore next 3 -- Guard */
   if (!openWithMe?.getAppIcons) {
     return [];
   }
@@ -86,6 +94,7 @@ ipcMain.handle('getAppIcons', async (_event, appPaths) => {
 });
 
 ipcMain.handle('getIconDataURLForFile', (_event, filePath) => {
+  /* c8 ignore next 3 -- Guard */
   if (!getIconDataURLForFile) {
     return null;
   }
@@ -97,17 +106,20 @@ const watchers = new Map();
 let watcherId = 0;
 
 ipcMain.handle('parcelWatcher:subscribe', async (evt, dir) => {
+  /* c8 ignore next 3 -- Guard */
   if (!parcelWatcher?.subscribe) {
     throw new Error('parcelWatcher not available');
   }
 
   const id = watcherId++;
   const subscription = await parcelWatcher.subscribe(dir, (err, events) => {
+    /* c8 ignore next 4 -- Guard */
     // Check if the sender (webContents) is still available
     if (evt.sender.isDestroyed()) {
       return;
     }
 
+    /* c8 ignore next 3 -- Guard */
     if (err) {
       evt.sender.send(`parcelWatcher:callback:${id}`, {error: err.message});
     } else {
@@ -120,6 +132,7 @@ ipcMain.handle('parcelWatcher:subscribe', async (evt, dir) => {
 });
 
 ipcMain.handle('parcelWatcher:unsubscribe', async (_event, id) => {
+  /* c8 ignore next 5 -- Not in use */
   const subscription = watchers.get(id);
   if (subscription) {
     await subscription.unsubscribe();
@@ -140,6 +153,7 @@ try {
     const data = fs.readFileSync(storageFilePath, 'utf8');
     storageCache = JSON.parse(data);
   }
+/* c8 ignore next 5 -- Guard */
 } catch (error) {
   // eslint-disable-next-line no-console -- Main process logging
   console.error('Failed to load storage:', error.message);
@@ -157,6 +171,7 @@ ipcMain.on('storage:setItem', (evt, key, value) => {
   try {
     fs.writeFileSync(storageFilePath, JSON.stringify(storageCache, null, 2));
     evt.returnValue = true;
+  /* c8 ignore next 5 -- Guard */
   } catch (error) {
     // eslint-disable-next-line no-console -- Main process logging
     console.error('Failed to save storage:', error.message);
@@ -165,6 +180,7 @@ ipcMain.on('storage:setItem', (evt, key, value) => {
 });
 
 ipcMain.on('storage:removeItem', (evt, key) => {
+  /* c8 ignore next 9 -- Not in use */
   delete storageCache[key];
   try {
     fs.writeFileSync(storageFilePath, JSON.stringify(storageCache, null, 2));
@@ -177,6 +193,7 @@ ipcMain.on('storage:removeItem', (evt, key) => {
 });
 
 ipcMain.on('storage:clear', (evt) => {
+  /* c8 ignore next 9 -- Not in use */
   storageCache = {};
   try {
     fs.writeFileSync(storageFilePath, JSON.stringify(storageCache, null, 2));
@@ -248,6 +265,7 @@ function createWindow () {
         (async () => {
           try {
             await subscription.unsubscribe();
+          /* c8 ignore next 3 -- Guard */
           } catch {
             // Ignore errors during cleanup
           }

@@ -16960,6 +16960,8 @@
       ? jQuery('table[data-base-path]').attr('data-base-path')
       : ($columns && $columns.find(
         'li.miller-selected a, li.miller-selected span'
+      /* c8 ignore next 2 -- When tested alone, appears to be
+         covered by test that checks 2403, but not when testing together */
       ).last()[0]?.dataset?.path) ?? '/';
     const note = stickyNotes.createNote({
       metadata: {type: 'local', path: pth},

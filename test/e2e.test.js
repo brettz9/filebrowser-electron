@@ -749,6 +749,56 @@ describe('renderer', () => {
       await confirmBtn2.click();
       await page.waitForTimeout(300);
     });
+
+    test('covers lines 228, 2403: create sticky in icon view', async () => {
+      // Line 228: getBasePath() with no path param (returns '/')
+      // Line 2403: create-sticky button in icon view (not column view)
+
+      // Navigate to a URL with a path first
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/Users';
+      });
+      await page.waitForTimeout(500);
+
+      // Now set hash with params but without 'path' key
+      // This will cause params.has('path') to return false (line 228)
+      await page.evaluate(() => {
+        globalThis.location.hash = '#someOtherParam=value';
+      });
+      // This triggers hashchange which calls changePath() which calls
+      // getBasePath() where params.has('path') will be false (line 228)
+      await page.waitForTimeout(500);
+
+      // Verify we're in icon view (default view)
+      const iconViewBtn = await page.locator('#icon-view');
+      await iconViewBtn.click();
+      await page.waitForTimeout(300);
+
+      // Create a local sticky in icon view (covers line 2403 if branch)
+      const createButton = await page.locator('button#create-sticky');
+      await createButton.waitFor({state: 'visible', timeout: 5000});
+      await createButton.click();
+
+      const noteContent = await page.locator('.sticky-note-content').first();
+      await noteContent.waitFor({state: 'visible', timeout: 5000});
+
+      // Verify note was created
+      expect(noteContent).toBeVisible();
+
+      // Clean up
+      const deleteBtn = await page.locator(
+        '.sticky-note .sticky-note-btn[title="Delete note"]'
+      ).first();
+      await deleteBtn.waitFor({state: 'visible', timeout: 5000});
+      await deleteBtn.click();
+
+      const confirmBtn = await page.locator(
+        '.sticky-note-confirm-btn.sticky-note-confirm-btn-yes'
+      );
+      await confirmBtn.waitFor({state: 'visible', timeout: 5000});
+      await confirmBtn.click();
+      await page.waitForTimeout(300);
+    });
   });
 
   describe('column browser', () => {
