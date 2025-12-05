@@ -43,6 +43,7 @@ done
     1. Ideally would allow separate windows and tabs
 1. Preview/Editing Metadata/File
 
+1. Add undo history
 1. Demo with file handler web apps
 1. Build/set icon:
     <https://stackoverflow.com/questions/31529772/how-to-set-app-icon-for-electron-atom-shell-app>
