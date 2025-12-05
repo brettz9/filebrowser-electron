@@ -4,7 +4,7 @@
   "description": "A file browser",
   "author": "Brett Zamir",
   "contributors": [],
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "main": "src/main.js",
   "type": "module",
   "browserslist": [
