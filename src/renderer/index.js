@@ -468,6 +468,38 @@ function addItems (result, basePath, currentBasePath) {
       // @ts-expect-error Custom property
       iconViewTable._keydownListener = keydownListener;
 
+      // Add drop support for table background (empty space)
+      iconViewTable.addEventListener('dragover', (e) => {
+        // Only handle drops on the table itself or empty cells, not on items
+        const {target} = e;
+        const targetEl = /** @type {HTMLElement} */ (target);
+        if (targetEl === iconViewTable || targetEl.tagName === 'TR' ||
+            (targetEl.tagName === 'TD' &&
+             !targetEl.classList.contains('list-item'))) {
+          e.preventDefault();
+          if (e.dataTransfer) {
+            e.dataTransfer.dropEffect = e.altKey ? 'copy' : 'move';
+          }
+        }
+      });
+
+      iconViewTable.addEventListener('drop', (e) => {
+        const {target} = e;
+        const targetEl = /** @type {HTMLElement} */ (target);
+        // Only handle drops on the table itself or empty cells, not on items
+        if (targetEl === iconViewTable || targetEl.tagName === 'TR' ||
+            (targetEl.tagName === 'TD' &&
+             !targetEl.classList.contains('list-item'))) {
+          e.preventDefault();
+          const sourcePath = e.dataTransfer?.getData('text/plain');
+          /* c8 ignore next -- TS */
+          const targetDir = iconViewTable.dataset.basePath || '/';
+          if (sourcePath && targetDir) {
+            copyOrMoveItem(sourcePath, targetDir, e.altKey);
+          }
+        }
+      });
+
       // Focus the table for keyboard navigation
       requestAnimationFrame(() => {
         iconViewTable.focus();
@@ -934,6 +966,60 @@ function addItems (result, basePath, currentBasePath) {
       if (millerColumnsDiv) {
         millerColumnsDiv.setAttribute('tabindex', '0');
         millerColumnsDiv.focus();
+
+        // Add drop support for miller-columns background (empty space)
+        millerColumnsDiv.addEventListener('dragover', (e) => {
+          const {target} = e;
+          const targetEl = /** @type {HTMLElement} */ (target);
+          // Only handle drops on columns or empty space, not on list items
+          if (targetEl.classList.contains('miller-column') ||
+              targetEl === millerColumnsDiv) {
+            e.preventDefault();
+            if (e.dataTransfer) {
+              e.dataTransfer.dropEffect = e.altKey ? 'copy' : 'move';
+            }
+          }
+        });
+
+        millerColumnsDiv.addEventListener('drop', (e) => {
+          const {target} = e;
+          const targetEl = /** @type {HTMLElement} */ (target);
+          // Only handle drops on columns or empty space, not on list items
+          if (targetEl.classList.contains('miller-column') ||
+              targetEl === millerColumnsDiv) {
+            e.preventDefault();
+            const sourcePath = e.dataTransfer?.getData('text/plain');
+
+            // Determine target directory based on which column was clicked
+            let targetDir = getBasePath();
+            if (targetEl.classList.contains('miller-column')) {
+              // Find the selected item in the previous visible column
+              const columns = [
+                ...millerColumnsDiv.querySelectorAll('ul.miller-column')
+              ];
+              const visibleColumns = columns.filter(
+                (col) => !col.classList.contains('miller-collapse')
+              );
+              const columnIndex = visibleColumns.indexOf(targetEl);
+              if (columnIndex > 0) {
+                const prevColumn = visibleColumns[columnIndex - 1];
+                const selectedItem = prevColumn.querySelector(
+                  'li.miller-selected a'
+                );
+                if (selectedItem) {
+                  const selectedEl = /** @type {HTMLElement} */ (selectedItem);
+                  targetDir = selectedEl.dataset.path
+                    ? decodeURIComponent(selectedEl.dataset.path)
+                    : targetDir;
+                }
+              }
+            }
+
+            if (sourcePath && targetDir) {
+              copyOrMoveItem(sourcePath, targetDir, e.altKey);
+            }
+          }
+        });
 
         // Add keyboard shortcuts for miller columns
         const keydownListener = (e) => {
