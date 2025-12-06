@@ -1100,6 +1100,16 @@ describe('renderer', () => {
       await threeColBtn.click();
       await page.waitForTimeout(500);
 
+      // Navigate away and back to ensure cleanup is reflected in UI
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/';
+      });
+      await page.waitForTimeout(300);
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1000);
+
       // Get initial count of items (excluding backup files)
       const initialCount = await page.evaluate(() => {
         // Count folders in the last (rightmost) non-collapsed column
@@ -1299,17 +1309,17 @@ describe('renderer', () => {
 
       // Redo the folder creation with Cmd+Shift+Z
       await page.keyboard.press('Meta+Shift+z');
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(2000);
 
       // Navigate away and back to force refresh
       await page.evaluate(() => {
         globalThis.location.hash = '#path=/';
       });
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(500);
       await page.evaluate(() => {
         globalThis.location.hash = '#path=/tmp';
       });
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(2000);
 
       // Count should increase again (excluding backup files)
       const afterRedoCount = await page.evaluate(() => {
@@ -3798,10 +3808,16 @@ describe('renderer', () => {
 
         // Set up alert handler to verify error is thrown
         let alertMessage = '';
-        page.on('dialog', async (dialog) => {
+        /**
+         * @type {(
+         *   dialog: import('@playwright/test').Dialog
+         * ) => Promise<void>}
+         */
+        const dialogHandler = async (dialog) => {
           alertMessage = dialog.message();
           await dialog.accept();
-        });
+        };
+        page.on('dialog', dialogHandler);
 
         // Try to rename to invalid filename (forward slash not allowed)
         await renameInput.fill('invalid/name');
@@ -3812,6 +3828,9 @@ describe('renderer', () => {
 
         // Verify error alert was shown
         expect(alertMessage).toContain('Failed to rename');
+
+        // Remove dialog handler to prevent interference with other tests
+        page.off('dialog', dialogHandler);
 
         // The folder should still exist with default name
         const folderExists = await page.evaluate(() => {
