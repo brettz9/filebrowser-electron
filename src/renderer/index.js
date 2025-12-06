@@ -440,6 +440,18 @@ function addItems (result, basePath, currentBasePath) {
             }
           }
 
+        // Cmd+X to cut selected item
+        } else if (e.metaKey && e.key === 'x') {
+          const selectedRow = iconViewTable.querySelector('tr.selected');
+          if (selectedRow) {
+            e.preventDefault();
+            const selectedEl = /** @type {HTMLElement} */ (selectedRow);
+            const itemPath = selectedEl.dataset.path;
+            if (itemPath) {
+              setClipboard({path: itemPath, isCopy: false});
+            }
+          }
+
         // Cmd+V to paste (copy) to current directory
         } else if (e.metaKey && e.key === 'v' && getClipboard()) {
           e.preventDefault();
@@ -746,6 +758,10 @@ function addItems (result, basePath, currentBasePath) {
     } else if (e.metaKey && e.key === 'c' && pth) {
       e.preventDefault();
       setClipboard({path: pth, isCopy: true});
+    // Cmd+X to cut selected item
+    } else if (e.metaKey && e.key === 'x' && pth) {
+      e.preventDefault();
+      setClipboard({path: pth, isCopy: false});
     // Cmd+V to paste into selected folder
     } else if (e.metaKey && e.key === 'v' && getClipboard()) {
       e.preventDefault();
