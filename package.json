@@ -44,7 +44,7 @@
     "jquery": "^3.7.1",
     "jsdom": "^27.2.0",
     "load-stylesheets": "^0.13.0",
-    "miller-columns": "0.14.0",
+    "miller-columns": "0.15.0",
     "open-with-me": "^0.4.2",
     "stickynote": "^0.7.0",
     "system-icon2": "^0.5.1"
