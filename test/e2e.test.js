@@ -7241,4 +7241,505 @@ describe('renderer', () => {
       await expect(breadcrumbs).toBeVisible();
     });
   });
+
+  describe('Context Menu Cut/Copy/Paste', () => {
+    test('should cut and paste a file using context menu', async () => {
+      // Create a test file
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const testDir = path.join('/tmp', 'context-menu-test-dir');
+        const testFile = path.join(testDir, 'test-cut-file.txt');
+        fs.mkdirSync(testDir, {recursive: true});
+        fs.writeFileSync(testFile, 'test content');
+      });
+
+      // Switch to three-columns view and navigate
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp/context-menu-test-dir';
+      });
+      await page.waitForTimeout(1000);
+
+      // Wait for file to appear and right-click on it
+      const fileElement = page.locator(
+        'span[data-path="/tmp/context-menu-test-dir/test-cut-file.txt"]'
+      );
+      await fileElement.waitFor({state: 'visible', timeout: 5000});
+      await fileElement.click({button: 'right'});
+      await page.waitForTimeout(100);
+
+      // Click Cut from context menu
+      const cutMenuItem = page.locator('.context-menu-item', {hasText: 'Cut'});
+      await expect(cutMenuItem).toBeVisible();
+      await cutMenuItem.click();
+      await page.waitForTimeout(100);
+
+      // Navigate back to /tmp
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1000);
+
+      // Wait for folder to appear and right-click on it
+      await page.waitForFunction(() => {
+        return document.querySelectorAll(
+          'a[data-path="/tmp/context-menu-test-dir"]'
+        ).length > 0;
+      }, {timeout: 10000});
+
+      const folder = page.locator('a[data-path="/tmp/context-menu-test-dir"]');
+      await folder.click({button: 'right'});
+      await page.waitForTimeout(100);
+
+      const pasteMenuItem = page.locator(
+        '.context-menu-item',
+        {hasText: 'Paste'}
+      );
+      await expect(pasteMenuItem).toBeVisible();
+      await pasteMenuItem.click();
+      await page.waitForTimeout(500);
+
+      // Verify file still exists (moved to same location = no-op)
+      const fileExists = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        return fs.existsSync(
+          path.join('/tmp', 'context-menu-test-dir', 'test-cut-file.txt')
+        );
+      });
+      expect(fileExists).toBe(true);
+
+      // Cleanup
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        try {
+          fs.rmSync(
+            path.join('/tmp', 'context-menu-test-dir'),
+            {recursive: true, force: true}
+          );
+        } catch {}
+      });
+    });
+
+    test('should copy and paste a file using context menu', async () => {
+      // Create a test file and target directory
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const testFile = path.join('/tmp', 'test-copy-file.txt');
+        const targetDir = path.join('/tmp', 'copy-target-dir');
+        fs.writeFileSync(testFile, 'copy test content');
+        fs.mkdirSync(targetDir, {recursive: true});
+      });
+
+      // Switch to three-columns view and navigate
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1000);
+
+      // Right-click on the file to open context menu
+      const fileElement = page.locator(
+        'span[data-path="/tmp/test-copy-file.txt"]'
+      );
+      await fileElement.click({button: 'right'});
+      await page.waitForTimeout(100);
+
+      // Click Copy from context menu
+      const copyMenuItem = page.locator(
+        '.context-menu-item',
+        {hasText: 'Copy'}
+      );
+      await expect(copyMenuItem).toBeVisible();
+      await copyMenuItem.click();
+      await page.waitForTimeout(100);
+
+      // Right-click on target folder and paste
+      const targetFolder = page.locator(
+        'a[data-path="/tmp/copy-target-dir"]'
+      );
+      await targetFolder.click({button: 'right'});
+      await page.waitForTimeout(100);
+
+      const pasteMenuItem = page.locator(
+        '.context-menu-item',
+        {hasText: 'Paste'}
+      );
+      await expect(pasteMenuItem).toBeVisible();
+      await pasteMenuItem.click();
+      await page.waitForTimeout(500);
+
+      // Verify file was copied
+      const verification = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const copiedFile = path.join(
+          '/tmp',
+          'copy-target-dir',
+          'test-copy-file.txt'
+        );
+        const originalFile = path.join('/tmp', 'test-copy-file.txt');
+        return {
+          copiedExists: fs.existsSync(copiedFile),
+          originalExists: fs.existsSync(originalFile),
+          copiedContent: fs.existsSync(copiedFile)
+            ? fs.readFileSync(copiedFile, 'utf8')
+            : ''
+        };
+      });
+      expect(verification.copiedExists).toBe(true);
+      expect(verification.originalExists).toBe(true);
+      expect(verification.copiedContent).toBe('copy test content');
+
+      // Cleanup
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        try {
+          fs.rmSync(
+            path.join('/tmp', 'copy-target-dir'),
+            {recursive: true, force: true}
+          );
+          fs.unlinkSync(path.join('/tmp', 'test-copy-file.txt'));
+        } catch {}
+      });
+    });
+
+    test('should cut and paste a folder using context menu', async () => {
+      // Create test folders
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const sourceFolder = path.join('/tmp', 'source-folder');
+        const targetFolder = path.join('/tmp', 'target-folder');
+        const testFile = path.join(sourceFolder, 'nested-file.txt');
+        fs.mkdirSync(sourceFolder, {recursive: true});
+        fs.mkdirSync(targetFolder, {recursive: true});
+        fs.writeFileSync(testFile, 'nested content');
+      });
+
+      // Switch to three-columns view and navigate
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1000);
+
+      // Right-click on source folder
+      const sourceFolderElement = page.locator(
+        'a[data-path="/tmp/source-folder"]'
+      );
+      await sourceFolderElement.click({button: 'right'});
+      await page.waitForTimeout(100);
+
+      // Click Cut from context menu
+      const cutMenuItem = page.locator('.context-menu-item', {hasText: 'Cut'});
+      await expect(cutMenuItem).toBeVisible();
+      await cutMenuItem.click();
+      await page.waitForTimeout(100);
+
+      // Right-click on target folder and paste
+      const targetFolderElement = page.locator(
+        'a[data-path="/tmp/target-folder"]'
+      );
+      await targetFolderElement.click({button: 'right'});
+      await page.waitForTimeout(100);
+
+      const pasteMenuItem = page.locator(
+        '.context-menu-item',
+        {hasText: 'Paste'}
+      );
+      await expect(pasteMenuItem).toBeVisible();
+      await pasteMenuItem.click();
+      await page.waitForTimeout(500);
+
+      // Verify folder was moved
+      const verification = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const movedFolder = path.join(
+          '/tmp',
+          'target-folder',
+          'source-folder'
+        );
+        const movedFile = path.join(movedFolder, 'nested-file.txt');
+        const originalFolder = path.join('/tmp', 'source-folder');
+        return {
+          movedFolderExists: fs.existsSync(movedFolder),
+          movedFileExists: fs.existsSync(movedFile),
+          originalFolderExists: fs.existsSync(originalFolder),
+          movedContent: fs.existsSync(movedFile)
+            ? fs.readFileSync(movedFile, 'utf8')
+            : ''
+        };
+      });
+      expect(verification.movedFolderExists).toBe(true);
+      expect(verification.movedFileExists).toBe(true);
+      expect(verification.originalFolderExists).toBe(false);
+      expect(verification.movedContent).toBe('nested content');
+
+      // Cleanup
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        try {
+          fs.rmSync(
+            path.join('/tmp', 'target-folder'),
+            {recursive: true, force: true}
+          );
+        } catch {}
+      });
+    });
+
+    test(
+      'should show paste option only when clipboard has content',
+      async () => {
+        // Switch to three-columns view
+        await page.locator('#three-columns').click();
+        await page.waitForTimeout(500);
+
+        await page.evaluate(() => {
+          globalThis.location.hash = '#path=/tmp';
+        });
+        await page.waitForTimeout(1000);
+
+        // Right-click on empty area - should not show Paste
+        // (no clipboard content)
+        const emptyArea = page.locator('.miller-columns').first();
+        await emptyArea.click(
+          {button: 'right', position: {x: 200, y: 200}}
+        );
+        await page.waitForTimeout(100);
+
+        // Paste should not be visible initially
+        let pasteMenuItem = page.locator(
+          '.context-menu-item',
+          {hasText: 'Paste'}
+        );
+        await expect(pasteMenuItem).not.toBeVisible();
+
+        // Close context menu
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(100);
+
+        // Create and copy a file
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available
+          const {fs, path} = globalThis.electronAPI;
+          const testFile = path.join('/tmp', 'clipboard-test-file.txt');
+          fs.writeFileSync(testFile, 'clipboard test');
+        });
+        await page.reload();
+        await page.waitForTimeout(500);
+
+        await page.locator('#three-columns').click();
+        await page.waitForTimeout(500);
+
+        await page.evaluate(() => {
+          globalThis.location.hash = '#path=/tmp';
+        });
+        await page.waitForTimeout(1000);
+
+        // Copy the file
+        const fileElement = page.locator(
+          'span[data-path="/tmp/clipboard-test-file.txt"]'
+        );
+        await fileElement.click({button: 'right'});
+        await page.waitForTimeout(100);
+
+        const copyMenuItem = page.locator(
+          '.context-menu-item',
+          {hasText: 'Copy'}
+        );
+        await copyMenuItem.click();
+        await page.waitForTimeout(100);
+
+        // Right-click on empty area again - should now show Paste
+        await emptyArea.click(
+          {button: 'right', position: {x: 200, y: 200}}
+        );
+        await page.waitForTimeout(100);
+
+        pasteMenuItem = page.locator(
+          '.context-menu-item',
+          {hasText: 'Paste'}
+        );
+        await expect(pasteMenuItem).toBeVisible();
+
+        // Cleanup
+        await page.keyboard.press('Escape');
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available
+          const {fs, path} = globalThis.electronAPI;
+          try {
+            fs.unlinkSync(path.join('/tmp', 'clipboard-test-file.txt'));
+          } catch {}
+        });
+      }
+    );
+
+    test('should paste into folder from empty area context menu', async () => {
+      // Create test file and target folder
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const testFile = path.join('/tmp', 'paste-empty-area-file.txt');
+        const targetFolder = path.join('/tmp', 'paste-empty-target');
+        fs.writeFileSync(testFile, 'empty area paste test');
+        fs.mkdirSync(targetFolder, {recursive: true});
+      });
+
+      // Switch to three-columns view and navigate
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1000);
+
+      // Copy the file
+      const fileElement = page.locator(
+        'span[data-path="/tmp/paste-empty-area-file.txt"]'
+      );
+      await fileElement.click({button: 'right'});
+      await page.waitForTimeout(100);
+
+      const copyMenuItem = page.locator(
+        '.context-menu-item',
+        {hasText: 'Copy'}
+      );
+      await copyMenuItem.click();
+      await page.waitForTimeout(100);
+
+      // Right-click on the target folder itself (not navigate into it)
+      const targetFolder = page.locator(
+        'a[data-path="/tmp/paste-empty-target"]'
+      );
+      await targetFolder.click({button: 'right'});
+      await page.waitForTimeout(200);
+
+      const pasteMenuItem = page.locator(
+        '.context-menu-item',
+        {hasText: 'Paste'}
+      );
+      await expect(pasteMenuItem).toBeVisible();
+      await pasteMenuItem.click();
+      await page.waitForTimeout(1000);
+
+      // Verify file was copied into target folder
+      const verification = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const copiedFile = path.join(
+          '/tmp',
+          'paste-empty-target',
+          'paste-empty-area-file.txt'
+        );
+        return {
+          exists: fs.existsSync(copiedFile),
+          content: fs.existsSync(copiedFile)
+            ? fs.readFileSync(copiedFile, 'utf8')
+            : ''
+        };
+      });
+      expect(verification.exists).toBe(true);
+      expect(verification.content).toBe('empty area paste test');
+
+      // Cleanup
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        try {
+          fs.rmSync(
+            path.join('/tmp', 'paste-empty-target'),
+            {recursive: true, force: true}
+          );
+          fs.unlinkSync(path.join('/tmp', 'paste-empty-area-file.txt'));
+        } catch {}
+      });
+    });
+
+    test('should work with keyboard shortcuts interchangeably', async () => {
+      // Create test file and target folder
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const testFile = path.join('/tmp', 'keyboard-context-file.txt');
+        const targetFolder = path.join('/tmp', 'keyboard-context-target');
+        fs.writeFileSync(testFile, 'keyboard context test');
+        fs.mkdirSync(targetFolder, {recursive: true});
+      });
+
+      // Switch to three-columns view and navigate
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1000);
+
+      // Copy using keyboard shortcut
+      const fileElement = page.locator(
+        'span[data-path="/tmp/keyboard-context-file.txt"]'
+      );
+      await fileElement.click();
+      await page.waitForTimeout(100);
+      await page.keyboard.press('Meta+c');
+      await page.waitForTimeout(100);
+
+      // Paste using context menu
+      const targetFolderElement = page.locator(
+        'a[data-path="/tmp/keyboard-context-target"]'
+      );
+      await targetFolderElement.click({button: 'right'});
+      await page.waitForTimeout(100);
+
+      const pasteMenuItem = page.locator(
+        '.context-menu-item',
+        {hasText: 'Paste'}
+      );
+      await expect(pasteMenuItem).toBeVisible();
+      await pasteMenuItem.click();
+      await page.waitForTimeout(500);
+
+      // Verify file was copied
+      const verification = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const copiedFile = path.join(
+          '/tmp',
+          'keyboard-context-target',
+          'keyboard-context-file.txt'
+        );
+        return {
+          exists: fs.existsSync(copiedFile)
+        };
+      });
+      expect(verification.exists).toBe(true);
+
+      // Cleanup
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        try {
+          fs.rmSync(
+            path.join('/tmp', 'keyboard-context-target'),
+            {recursive: true, force: true}
+          );
+          fs.unlinkSync(path.join('/tmp', 'keyboard-context-file.txt'));
+        } catch {}
+      });
+    });
+  });
 });

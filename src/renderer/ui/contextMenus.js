@@ -29,7 +29,8 @@ export function showFolderContextMenu (
   {
     jml, jQuery, path, shell, existsSync, writeFileSync,
     decodeURIComponentFn, encodeURIComponentFn,
-    changePath, startRename, deleteItem
+    changePath, startRename, deleteItem,
+    getClipboard, setClipboard, copyOrMoveItem
   },
   e
 ) {
@@ -58,6 +59,43 @@ export function showFolderContextMenu (
     }, [
       'Open in Finder'
     ]],
+    ['li', {
+      class: 'context-menu-item',
+      $on: {
+        click () {
+          customContextMenu.style.display = 'none';
+          setClipboard({path: pth, isCopy: false});
+        }
+      }
+    }, [
+      'Cut'
+    ]],
+    ['li', {
+      class: 'context-menu-item',
+      $on: {
+        click () {
+          customContextMenu.style.display = 'none';
+          setClipboard({path: pth, isCopy: true});
+        }
+      }
+    }, [
+      'Copy'
+    ]],
+    ...(getClipboard() ? [['li', {
+      class: 'context-menu-item',
+      $on: {
+        click () {
+          customContextMenu.style.display = 'none';
+          const clip = getClipboard();
+          if (clip) {
+            const targetDir = decodeURIComponentFn(pth);
+            copyOrMoveItem(clip.path, targetDir, clip.isCopy);
+          }
+        }
+      }
+    }, [
+      'Paste'
+    ]]] : []),
     ['li', {
       class: 'context-menu-item',
       $on: {
@@ -270,7 +308,8 @@ export function showFolderContextMenu (
 export async function showFileContextMenu (
   {
     jml, shell, spawnSync, getOpenWithApps, getAppIcons,
-    startRename, deleteItem
+    startRename, deleteItem,
+    getClipboard, setClipboard, copyOrMoveItem, path: pathModule
   },
   e
 ) {
@@ -342,6 +381,43 @@ export async function showFileContextMenu (
         })
       ]]
     ]],
+    ['li', {
+      class: 'context-menu-item',
+      $on: {
+        click () {
+          customContextMenu.style.display = 'none';
+          setClipboard({path: pth, isCopy: false});
+        }
+      }
+    }, [
+      'Cut'
+    ]],
+    ['li', {
+      class: 'context-menu-item',
+      $on: {
+        click () {
+          customContextMenu.style.display = 'none';
+          setClipboard({path: pth, isCopy: true});
+        }
+      }
+    }, [
+      'Copy'
+    ]],
+    ...(getClipboard() ? [['li', {
+      class: 'context-menu-item',
+      $on: {
+        click () {
+          customContextMenu.style.display = 'none';
+          const clip = getClipboard();
+          if (clip) {
+            const targetDir = pathModule.dirname(pth);
+            copyOrMoveItem(clip.path, targetDir, clip.isCopy);
+          }
+        }
+      }
+    }, [
+      'Paste'
+    ]]] : []),
     ['li', {
       class: 'context-menu-item',
       $on: {

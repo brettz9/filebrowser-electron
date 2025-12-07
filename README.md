@@ -43,7 +43,9 @@ done
 - **Rename**: Rename files and folders in place
 - **Copy/Move**:
   - Drag-and-drop files/folders (hold **Option/Alt** key to copy instead of move)
-  - Keyboard shortcuts: **Cmd+C** to copy, **Cmd+V** to paste
+  - Keyboard shortcuts: **Cmd+C** to copy, **Cmd+X** to cut, **Cmd+V** to paste
+  - Context menu: Right-click on files/folders for Cut, Copy, and Paste options
+  - Replace confirmation: When pasting to a location with an existing file/folder of the same name, you'll be prompted to replace or cancel
 
 ### Undo/Redo
 - **Cmd+Z**: Undo the last file operation (create, delete, rename, move, or copy)
@@ -88,9 +90,7 @@ done
 
 ## Misc. bugs
 
-1. After deleting an external file, prompting a refresh, let the scroll be back
-    to the exact coordinates as before if that is in the viewport
-1. Ensure cut/copy-paste in context menu
+1. After deleting an external file, prompting a refresh, the scroll should be back to the exact coordinates as before if that is in the viewport
 1. Stickies
     1. Fix icon view and local sticky note creation at root
     1. Fix column view and local sticky note creation at root

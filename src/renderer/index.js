@@ -445,7 +445,10 @@ function addItems (result, basePath, currentBasePath) {
         encodeURIComponentFn: encodeURIComponent,
         changePath,
         startRename,
-        deleteItem
+        deleteItem,
+        getClipboard,
+        setClipboard,
+        copyOrMoveItem
       },
       e
     );
@@ -463,7 +466,11 @@ function addItems (result, basePath, currentBasePath) {
         getOpenWithApps,
         getAppIcons,
         startRename,
-        deleteItem
+        deleteItem,
+        getClipboard,
+        setClipboard,
+        copyOrMoveItem,
+        path
       },
       e
     );
@@ -1071,7 +1078,23 @@ function addItems (result, basePath, currentBasePath) {
         }
       }, [
         'Create new folder'
-      ]]
+      ]],
+      ...(getClipboard()
+        ? [['li', {
+          class: 'context-menu-item',
+          $on: {
+            click () {
+              customContextMenu.remove();
+              const clip = getClipboard();
+              if (clip) {
+                copyOrMoveItem(clip.path, folderPath, clip.isCopy);
+              }
+            }
+          }
+        }, [
+          'Paste'
+        ]]]
+        : [])
     ], document.body);
 
     // Ensure main context menu is visible within viewport

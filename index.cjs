@@ -16468,7 +16468,8 @@
 	  {
 	    jml, jQuery, path, shell, existsSync, writeFileSync,
 	    decodeURIComponentFn, encodeURIComponentFn,
-	    changePath, startRename, deleteItem
+	    changePath, startRename, deleteItem,
+	    getClipboard, setClipboard, copyOrMoveItem
 	  },
 	  e
 	) {
@@ -16497,6 +16498,43 @@
 	    }, [
 	      'Open in Finder'
 	    ]],
+	    ['li', {
+	      class: 'context-menu-item',
+	      $on: {
+	        click () {
+	          customContextMenu.style.display = 'none';
+	          setClipboard({path: pth, isCopy: false});
+	        }
+	      }
+	    }, [
+	      'Cut'
+	    ]],
+	    ['li', {
+	      class: 'context-menu-item',
+	      $on: {
+	        click () {
+	          customContextMenu.style.display = 'none';
+	          setClipboard({path: pth, isCopy: true});
+	        }
+	      }
+	    }, [
+	      'Copy'
+	    ]],
+	    ...(getClipboard() ? [['li', {
+	      class: 'context-menu-item',
+	      $on: {
+	        click () {
+	          customContextMenu.style.display = 'none';
+	          const clip = getClipboard();
+	          if (clip) {
+	            const targetDir = decodeURIComponentFn(pth);
+	            copyOrMoveItem(clip.path, targetDir, clip.isCopy);
+	          }
+	        }
+	      }
+	    }, [
+	      'Paste'
+	    ]]] : []),
 	    ['li', {
 	      class: 'context-menu-item',
 	      $on: {
@@ -16709,7 +16747,8 @@
 	async function showFileContextMenu (
 	  {
 	    jml, shell, spawnSync, getOpenWithApps, getAppIcons,
-	    startRename, deleteItem
+	    startRename, deleteItem,
+	    getClipboard, setClipboard, copyOrMoveItem, path: pathModule
 	  },
 	  e
 	) {
@@ -16781,6 +16820,43 @@
 	        })
 	      ]]
 	    ]],
+	    ['li', {
+	      class: 'context-menu-item',
+	      $on: {
+	        click () {
+	          customContextMenu.style.display = 'none';
+	          setClipboard({path: pth, isCopy: false});
+	        }
+	      }
+	    }, [
+	      'Cut'
+	    ]],
+	    ['li', {
+	      class: 'context-menu-item',
+	      $on: {
+	        click () {
+	          customContextMenu.style.display = 'none';
+	          setClipboard({path: pth, isCopy: true});
+	        }
+	      }
+	    }, [
+	      'Copy'
+	    ]],
+	    ...(getClipboard() ? [['li', {
+	      class: 'context-menu-item',
+	      $on: {
+	        click () {
+	          customContextMenu.style.display = 'none';
+	          const clip = getClipboard();
+	          if (clip) {
+	            const targetDir = pathModule.dirname(pth);
+	            copyOrMoveItem(clip.path, targetDir, clip.isCopy);
+	          }
+	        }
+	      }
+	    }, [
+	      'Paste'
+	    ]]] : []),
 	    ['li', {
 	      class: 'context-menu-item',
 	      $on: {
@@ -17396,7 +17472,10 @@
 	        encodeURIComponentFn: encodeURIComponent,
 	        changePath,
 	        startRename: startRename$1,
-	        deleteItem: deleteItem$1
+	        deleteItem: deleteItem$1,
+	        getClipboard,
+	        setClipboard,
+	        copyOrMoveItem: copyOrMoveItem$1
 	      },
 	      e
 	    );
@@ -17414,7 +17493,11 @@
 	        getOpenWithApps,
 	        getAppIcons,
 	        startRename: startRename$1,
-	        deleteItem: deleteItem$1
+	        deleteItem: deleteItem$1,
+	        getClipboard,
+	        setClipboard,
+	        copyOrMoveItem: copyOrMoveItem$1,
+	        path
 	      },
 	      e
 	    );
@@ -18022,7 +18105,23 @@
 	        }
 	      }, [
 	        'Create new folder'
-	      ]]
+	      ]],
+	      ...(getClipboard()
+	        ? [['li', {
+	          class: 'context-menu-item',
+	          $on: {
+	            click () {
+	              customContextMenu.remove();
+	              const clip = getClipboard();
+	              if (clip) {
+	                copyOrMoveItem$1(clip.path, folderPath, clip.isCopy);
+	              }
+	            }
+	          }
+	        }, [
+	          'Paste'
+	        ]]]
+	        : [])
 	    ], document.body);
 
 	    // Ensure main context menu is visible within viewport
