@@ -16880,6 +16880,64 @@
 	  changePath();
 	});
 
+	// Track if a drag is in progress and the dragged element
+	let isDragging = false;
+	let currentDraggedElement = null;
+	let escapeUsedForDragCancel = false;
+	let mouseIsDown = false;
+
+	// Track mouse button state globally
+	document.addEventListener('mousedown', () => {
+	  mouseIsDown = true;
+	}, true);
+
+	document.addEventListener('mouseup', () => {
+	  mouseIsDown = false;
+	  // Reset escape flag when mouse is released
+	  escapeUsedForDragCancel = false;
+	}, true);
+
+	// Set up escape key handler EARLY to ensure it runs before miller-columns
+	document.addEventListener('keydown', (e) => {
+	  if (e.key === 'Escape' && isDragging) {
+	    e.preventDefault();
+	    e.stopPropagation();
+	    e.stopImmediatePropagation();
+	    escapeUsedForDragCancel = true;
+	    // Setting dropEffect to 'none' cancels the drag
+	    if (currentDraggedElement) {
+	      // Trigger dragend by removing draggable temporarily
+	      currentDraggedElement.setAttribute('draggable', 'false');
+	      setTimeout(() => {
+	        if (currentDraggedElement) {
+	          currentDraggedElement.setAttribute('draggable', 'true');
+	        }
+	      }, 0);
+	    }
+	    isDragging = false;
+	    currentDraggedElement = null;
+	    // Clean up any drag-over highlights
+	    document.querySelectorAll('.drag-over').forEach((elem) => {
+	      elem.classList.remove('drag-over');
+	    });
+	    return;
+	  }
+
+	  // Block Escape if used for drag cancel OR if mouse is still down
+	  if (e.key === 'Escape' && (escapeUsedForDragCancel || mouseIsDown)) {
+	    e.preventDefault();
+	    e.stopPropagation();
+	    e.stopImmediatePropagation();
+	  }
+	}, true); // Use capture phase to run before other handlers
+
+	// Reset escape flag when key released (but keep blocking if mouse down)
+	document.addEventListener('keyup', (e) => {
+	  if (e.key === 'Escape' && !mouseIsDown) {
+	    escapeUsedForDragCancel = false;
+	  }
+	}, true);
+
 	/**
 	 * Add drag-and-drop support to an element.
 	 * @param {HTMLElement} element - The element to make draggable
@@ -16892,10 +16950,21 @@
 	  element.setAttribute('draggable', 'true');
 
 	  element.addEventListener('dragstart', (e) => {
+	    isDragging = true;
+	    currentDraggedElement = element;
 	    if (e.dataTransfer) {
 	      e.dataTransfer.effectAllowed = 'copyMove';
 	      e.dataTransfer.setData('text/plain', itemPath);
 	    }
+	  });
+
+	  element.addEventListener('dragend', () => {
+	    isDragging = false;
+	    currentDraggedElement = null;
+	    // Clean up any lingering drag-over classes
+	    document.querySelectorAll('.drag-over').forEach((el) => {
+	      el.classList.remove('drag-over');
+	    });
 	  });
 
 	  // Only allow drop on folders
@@ -17924,6 +17993,7 @@
 	    performRedo();
 	  }
 	});
+
 
 	$('#icon-view').addEventListener('click', function () {
 	  $$('nav button').forEach((button) => {
