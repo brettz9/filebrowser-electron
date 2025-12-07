@@ -87,8 +87,6 @@ done
 
 ## Misc. bugs
 
-1. Allow navigating into folders during drag-and-drop
-
 1. Allow paste of untitled folder to increment untitled folder copy, etc.
 1. After deleting an external file, prompting a refresh, let the scroll be back
     to the exact coordinates as before if that is in the viewport

@@ -6741,5 +6741,289 @@ describe('renderer', () => {
       }, testDir);
     });
   });
+
+  describe('Drag and Drop - Hover to Open', () => {
+    test(
+      'hovering over folder during drag opens it after 1 second',
+      async () => {
+        await page.locator('#three-columns').click();
+
+        // Create nested folder structure
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          const {path} = globalThis.electronAPI;
+          // @ts-expect-error - electronAPI available via preload
+          const {mkdirSync, writeFileSync} = globalThis.electronAPI.fs;
+          const testDir = path.join('/tmp', 'test-hover-open');
+          try {
+            mkdirSync(testDir);
+            writeFileSync(
+              path.join(testDir, 'draggable-file.txt'),
+              'content'
+            );
+            mkdirSync(path.join(testDir, 'target-folder'));
+            mkdirSync(path.join(testDir, 'target-folder', 'subfolder'));
+          } catch {
+            // Ignore if already exists
+          }
+        });
+
+        const testDir = '/tmp/test-hover-open';
+
+        // Navigate to test directory
+        await page.evaluate((dir) => {
+          globalThis.location.hash = `#path=${encodeURIComponent(dir)}`;
+        }, testDir);
+
+        await page.waitForTimeout(500);
+
+        // Get initial path
+        const pathBefore = await page.evaluate(() => {
+          return globalThis.location.hash;
+        });
+
+        expect(pathBefore).toContain('test-hover-open');
+        expect(pathBefore).not.toContain('target-folder');
+
+        // Simulate drag by dispatching dragover event directly
+        const result = await page.evaluate(() => {
+          const targetFolder = document.querySelector(
+            'a[data-path*="target-folder"]'
+          );
+          if (!targetFolder) return {error: 'target not found'};
+
+          const parent = targetFolder.closest('.list-item');
+          if (!parent) return {error: 'parent not found'};
+
+          // Simulate dragover event
+          const dragEvent = new DragEvent('dragover', {
+            bubbles: true,
+            cancelable: true,
+            dataTransfer: new DataTransfer()
+          });
+
+          parent.dispatchEvent(dragEvent);
+
+          return {success: true};
+        });
+
+        expect(result).toEqual({success: true});
+
+        // Wait for hover-to-open timer (1 second + buffer)
+        await page.waitForTimeout(1200);
+
+        // Check that we navigated into the folder
+        const pathAfter = await page.evaluate(() => {
+          return globalThis.location.hash;
+        });
+
+        expect(pathAfter).toContain('target-folder');
+
+        // Cleanup
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          const {rmSync} = globalThis.electronAPI.fs;
+          try {
+            rmSync('/tmp/test-hover-open', {recursive: true, force: true});
+          } catch {
+            // Ignore
+          }
+        });
+      }
+    );
+
+    test(
+      'moving away from folder before timer cancels auto-open',
+      async () => {
+        await page.locator('#three-columns').click();
+
+        // Create test structure
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          const {path} = globalThis.electronAPI;
+          // @ts-expect-error - electronAPI available via preload
+          const {mkdirSync, writeFileSync} = globalThis.electronAPI.fs;
+          const testDir = path.join('/tmp', 'test-hover-cancel');
+          try {
+            mkdirSync(testDir);
+            writeFileSync(
+              path.join(testDir, 'test-file.txt'),
+              'content'
+            );
+            mkdirSync(path.join(testDir, 'folder1'));
+            mkdirSync(path.join(testDir, 'folder2'));
+          } catch {
+            // Ignore if already exists
+          }
+        });
+
+        const testDir = '/tmp/test-hover-cancel';
+
+        // Navigate to test directory
+        await page.evaluate((dir) => {
+          globalThis.location.hash = `#path=${encodeURIComponent(dir)}`;
+        }, testDir);
+
+        await page.waitForTimeout(500);
+
+        // Get initial path
+        const pathBefore = await page.evaluate(() => {
+          return globalThis.location.hash;
+        });
+
+        // Simulate dragging - dispatch dragover on folder1, wait briefly,
+        // then dispatch dragleave and dragover on folder2
+        await page.evaluate(() => {
+          const folder1 = document.querySelector(
+            'a[data-path*="folder1"]'
+          )?.closest('.list-item');
+          const folder2 = document.querySelector(
+            'a[data-path*="folder2"]'
+          )?.closest('.list-item');
+
+          if (!folder1 || !folder2) return;
+
+          // Start hovering over folder1
+          const dragEvent1 = new DragEvent('dragover', {
+            bubbles: true,
+            cancelable: true,
+            dataTransfer: new DataTransfer()
+          });
+          folder1.dispatchEvent(dragEvent1);
+
+          // After 500ms, leave folder1 and enter folder2
+          setTimeout(() => {
+            const leaveEvent = new DragEvent('dragleave', {
+              bubbles: true,
+              cancelable: true,
+              dataTransfer: new DataTransfer(),
+              clientX: 0,
+              clientY: 0
+            });
+            folder1.dispatchEvent(leaveEvent);
+
+            const dragEvent2 = new DragEvent('dragover', {
+              bubbles: true,
+              cancelable: true,
+              dataTransfer: new DataTransfer()
+            });
+            folder2.dispatchEvent(dragEvent2);
+          }, 500);
+        });
+
+        // Wait only 900ms total (500ms on folder1, 400ms on folder2)
+        // Not enough for either to open (need 1000ms each)
+        await page.waitForTimeout(900);
+
+        // Check that we did NOT navigate into any folder
+        const pathAfter = await page.evaluate(() => {
+          return globalThis.location.hash;
+        });
+
+        expect(pathAfter).toBe(pathBefore);
+        expect(pathAfter).not.toContain('folder1');
+        expect(pathAfter).not.toContain('folder2');
+
+        // Cleanup
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          const {rmSync} = globalThis.electronAPI.fs;
+          try {
+            rmSync('/tmp/test-hover-cancel', {recursive: true, force: true});
+          } catch {
+            // Ignore
+          }
+        });
+      }
+    );
+
+    test(
+      'hover-to-open works in icon view',
+      async () => {
+        await page.locator('#icon-view').click();
+
+        // Create nested folder structure
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          const {path} = globalThis.electronAPI;
+          // @ts-expect-error - electronAPI available via preload
+          const {mkdirSync, writeFileSync} = globalThis.electronAPI.fs;
+          const testDir = path.join('/tmp', 'test-hover-icon');
+          try {
+            mkdirSync(testDir);
+            writeFileSync(
+              path.join(testDir, 'file.txt'),
+              'content'
+            );
+            mkdirSync(path.join(testDir, 'target'));
+          } catch {
+            // Ignore if already exists
+          }
+        });
+
+        const testDir = '/tmp/test-hover-icon';
+
+        // Navigate to test directory
+        await page.evaluate((dir) => {
+          globalThis.location.hash = `#path=${encodeURIComponent(dir)}`;
+        }, testDir);
+
+        await page.waitForTimeout(500);
+
+        // Get initial path
+        const pathBefore = await page.evaluate(() => {
+          return globalThis.location.hash;
+        });
+
+        expect(pathBefore).not.toContain('/target');
+
+        // Simulate drag by dispatching dragover event on the target cell
+        const result = await page.evaluate(() => {
+          const targetCell = Array.from(
+            document.querySelectorAll('td.list-item')
+          ).find((cell) => {
+            const link = cell.querySelector('a[data-path*="target"]');
+            return link !== null;
+          });
+
+          if (!targetCell) return {error: 'target not found'};
+
+          // Simulate dragover event
+          const dragEvent = new DragEvent('dragover', {
+            bubbles: true,
+            cancelable: true,
+            dataTransfer: new DataTransfer()
+          });
+
+          targetCell.dispatchEvent(dragEvent);
+
+          return {success: true};
+        });
+
+        expect(result).toEqual({success: true});
+
+        // Wait for hover-to-open timer
+        await page.waitForTimeout(1200);
+
+        // Check that we navigated into the folder
+        const pathAfter = await page.evaluate(() => {
+          return globalThis.location.hash;
+        });
+
+        expect(pathAfter).toContain('target');
+
+        // Cleanup
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          const {rmSync} = globalThis.electronAPI.fs;
+          try {
+            rmSync('/tmp/test-hover-icon', {recursive: true, force: true});
+          } catch {
+            // Ignore
+          }
+        });
+      }
+    );
+  });
 });
 

@@ -74,6 +74,8 @@ let isDragging = false;
 let currentDraggedElement = null;
 let escapeUsedForDragCancel = false;
 let mouseIsDown = false;
+let hoverOpenTimer = null;
+let currentHoverTarget = null;
 
 // Track mouse button state globally
 document.addEventListener('mousedown', () => {
@@ -154,6 +156,12 @@ function addDragAndDropSupport (element, itemPath, isFolder) {
     document.querySelectorAll('.drag-over').forEach((el) => {
       el.classList.remove('drag-over');
     });
+    // Clear hover-to-open timer
+    if (hoverOpenTimer) {
+      clearTimeout(hoverOpenTimer);
+      hoverOpenTimer = null;
+    }
+    currentHoverTarget = null;
   });
 
   // Only allow drop on folders
@@ -166,6 +174,25 @@ function addDragAndDropSupport (element, itemPath, isFolder) {
       if (e.dataTransfer) {
         e.dataTransfer.dropEffect = e.altKey ? 'copy' : 'move';
       }
+
+      // Set up hover-to-open timer if not already hovering over this target
+      if (currentHoverTarget !== dropTarget) {
+        // Clear any existing timer
+        if (hoverOpenTimer) {
+          clearTimeout(hoverOpenTimer);
+        }
+
+        currentHoverTarget = dropTarget;
+
+        // Set timer to open folder after 1 second of hovering
+        hoverOpenTimer = setTimeout(() => {
+          // Navigate into the folder
+          const decodedPath = decodeURIComponent(itemPath);
+          globalThis.location.hash = `#path=${encodeURIComponent(
+            decodedPath
+          )}`;
+        }, 1000);
+      }
     });
 
     dropTarget.addEventListener('dragleave', (e) => {
@@ -176,6 +203,15 @@ function addDragAndDropSupport (element, itemPath, isFolder) {
       if (x < rect.left || x >= rect.right ||
           y < rect.top || y >= rect.bottom) {
         dropTarget.classList.remove('drag-over');
+
+        // Clear hover-to-open timer when leaving
+        if (currentHoverTarget === dropTarget) {
+          if (hoverOpenTimer) {
+            clearTimeout(hoverOpenTimer);
+            hoverOpenTimer = null;
+          }
+          currentHoverTarget = null;
+        }
       }
     });
 
@@ -183,6 +219,14 @@ function addDragAndDropSupport (element, itemPath, isFolder) {
       e.preventDefault();
       e.stopPropagation(); // Prevent bubbling to parent drop handlers
       dropTarget.classList.remove('drag-over');
+
+      // Clear hover-to-open timer on drop
+      if (hoverOpenTimer) {
+        clearTimeout(hoverOpenTimer);
+        hoverOpenTimer = null;
+      }
+      currentHoverTarget = null;
+
       const sourcePath = e.dataTransfer?.getData('text/plain');
       const targetPath = itemPath;
       if (sourcePath && targetPath) {
