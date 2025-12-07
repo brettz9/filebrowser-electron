@@ -17194,6 +17194,52 @@
 	  }
 	}
 
+	/**
+	 * Update breadcrumbs for navigation.
+	 * @param {string} currentPath - The current path to display
+	 * @returns {void}
+	 */
+	function updateBreadcrumbs (currentPath) {
+	  const breadcrumbsDiv = $('.miller-breadcrumbs');
+	  if (!breadcrumbsDiv) {
+	    return;
+	  }
+
+	  // Clear existing breadcrumbs
+	  breadcrumbsDiv.innerHTML = '';
+
+	  // Split path into segments
+	  const segments = currentPath === '/'
+	    ? []
+	    : currentPath.split('/').filter(Boolean);
+
+	  // Create root breadcrumb
+	  jmlExports.jml('span', {
+	    class: 'miller-breadcrumb miller-breadcrumb-root',
+	    $on: {
+	      click () {
+	        globalThis.location.hash = '#path=/';
+	      }
+	    }
+	  }, ['/'], breadcrumbsDiv);
+
+	  // Create breadcrumb for each segment
+	  let accumulatedPath = '';
+	  segments.forEach((segment) => {
+	    accumulatedPath += '/' + segment;
+	    const segmentPath = accumulatedPath;
+	    jmlExports.jml('span', {
+	      class: 'miller-breadcrumb',
+	      $on: {
+	        click () {
+	          globalThis.location.hash =
+	            `#path=${encodeURIComponent(segmentPath)}`;
+	        }
+	      }
+	    }, [decodeURIComponent(segment)], breadcrumbsDiv);
+	  });
+	}
+
 
 	/**
 	 *
@@ -17479,6 +17525,9 @@
 	  }
 
 	  if (view === 'icon-view') {
+	    // Update breadcrumbs for icon view
+	    updateBreadcrumbs(currentBasePath);
+
 	    // Add keyboard support for icon-view
 	    const iconViewTable = $('table[data-base-path]');
 	    if (iconViewTable) {
@@ -17600,6 +17649,7 @@
 	  const parentMap = new WeakMap();
 	  const childMap = new WeakMap();
 	  const columnsInstance = millerColumns.millerColumns({
+	    breadcrumbRoot: '/',
 	    // Options:
 	    // preview () {
 	    //   return 'preview placeholder';
@@ -18200,7 +18250,7 @@
 	  });
 	  this.classList.add('selected');
 	  localStorage.setItem('view', 'icon-view');
-	  $('.miller-breadcrumbs').style.display = 'none';
+	  $('.miller-breadcrumbs').style.display = 'block';
 	  changePath();
 	});
 	$('#three-columns').addEventListener('click', function () {

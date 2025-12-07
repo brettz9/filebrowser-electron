@@ -243,6 +243,52 @@ function addDragAndDropSupport (element, itemPath, isFolder) {
   }
 }
 
+/**
+ * Update breadcrumbs for navigation.
+ * @param {string} currentPath - The current path to display
+ * @returns {void}
+ */
+function updateBreadcrumbs (currentPath) {
+  const breadcrumbsDiv = $('.miller-breadcrumbs');
+  if (!breadcrumbsDiv) {
+    return;
+  }
+
+  // Clear existing breadcrumbs
+  breadcrumbsDiv.innerHTML = '';
+
+  // Split path into segments
+  const segments = currentPath === '/'
+    ? []
+    : currentPath.split('/').filter(Boolean);
+
+  // Create root breadcrumb
+  jml('span', {
+    class: 'miller-breadcrumb miller-breadcrumb-root',
+    $on: {
+      click () {
+        globalThis.location.hash = '#path=/';
+      }
+    }
+  }, ['/'], breadcrumbsDiv);
+
+  // Create breadcrumb for each segment
+  let accumulatedPath = '';
+  segments.forEach((segment) => {
+    accumulatedPath += '/' + segment;
+    const segmentPath = accumulatedPath;
+    jml('span', {
+      class: 'miller-breadcrumb',
+      $on: {
+        click () {
+          globalThis.location.hash =
+            `#path=${encodeURIComponent(segmentPath)}`;
+        }
+      }
+    }, [decodeURIComponent(segment)], breadcrumbsDiv);
+  });
+}
+
 
 /**
  *
@@ -528,6 +574,9 @@ function addItems (result, basePath, currentBasePath) {
   }
 
   if (view === 'icon-view') {
+    // Update breadcrumbs for icon view
+    updateBreadcrumbs(currentBasePath);
+
     // Add keyboard support for icon-view
     const iconViewTable = $('table[data-base-path]');
     if (iconViewTable) {
@@ -649,6 +698,7 @@ function addItems (result, basePath, currentBasePath) {
   const parentMap = new WeakMap();
   const childMap = new WeakMap();
   const columnsInstance = millerColumns.millerColumns({
+    breadcrumbRoot: '/',
     // Options:
     // preview () {
     //   return 'preview placeholder';
@@ -1249,7 +1299,7 @@ $('#icon-view').addEventListener('click', function () {
   });
   this.classList.add('selected');
   localStorage.setItem('view', 'icon-view');
-  $('.miller-breadcrumbs').style.display = 'none';
+  $('.miller-breadcrumbs').style.display = 'block';
   changePath();
 });
 $('#three-columns').addEventListener('click', function () {

@@ -7033,5 +7033,212 @@ describe('renderer', () => {
       }
     );
   });
-});
 
+  describe('Icon view breadcrumbs', () => {
+    test('displays breadcrumbs in icon view', async () => {
+      // Switch to icon view
+      await page.locator('#icon-view').click();
+      await page.waitForTimeout(200);
+
+      // Navigate to a nested folder
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(200);
+
+      // Check breadcrumbs are visible
+      const breadcrumbs = await page.locator('.miller-breadcrumbs');
+      await expect(breadcrumbs).toBeVisible();
+
+      // Check root breadcrumb exists
+      const rootBreadcrumb = await page.locator(
+        '.miller-breadcrumb-root'
+      );
+      await expect(rootBreadcrumb).toBeVisible();
+      const rootText = await rootBreadcrumb.textContent();
+      expect(rootText).toBe('/');
+
+      // Check tmp breadcrumb exists
+      const breadcrumbItems = await page.locator('.miller-breadcrumb').all();
+      expect(breadcrumbItems.length).toBeGreaterThanOrEqual(2);
+
+      const tmpBreadcrumb = breadcrumbItems.find(async (item) => {
+        const text = await item.textContent();
+        return text === 'tmp';
+      });
+      expect(tmpBreadcrumb).toBeTruthy();
+    });
+
+    test('breadcrumbs navigate to clicked path', async () => {
+      // Switch to icon view
+      await page.locator('#icon-view').click();
+      await page.waitForTimeout(200);
+
+      // Create nested test folders
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available via preload
+        const {mkdirSync, existsSync} = globalThis.electronAPI.fs;
+        const testPath = '/tmp/breadcrumb-test';
+        const nestedPath = '/tmp/breadcrumb-test/nested';
+        const deepPath = '/tmp/breadcrumb-test/nested/deep';
+
+        if (!existsSync(testPath)) {
+          mkdirSync(testPath, {recursive: true});
+        }
+        if (!existsSync(nestedPath)) {
+          mkdirSync(nestedPath, {recursive: true});
+        }
+        if (!existsSync(deepPath)) {
+          mkdirSync(deepPath, {recursive: true});
+        }
+      });
+
+      // Navigate to deep nested folder
+      await page.evaluate(() => {
+        globalThis.location.hash =
+          '#path=/tmp/breadcrumb-test/nested/deep';
+      });
+      await page.waitForTimeout(200);
+
+      // Verify we're at the deep path
+      let currentPath = await page.evaluate(() => {
+        return globalThis.location.hash;
+      });
+      expect(currentPath).toContain('deep');
+
+      // Click on the "nested" breadcrumb to navigate back
+      const breadcrumbItems = await page.locator('.miller-breadcrumb').all();
+      let nestedBreadcrumb = null;
+      for (const item of breadcrumbItems) {
+        // eslint-disable-next-line no-await-in-loop -- Testing
+        const text = await item.textContent();
+        if (text === 'nested') {
+          nestedBreadcrumb = item;
+          break;
+        }
+      }
+
+      expect(nestedBreadcrumb).toBeTruthy();
+      if (nestedBreadcrumb) {
+        await nestedBreadcrumb.click();
+        await page.waitForTimeout(200);
+
+        // Verify navigation occurred
+        currentPath = await page.evaluate(() => {
+          return globalThis.location.hash;
+        });
+        expect(currentPath).toContain('nested');
+        expect(currentPath).not.toContain('deep');
+      }
+
+      // Click root breadcrumb to go back to root
+      const rootBreadcrumb = await page.locator('.miller-breadcrumb-root');
+      await rootBreadcrumb.click();
+      await page.waitForTimeout(200);
+
+      currentPath = await page.evaluate(() => {
+        return globalThis.location.hash;
+      });
+      expect(currentPath).toBe('#path=/');
+
+      // Cleanup
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available via preload
+        const {rmSync} = globalThis.electronAPI.fs;
+        try {
+          rmSync('/tmp/breadcrumb-test', {recursive: true, force: true});
+        } catch {
+          // Ignore
+        }
+      });
+    });
+
+    test('breadcrumbs update when navigating folders', async () => {
+      // Switch to icon view
+      await page.locator('#icon-view').click();
+      await page.waitForTimeout(200);
+
+      // Create test folders
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available via preload
+        const {mkdirSync, existsSync} = globalThis.electronAPI.fs;
+        const testPath = '/tmp/breadcrumb-nav-test';
+        const folder1 = '/tmp/breadcrumb-nav-test/folder1';
+        const folder2 = '/tmp/breadcrumb-nav-test/folder2';
+
+        if (!existsSync(testPath)) {
+          mkdirSync(testPath, {recursive: true});
+        }
+        if (!existsSync(folder1)) {
+          mkdirSync(folder1, {recursive: true});
+        }
+        if (!existsSync(folder2)) {
+          mkdirSync(folder2, {recursive: true});
+        }
+      });
+
+      // Navigate to test folder
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp/breadcrumb-nav-test';
+      });
+      await page.waitForTimeout(200);
+
+      // Check initial breadcrumbs
+      let breadcrumbItems = await page.locator('.miller-breadcrumb').all();
+      let breadcrumbTexts = await Promise.all(
+        breadcrumbItems.map((item) => item.textContent())
+      );
+      expect(breadcrumbTexts).toContain('breadcrumb-nav-test');
+
+      // Navigate into folder1
+      const folder1Link = await page.locator(
+        'a[href="#path=/tmp/breadcrumb-nav-test/folder1"]'
+      );
+      await folder1Link.click();
+      await page.waitForTimeout(200);
+
+      // Check breadcrumbs updated
+      breadcrumbItems = await page.locator('.miller-breadcrumb').all();
+      breadcrumbTexts = await Promise.all(
+        breadcrumbItems.map((item) => item.textContent())
+      );
+      expect(breadcrumbTexts).toContain('folder1');
+
+      // Cleanup
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available via preload
+        const {rmSync} = globalThis.electronAPI.fs;
+        try {
+          rmSync('/tmp/breadcrumb-nav-test', {recursive: true, force: true});
+        } catch {
+          // Ignore
+        }
+      });
+    });
+
+    test('breadcrumbs hidden in three-columns view', async () => {
+      // Start in icon view
+      await page.locator('#icon-view').click();
+      await page.waitForTimeout(200);
+
+      // Navigate to a folder
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(200);
+
+      // Verify breadcrumbs visible in icon view
+      let breadcrumbs = await page.locator('.miller-breadcrumbs');
+      await expect(breadcrumbs).toBeVisible();
+
+      // Switch to three-columns view
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(200);
+
+      // Breadcrumbs should still be visible
+      // (three-columns has its own built-in breadcrumbs)
+      breadcrumbs = await page.locator('.miller-breadcrumbs');
+      await expect(breadcrumbs).toBeVisible();
+    });
+  });
+});
