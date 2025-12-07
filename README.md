@@ -92,11 +92,13 @@ done
 1. Allow paste of untitled folder to increment untitled folder copy, etc.
 1. After deleting an external file, prompting a refresh, let the scroll be back
     to the exact coordinates as before if that is in the viewport
-1. Retain z-index of stickies
-1. Fix icon view and local sticky note creation at root
-1. Fix column view and local sticky note creation at root
-1. Allow escape key in column view (or clicking off folder at root) to show
-    local sticky for root
 1. Add breadcrumbs for both views
-1. Way to clean up opened Finder windows from tests?
 1. Ensure copy-paste in context menu
+1. Stickies
+    1. Retain z-index of stickies
+    1. Fix icon view and local sticky note creation at root
+    1. Fix column view and local sticky note creation at root
+    1. Allow escape key in column view (or clicking off folder at root) to show
+        local sticky for root
+1. Testing
+    1. Way to clean up opened Finder windows from tests?
