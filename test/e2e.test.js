@@ -1403,11 +1403,7 @@ describe('renderer', () => {
         let count = 0;
         items.forEach((item) => {
           const link = item.querySelector('a[data-path], span[data-path]');
-          const path = link
-            ? /** @type {HTMLElement} */ (link).dataset.path
-            : null;
-          // Only count items that are not backup files
-          if (path && !path.includes('.undo-backup-')) {
+          if (link) {
             count++;
           }
         });
@@ -1484,11 +1480,7 @@ describe('renderer', () => {
           let count = 0;
           items.forEach((item) => {
             const link = item.querySelector('a[data-path], span[data-path]');
-            const path = link
-              ? /** @type {HTMLElement} */ (link).dataset.path
-              : null;
-            // Only count items that are not backup files
-            if (path && !path.includes('.undo-backup-')) {
+            if (link) {
               count++;
             }
           });
@@ -1512,11 +1504,7 @@ describe('renderer', () => {
         let count = 0;
         items.forEach((item) => {
           const link = item.querySelector('a[data-path], span[data-path]');
-          const path = link
-            ? /** @type {HTMLElement} */ (link).dataset.path
-            : null;
-          // Only count items that are not backup files
-          if (path && !path.includes('.undo-backup-')) {
+          if (link) {
             count++;
           }
         });
@@ -1553,11 +1541,7 @@ describe('renderer', () => {
         let count = 0;
         items.forEach((item) => {
           const link = item.querySelector('a[data-path], span[data-path]');
-          const path = link
-            ? /** @type {HTMLElement} */ (link).dataset.path
-            : null;
-          // Only count items that are not backup files
-          if (path && !path.includes('.undo-backup-')) {
+          if (link) {
             count++;
           }
         });
@@ -1612,11 +1596,7 @@ describe('renderer', () => {
         let count = 0;
         items.forEach((item) => {
           const link = item.querySelector('a[data-path], span[data-path]');
-          const path = link
-            ? /** @type {HTMLElement} */ (link).dataset.path
-            : null;
-          // Only count items that are not backup files
-          if (path && !path.includes('.undo-backup-')) {
+          if (link) {
             count++;
           }
         });
@@ -2703,8 +2683,7 @@ describe('renderer', () => {
       // Filter out backup files which might still exist
       const deletedFolder = await page.locator(
         '.miller-column:not(.miller-collapse) ' +
-        'a[data-path*="test-folder-to-delete"]:' +
-          'not([data-path*=".undo-backup-"])'
+        'a[data-path*="test-folder-to-delete"]:'
       );
       await expect(deletedFolder).toBeHidden();
 

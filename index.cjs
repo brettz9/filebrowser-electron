@@ -13914,10 +13914,6 @@
 	function readDirectory (basePath) {
 	  // eslint-disable-next-line n/no-sync -- Needed for performance
 	  return readdirSync(basePath).
-	    filter((fileOrDir) => {
-	      // Filter out undo backup files
-	      return !fileOrDir.includes('.undo-backup-');
-	    }).
 	    map((fileOrDir) => {
 	      // eslint-disable-next-line n/no-sync -- Needed for performance
 	      const stat = lstatSync$1(path$4.join(basePath, fileOrDir));
