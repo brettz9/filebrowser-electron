@@ -6518,4 +6518,228 @@ describe('renderer', () => {
       }
     );
   });
+
+  describe('Drag and Drop - Escape Key', () => {
+    test('escape key cancels drag in three-columns view', async () => {
+      // Navigate to a directory
+      await page.locator('#three-columns').click();
+
+      // Create test files and folders
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available via preload
+        const {path} = globalThis.electronAPI;
+        // @ts-expect-error - electronAPI available via preload
+        const {mkdirSync, writeFileSync} = globalThis.electronAPI.fs;
+        const testDir = path.join('/tmp', 'test-escape-drag');
+        try {
+          mkdirSync(testDir);
+          writeFileSync(
+            path.join(testDir, 'source-file.txt'),
+            'content'
+          );
+          mkdirSync(path.join(testDir, 'target-folder'));
+        } catch {
+          // Ignore if already exists
+        }
+        return testDir;
+      });
+
+      const testDir = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available via preload
+        const {path} = globalThis.electronAPI;
+        return path.join('/tmp', 'test-escape-drag');
+      });
+
+      // Navigate to test directory
+      await page.evaluate((dir) => {
+        globalThis.location.hash = `#path=${encodeURIComponent(dir)}`;
+      }, testDir);
+
+      await page.waitForTimeout(500);
+
+      // Verify escape key doesn't cause errors during potential drag
+      const sourceFile = page.locator('.list-item:has-text("source-file.txt")');
+
+      // Focus the file
+      await sourceFile.click();
+      await page.waitForTimeout(100);
+
+      // Press escape (should not cause any errors even if no drag active)
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(100);
+
+      // Verify file still exists
+      const fileExists = await page.evaluate((dir) => {
+        // @ts-expect-error - electronAPI available via preload
+        const {path} = globalThis.electronAPI;
+        // @ts-expect-error - electronAPI available via preload
+        const {existsSync} = globalThis.electronAPI.fs;
+        return existsSync(path.join(dir, 'source-file.txt'));
+      }, testDir);
+
+      expect(fileExists).toBe(true);
+
+      // Cleanup
+      await page.evaluate((dir) => {
+        // @ts-expect-error - electronAPI available via preload
+        const {rmSync} = globalThis.electronAPI.fs;
+        try {
+          rmSync(dir, {recursive: true, force: true});
+        } catch {
+          // Ignore
+        }
+      }, testDir);
+    });
+
+    test(
+      'held escape during drag does not trigger root navigation',
+      async () => {
+        // Navigate to a subdirectory
+        await page.locator('#three-columns').click();
+
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          const {path} = globalThis.electronAPI;
+          // @ts-expect-error - electronAPI available via preload
+          const {mkdirSync, writeFileSync} = globalThis.electronAPI.fs;
+          const testDir = path.join('/tmp', 'test-escape-root');
+          try {
+            mkdirSync(testDir);
+            mkdirSync(path.join(testDir, 'subdir'));
+            writeFileSync(
+              path.join(testDir, 'subdir', 'file.txt'),
+              'content'
+            );
+            mkdirSync(path.join(testDir, 'subdir', 'folder'));
+          } catch {
+            // Ignore if already exists
+          }
+          return testDir;
+        });
+
+        const testDir = await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available via preload
+          const {path} = globalThis.electronAPI;
+          return path.join('/tmp', 'test-escape-root');
+        });
+
+        const subdir = await page.evaluate((dir) => {
+          // @ts-expect-error - electronAPI available via preload
+          const {path} = globalThis.electronAPI;
+          return path.join(dir, 'subdir');
+        }, testDir);
+
+        // Navigate to subdirectory
+        await page.evaluate((dir) => {
+          globalThis.location.hash = `#path=${encodeURIComponent(dir)}`;
+        }, subdir);
+
+        await page.waitForTimeout(500);
+
+        // Get current path before drag
+        const pathBefore = await page.evaluate(() => {
+          return globalThis.location.hash;
+        });
+
+        expect(pathBefore).toContain('subdir');
+
+        // Test escape key doesn't navigate away when pressed
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(200);
+
+        // Verify we're still in subdir (escape didn't navigate to root)
+        const pathAfter = await page.evaluate(() => {
+          return globalThis.location.hash;
+        });
+
+        expect(pathAfter).toContain('subdir');
+        expect(pathAfter).toBe(pathBefore);
+
+        // Cleanup
+        await page.evaluate((dir) => {
+          // @ts-expect-error - electronAPI available via preload
+          const {rmSync} = globalThis.electronAPI.fs;
+          try {
+            rmSync(dir, {recursive: true, force: true});
+          } catch {
+            // Ignore
+          }
+        }, testDir);
+      }
+    );
+
+    test('escape key cancels drag in icon view', async () => {
+      // Switch to icon view
+      await page.locator('#icon-view').click();
+
+      // Create test files and folders
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available via preload
+        const {path} = globalThis.electronAPI;
+        // @ts-expect-error - electronAPI available via preload
+        const {mkdirSync, writeFileSync} = globalThis.electronAPI.fs;
+        const testDir = path.join('/tmp', 'test-escape-icon');
+        try {
+          mkdirSync(testDir);
+          writeFileSync(
+            path.join(testDir, 'source-file.txt'),
+            'content'
+          );
+          mkdirSync(path.join(testDir, 'target-folder'));
+        } catch {
+          // Ignore if already exists
+        }
+        return testDir;
+      });
+
+      const testDir = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available via preload
+        const {path} = globalThis.electronAPI;
+        return path.join('/tmp', 'test-escape-icon');
+      });
+
+      // Navigate to test directory
+      await page.evaluate((dir) => {
+        globalThis.location.hash = `#path=${encodeURIComponent(dir)}`;
+      }, testDir);
+
+      await page.waitForTimeout(500);
+
+      // Verify escape key doesn't cause errors in icon view
+      const sourceCell = page.locator(
+        'td.list-item:has-text("source-file.txt")'
+      );
+
+      // Focus the file
+      await sourceCell.click();
+      await page.waitForTimeout(100);
+
+      // Press escape (should not cause any errors)
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(100);
+
+      // Verify file still exists
+      const fileExists = await page.evaluate((dir) => {
+        // @ts-expect-error - electronAPI available via preload
+        const {path} = globalThis.electronAPI;
+        // @ts-expect-error - electronAPI available via preload
+        const {existsSync} = globalThis.electronAPI.fs;
+        return existsSync(path.join(dir, 'source-file.txt'));
+      }, testDir);
+
+      expect(fileExists).toBe(true);
+
+      // Cleanup
+      await page.evaluate((dir) => {
+        // @ts-expect-error - electronAPI available via preload
+        const {rmSync} = globalThis.electronAPI.fs;
+        try {
+          rmSync(dir, {recursive: true, force: true});
+        } catch {
+          // Ignore
+        }
+      }, testDir);
+    });
+  });
 });
+
