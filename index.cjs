@@ -15260,6 +15260,12 @@
 	  const itemName = path$2.basename(decodedSource);
 	  const targetPath = path$2.join(decodedTargetDir, itemName);
 
+	  // Silently ignore if dragging to the same location
+	  if (decodedSource === targetPath) {
+	    setIsCopyingOrMoving(false);
+	    return;
+	  }
+
 	  // Check if target already exists
 	  if (existsSync$1(targetPath)) {
 	    // eslint-disable-next-line no-alert -- User feedback

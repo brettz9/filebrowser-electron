@@ -126,6 +126,12 @@ export function copyOrMoveItem (sourcePath, targetDir, isCopy) {
   const itemName = path.basename(decodedSource);
   const targetPath = path.join(decodedTargetDir, itemName);
 
+  // Silently ignore if dragging to the same location
+  if (decodedSource === targetPath) {
+    setIsCopyingOrMoving(false);
+    return;
+  }
+
   // Check if target already exists
   if (existsSync(targetPath)) {
     // eslint-disable-next-line no-alert -- User feedback
