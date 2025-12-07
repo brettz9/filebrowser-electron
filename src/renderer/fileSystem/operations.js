@@ -1,6 +1,11 @@
 /* eslint-disable n/no-sync -- Needed for performance */
 import {emit} from '../events/eventBus.js';
-import {isDeleting, setIsDeleting} from '../state/flags.js';
+import {
+  isDeleting,
+  setIsDeleting,
+  isCopyingOrMoving,
+  setIsCopyingOrMoving
+} from '../state/flags.js';
 
 // Get Node APIs from the preload script
 const {
@@ -109,6 +114,13 @@ export function deleteItem (itemPath) {
  * @param {boolean} isCopy
  */
 export function copyOrMoveItem (sourcePath, targetDir, isCopy) {
+  // Prevent multiple simultaneous copy/move operations
+  if (isCopyingOrMoving) {
+    return;
+  }
+
+  setIsCopyingOrMoving(true);
+
   const decodedSource = decodeURIComponent(sourcePath);
   const decodedTargetDir = decodeURIComponent(targetDir);
   const itemName = path.basename(decodedSource);
@@ -118,6 +130,7 @@ export function copyOrMoveItem (sourcePath, targetDir, isCopy) {
   if (existsSync(targetPath)) {
     // eslint-disable-next-line no-alert -- User feedback
     alert(`"${itemName}" already exists in the destination.`);
+    setIsCopyingOrMoving(false);
     return;
   }
 
@@ -151,6 +164,11 @@ export function copyOrMoveItem (sourcePath, targetDir, isCopy) {
 
     // Refresh the view
     emit('refreshView');
+
+    // Reset flag after a short delay
+    setTimeout(() => {
+      setIsCopyingOrMoving(false);
+    }, 100);
   /* c8 ignore next 7 - Defensive: difficult to trigger errors in cp/rename */
   } catch (err) {
     // eslint-disable-next-line no-alert -- User feedback
@@ -158,5 +176,6 @@ export function copyOrMoveItem (sourcePath, targetDir, isCopy) {
       `Failed to ${isCopy ? 'copy' : 'move'}: ` +
       (/** @type {Error} */ (err)).message
     );
+    setIsCopyingOrMoving(false);
   }
 }

@@ -7,6 +7,7 @@ export let $columns;
 
 export let isDeleting = false;
 export let isCreating = false;
+export let isCopyingOrMoving = false;
 export const isRefreshing = false;
 export let isWatcherRefreshing = false;
 
@@ -32,6 +33,14 @@ export const setIsDeleting = (value) => {
  */
 export const setIsCreating = (value) => {
   isCreating = value;
+};
+
+/**
+ * Set the isCopyingOrMoving flag.
+ * @param {boolean} value
+ */
+export const setIsCopyingOrMoving = (value) => {
+  isCopyingOrMoving = value;
 };
 
 /**

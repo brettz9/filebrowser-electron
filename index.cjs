@@ -13913,12 +13913,12 @@
 	 */
 	function readDirectory (basePath) {
 	  // eslint-disable-next-line n/no-sync -- Needed for performance
-	  return readdirSync(basePath)
-	    .filter((fileOrDir) => {
+	  return readdirSync(basePath).
+	    filter((fileOrDir) => {
 	      // Filter out undo backup files
 	      return !fileOrDir.includes('.undo-backup-');
-	    })
-	    .map((fileOrDir) => {
+	    }).
+	    map((fileOrDir) => {
 	      // eslint-disable-next-line n/no-sync -- Needed for performance
 	      const stat = lstatSync$1(path$4.join(basePath, fileOrDir));
 	      return /** @type {Result} */ (
@@ -14858,6 +14858,7 @@
 
 	let isDeleting = false;
 	let isCreating = false;
+	let isCopyingOrMoving = false;
 	let isWatcherRefreshing = false;
 
 	/**
@@ -14882,6 +14883,14 @@
 	 */
 	const setIsCreating = (value) => {
 	  isCreating = value;
+	};
+
+	/**
+	 * Set the isCopyingOrMoving flag.
+	 * @param {boolean} value
+	 */
+	const setIsCopyingOrMoving = (value) => {
+	  isCopyingOrMoving = value;
 	};
 
 	/**
@@ -15243,6 +15252,13 @@
 	 * @param {boolean} isCopy
 	 */
 	function copyOrMoveItem (sourcePath, targetDir, isCopy) {
+	  // Prevent multiple simultaneous copy/move operations
+	  if (isCopyingOrMoving) {
+	    return;
+	  }
+
+	  setIsCopyingOrMoving(true);
+
 	  const decodedSource = decodeURIComponent(sourcePath);
 	  const decodedTargetDir = decodeURIComponent(targetDir);
 	  const itemName = path$2.basename(decodedSource);
@@ -15252,6 +15268,7 @@
 	  if (existsSync$1(targetPath)) {
 	    // eslint-disable-next-line no-alert -- User feedback
 	    alert(`"${itemName}" already exists in the destination.`);
+	    setIsCopyingOrMoving(false);
 	    return;
 	  }
 
@@ -15285,6 +15302,11 @@
 
 	    // Refresh the view
 	    emit('refreshView');
+
+	    // Reset flag after a short delay
+	    setTimeout(() => {
+	      setIsCopyingOrMoving(false);
+	    }, 100);
 	  /* c8 ignore next 7 - Defensive: difficult to trigger errors in cp/rename */
 	  } catch (err) {
 	    // eslint-disable-next-line no-alert -- User feedback
@@ -15292,6 +15314,7 @@
 	      `Failed to ${isCopy ? 'copy' : 'move'}: ` +
 	      (/** @type {Error} */ (err)).message
 	    );
+	    setIsCopyingOrMoving(false);
 	  }
 	}
 

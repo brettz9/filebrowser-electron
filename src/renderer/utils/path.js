@@ -36,12 +36,12 @@ export function getBasePath () {
  */
 export function readDirectory (basePath) {
   // eslint-disable-next-line n/no-sync -- Needed for performance
-  return readdirSync(basePath)
-    .filter((fileOrDir) => {
+  return readdirSync(basePath).
+    filter((fileOrDir) => {
       // Filter out undo backup files
       return !fileOrDir.includes('.undo-backup-');
-    })
-    .map((fileOrDir) => {
+    }).
+    map((fileOrDir) => {
       // eslint-disable-next-line n/no-sync -- Needed for performance
       const stat = lstatSync(path.join(basePath, fileOrDir));
       return /** @type {Result} */ (

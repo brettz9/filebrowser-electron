@@ -1115,7 +1115,7 @@ describe('renderer', () => {
       });
     });
 
-    test.only('cut and paste in icon view', async () => {
+    test('cut and paste in icon view', async () => {
       // This test covers lines 443-454 in index.js (Cmd+X in icon view)
 
       // Clean up any leftover files
@@ -6304,5 +6304,239 @@ describe('renderer', () => {
         }
       });
     });
+
+    test('drag file to duplicate location shows only one alert', async () => {
+      // This test verifies the isCopyingOrMoving flag prevents repeating alerts
+
+      // Clean up any leftover files
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        try {
+          fs.rmSync(path.join('/tmp', 'test-duplicate-drag.txt'), {
+            force: true
+          });
+          fs.rmSync(path.join('/tmp', 'test-duplicate-dest'), {
+            recursive: true,
+            force: true
+          });
+        } catch {
+          // Ignore cleanup errors
+        }
+      });
+
+      // Create test file and destination folder with duplicate file
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const testFile = path.join('/tmp', 'test-duplicate-drag.txt');
+        fs.writeFileSync(testFile, 'original content');
+
+        const destFolder = path.join('/tmp', 'test-duplicate-dest');
+        if (!fs.existsSync(destFolder)) {
+          fs.mkdirSync(destFolder);
+        }
+
+        // Create duplicate file in destination
+        const duplicateFile = path.join(destFolder, 'test-duplicate-drag.txt');
+        fs.writeFileSync(duplicateFile, 'duplicate content');
+      });
+
+      // Switch to three-columns view
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      // Navigate to /tmp
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1000);
+
+      // Wait for directory contents to load
+      await page.waitForFunction(() => {
+        const links = document.querySelectorAll(
+          'span[data-path*="test-duplicate-drag.txt"]'
+        );
+        return links.length > 0;
+      }, {timeout: 10000});
+
+      // Set up alert handler to track how many alerts are shown
+      let alertCount = 0;
+      // @ts-expect-error - Dialog type from Playwright
+      const dialogHandler = async (dialog) => {
+        alertCount++;
+        await dialog.accept();
+      };
+      page.on('dialog', dialogHandler);
+
+      // Locate the source file element
+      const sourceFile = await page.locator(
+        '.list-item:has(span[data-path*="test-duplicate-drag.txt"])'
+      ).first();
+      await sourceFile.waitFor({state: 'visible', timeout: 5000});
+
+      // Locate the destination folder element
+      const destFolder = await page.locator(
+        '.list-item:has(a[data-path*="test-duplicate-dest"])'
+      ).first();
+      await destFolder.waitFor({state: 'visible', timeout: 5000});
+
+      // Perform drag and drop
+      await sourceFile.dragTo(destFolder);
+      await page.waitForTimeout(1500);
+
+      // Remove dialog handler
+      page.off('dialog', dialogHandler);
+
+      // Verify only one alert was shown
+      expect(alertCount).toBe(1);
+
+      // Verify file was not moved (operation was cancelled)
+      const results = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        return {
+          destContent: fs.readFileSync(
+            path.join('/tmp', 'test-duplicate-dest', 'test-duplicate-drag.txt'),
+            'utf8'
+          ),
+          sourceExists: fs.existsSync('/tmp/test-duplicate-drag.txt')
+        };
+      });
+      expect(results.sourceExists).toBe(true); // Source still exists
+      expect(results.destContent).toBe('duplicate content'); // Dest unchanged
+
+      // Clean up
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        try {
+          fs.rmSync(path.join('/tmp', 'test-duplicate-drag.txt'), {
+            force: true
+          });
+          fs.rmSync(path.join('/tmp', 'test-duplicate-dest'), {
+            recursive: true,
+            force: true
+          });
+        } catch {
+          // Ignore
+        }
+      });
+    });
+
+    test(
+      'drag file to duplicate location in icon view shows only one alert',
+      async () => {
+        // This test verifies the isCopyingOrMoving flag in icon view
+
+        // Clean up any leftover files
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available
+          const {fs, path} = globalThis.electronAPI;
+          try {
+            fs.rmSync(path.join('/tmp', 'test-dup-icon.txt'), {force: true});
+            fs.rmSync(path.join('/tmp', 'test-dup-icon-dest'), {
+              recursive: true,
+              force: true
+            });
+          } catch {
+            // Ignore cleanup errors
+          }
+        });
+
+        // Create test file and destination folder with duplicate file
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available
+          const {fs, path} = globalThis.electronAPI;
+          const testFile = path.join('/tmp', 'test-dup-icon.txt');
+          fs.writeFileSync(testFile, 'original content');
+
+          const destFolder = path.join('/tmp', 'test-dup-icon-dest');
+          if (!fs.existsSync(destFolder)) {
+            fs.mkdirSync(destFolder);
+          }
+
+          // Create duplicate file in destination
+          const duplicateFile = path.join(destFolder, 'test-dup-icon.txt');
+          fs.writeFileSync(duplicateFile, 'duplicate content');
+        });
+
+        // Switch to icon view
+        await page.locator('#icon-view').click();
+        await page.waitForTimeout(1000);
+
+        // Navigate to /tmp
+        await page.evaluate(() => {
+          globalThis.location.hash = '#path=/tmp';
+        });
+        await page.waitForTimeout(2000);
+
+        // Wait for files to load - just wait for any table
+        //   row with list-item cells
+        await page.locator('td.list-item').first().waitFor({
+          state: 'visible',
+          timeout: 5000
+        });
+
+        // Set up alert handler to track how many alerts are shown
+        let alertCount = 0;
+        // @ts-expect-error - Dialog type from Playwright
+        const dialogHandler = async (dialog) => {
+          alertCount++;
+          await dialog.accept();
+        };
+        page.on('dialog', dialogHandler);
+
+        // In icon view, drag the specific cell (not the row)
+        const sourceCell = await page.locator(
+          'td.list-item:has-text("test-dup-icon.txt")'
+        ).first();
+
+        // Drag to the specific folder cell
+        const destCell = await page.locator(
+          'td.list-item:has-text("test-dup-icon-dest")'
+        ).first();
+
+        // Perform drag and drop from cell to cell
+        await sourceCell.dragTo(destCell);
+        await page.waitForTimeout(1500);
+
+        // Remove dialog handler
+        page.off('dialog', dialogHandler);
+
+        // Verify only one alert was shown
+        expect(alertCount).toBe(1);
+
+        // Verify file was not moved (operation was cancelled)
+        const results = await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available
+          const {fs, path} = globalThis.electronAPI;
+          return {
+            destContent: fs.readFileSync(
+              path.join('/tmp', 'test-dup-icon-dest', 'test-dup-icon.txt'),
+              'utf8'
+            ),
+            sourceExists: fs.existsSync('/tmp/test-dup-icon.txt')
+          };
+        });
+        expect(results.sourceExists).toBe(true); // Source still exists
+        expect(results.destContent).toBe('duplicate content'); // Dest unchanged
+
+        // Clean up
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available
+          const {fs, path} = globalThis.electronAPI;
+          try {
+            fs.rmSync(path.join('/tmp', 'test-dup-icon.txt'), {force: true});
+            fs.rmSync(path.join('/tmp', 'test-dup-icon-dest'), {
+              recursive: true,
+              force: true
+            });
+          } catch {
+            // Ignore
+          }
+        });
+      }
+    );
   });
 });
