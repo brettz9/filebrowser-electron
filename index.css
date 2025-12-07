@@ -27,6 +27,11 @@ nav button.selected {
   background-position: left center;
 }
 
+.list-item.drag-over {
+  background-color: #0047ab !important;
+  color: white !important;
+}
+
 #filebrowser {
   float: left;
   width: 85%;

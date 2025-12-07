@@ -87,7 +87,6 @@ done
 
 ## Misc. bugs
 
-1. Provide drag-and-drop files/folders visual feedback
 1. Allow navigating into folders during drag-and-drop
 
 1. Allow paste of untitled folder to increment untitled folder copy, etc.

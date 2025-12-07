@@ -92,15 +92,28 @@ function addDragAndDropSupport (element, itemPath, isFolder) {
     const dropTarget = element;
     dropTarget.addEventListener('dragover', (e) => {
       e.preventDefault();
+      dropTarget.classList.add('drag-over');
       /* c8 ignore next 3 -- dataTransfer always present in modern browsers */
       if (e.dataTransfer) {
         e.dataTransfer.dropEffect = e.altKey ? 'copy' : 'move';
       }
     });
 
+    dropTarget.addEventListener('dragleave', (e) => {
+      // Only remove if actually leaving the element (not entering a child)
+      const rect = dropTarget.getBoundingClientRect();
+      const x = e.clientX;
+      const y = e.clientY;
+      if (x < rect.left || x >= rect.right ||
+          y < rect.top || y >= rect.bottom) {
+        dropTarget.classList.remove('drag-over');
+      }
+    });
+
     dropTarget.addEventListener('drop', (e) => {
       e.preventDefault();
       e.stopPropagation(); // Prevent bubbling to parent drop handlers
+      dropTarget.classList.remove('drag-over');
       const sourcePath = e.dataTransfer?.getData('text/plain');
       const targetPath = itemPath;
       if (sourcePath && targetPath) {
