@@ -36,13 +36,18 @@ export function getBasePath () {
  */
 export function readDirectory (basePath) {
   // eslint-disable-next-line n/no-sync -- Needed for performance
-  return readdirSync(basePath).map((fileOrDir) => {
-    // eslint-disable-next-line n/no-sync -- Needed for performance
-    const stat = lstatSync(path.join(basePath, fileOrDir));
-    return /** @type {Result} */ (
-      [stat.isDirectory() || stat.isSymbolicLink(), basePath, fileOrDir]
-    );
-  }).toSorted(([, , a], [, , b]) => {
-    return a.localeCompare(b, undefined, {sensitivity: 'base'});
-  });
+  return readdirSync(basePath)
+    .filter((fileOrDir) => {
+      // Filter out undo backup files
+      return !fileOrDir.includes('.undo-backup-');
+    })
+    .map((fileOrDir) => {
+      // eslint-disable-next-line n/no-sync -- Needed for performance
+      const stat = lstatSync(path.join(basePath, fileOrDir));
+      return /** @type {Result} */ (
+        [stat.isDirectory() || stat.isSymbolicLink(), basePath, fileOrDir]
+      );
+    }).toSorted(([, , a], [, , b]) => {
+      return a.localeCompare(b, undefined, {sensitivity: 'base'});
+    });
 }

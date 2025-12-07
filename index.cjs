@@ -13878,7 +13878,7 @@
 	// Get Node APIs from the preload script
 	const {
 	  fs: {readdirSync, lstatSync: lstatSync$1},
-	  path: path$3,
+	  path: path$4,
 	  // eslint-disable-next-line no-shadow -- Different process
 	  process: process$1
 	} = globalThis.electronAPI;
@@ -13897,7 +13897,7 @@
 	  }
 
 	  const params = new URLSearchParams(location.hash.slice(1));
-	  return path$3.normalize(
+	  return path$4.normalize(
 	    params.has('path') ? params.get('path') + '/' : '/'
 	  );
 	}
@@ -13913,15 +13913,20 @@
 	 */
 	function readDirectory (basePath) {
 	  // eslint-disable-next-line n/no-sync -- Needed for performance
-	  return readdirSync(basePath).map((fileOrDir) => {
-	    // eslint-disable-next-line n/no-sync -- Needed for performance
-	    const stat = lstatSync$1(path$3.join(basePath, fileOrDir));
-	    return /** @type {Result} */ (
-	      [stat.isDirectory() || stat.isSymbolicLink(), basePath, fileOrDir]
-	    );
-	  }).toSorted(([, , a], [, , b]) => {
-	    return a.localeCompare(b, undefined, {sensitivity: 'base'});
-	  });
+	  return readdirSync(basePath)
+	    .filter((fileOrDir) => {
+	      // Filter out undo backup files
+	      return !fileOrDir.includes('.undo-backup-');
+	    })
+	    .map((fileOrDir) => {
+	      // eslint-disable-next-line n/no-sync -- Needed for performance
+	      const stat = lstatSync$1(path$4.join(basePath, fileOrDir));
+	      return /** @type {Result} */ (
+	        [stat.isDirectory() || stat.isSymbolicLink(), basePath, fileOrDir]
+	      );
+	    }).toSorted(([, , a], [, , b]) => {
+	      return a.localeCompare(b, undefined, {sensitivity: 'base'});
+	    });
 	}
 
 	// eslint-disable-next-line no-shadow -- Importing storage as `localStorage`
@@ -14890,9 +14895,23 @@
 	/* eslint-disable n/no-sync -- Needed for performance */
 	// Get Node APIs from the preload script
 	const {
-	  fs: {existsSync: existsSync$2, rmSync: rmSync$1, mkdirSync: mkdirSync$1, writeFileSync: writeFileSync$1, renameSync: renameSync$2},
-	  spawnSync: spawnSync$2
+	  fs: {existsSync: existsSync$2, rmSync: rmSync$1, mkdirSync: mkdirSync$2, writeFileSync: writeFileSync$1, renameSync: renameSync$2},
+	  spawnSync: spawnSync$2,
+	  path: path$3,
+	  os: os$1
 	} = globalThis.electronAPI;
+
+	// Use same undo backup directory as operations.js
+	const undoBackupDir$1 = path$3.join(os$1.tmpdir(), 'filebrowser-undo-backups');
+	try {
+	  if (!existsSync$2(undoBackupDir$1)) {
+	    mkdirSync$2(undoBackupDir$1, {recursive: true});
+	  }
+	/* c8 ignore next 4 -- Defensive: mkdir failure is rare */
+	} catch (err) {
+	  // eslint-disable-next-line no-console -- Startup logging
+	  console.error('Failed to create undo backup directory:', err);
+	}
 
 	/**
 	 * @typedef UndoAction
@@ -15001,7 +15020,7 @@
 	      // Redo create: recreate the item
 	      if (!existsSync$2(action.path)) {
 	        if (action.wasDirectory) {
-	          mkdirSync$1(action.path);
+	          mkdirSync$2(action.path);
 	        } else {
 	          writeFileSync$1(action.path, '');
 	        }
@@ -15013,7 +15032,11 @@
 	      // Redo delete: delete again
 	      if (existsSync$2(action.path)) {
 	        // Create backup for potential undo
-	        const backupPath = action.path + '.undo-backup-' + Date.now();
+	        const timestamp = Date.now();
+	        const safeName = path$3.basename(action.path).
+	          replaceAll(/[^\w.]/gv, '_');
+	        const backupName = `${safeName}.undo-backup-${timestamp}`;
+	        const backupPath = path$3.join(undoBackupDir$1, backupName);
 	        const cpResult = spawnSync$2('cp', ['-R', action.path, backupPath]);
 	        if (cpResult.status === 0) {
 	          rmSync$1(action.path, {recursive: true, force: true});
@@ -15115,10 +15138,23 @@
 
 	// Get Node APIs from the preload script
 	const {
-	  fs: {existsSync: existsSync$1, lstatSync, rmSync, renameSync: renameSync$1},
+	  fs: {existsSync: existsSync$1, lstatSync, rmSync, renameSync: renameSync$1, mkdirSync: mkdirSync$1},
 	  path: path$2,
-	  spawnSync: spawnSync$1
+	  spawnSync: spawnSync$1,
+	  os
 	} = globalThis.electronAPI;
+
+	// Create undo backup directory in system temp folder
+	const undoBackupDir = path$2.join(os.tmpdir(), 'filebrowser-undo-backups');
+	try {
+	  if (!existsSync$1(undoBackupDir)) {
+	    mkdirSync$1(undoBackupDir, {recursive: true});
+	  }
+	/* c8 ignore next 4 -- Defensive: mkdir failure is rare */
+	} catch (err) {
+	  // eslint-disable-next-line no-console -- Startup logging
+	  console.error('Failed to create undo backup directory:', err);
+	}
 
 	/**
 	 * @typedef {import('../history/undoRedo.js').UndoAction} UndoAction
@@ -15149,7 +15185,11 @@
 
 	  try {
 	    // Create a backup before deleting for undo support
-	    const backupPath = decodedPath + '.undo-backup-' + Date.now();
+	    const timestamp = Date.now();
+	    const safeName = path$2.basename(decodedPath).
+	      replaceAll(/[^\w.\-]/gv, '_');
+	    const backupName = `${safeName}.undo-backup-${timestamp}`;
+	    const backupPath = path$2.join(undoBackupDir, backupName);
 	    const cpResult = spawnSync$1('cp', ['-R', decodedPath, backupPath]);
 
 	    /* c8 ignore next 3 - Defensive: requires cp command to fail */

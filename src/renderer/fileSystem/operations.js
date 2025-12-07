@@ -4,10 +4,23 @@ import {isDeleting, setIsDeleting} from '../state/flags.js';
 
 // Get Node APIs from the preload script
 const {
-  fs: {existsSync, lstatSync, rmSync, renameSync},
+  fs: {existsSync, lstatSync, rmSync, renameSync, mkdirSync},
   path,
-  spawnSync
+  spawnSync,
+  os
 } = globalThis.electronAPI;
+
+// Create undo backup directory in system temp folder
+const undoBackupDir = path.join(os.tmpdir(), 'filebrowser-undo-backups');
+try {
+  if (!existsSync(undoBackupDir)) {
+    mkdirSync(undoBackupDir, {recursive: true});
+  }
+/* c8 ignore next 4 -- Defensive: mkdir failure is rare */
+} catch (err) {
+  // eslint-disable-next-line no-console -- Startup logging
+  console.error('Failed to create undo backup directory:', err);
+}
 
 /**
  * @typedef {import('../history/undoRedo.js').UndoAction} UndoAction
@@ -38,7 +51,11 @@ export function deleteItem (itemPath) {
 
   try {
     // Create a backup before deleting for undo support
-    const backupPath = decodedPath + '.undo-backup-' + Date.now();
+    const timestamp = Date.now();
+    const safeName = path.basename(decodedPath).
+      replaceAll(/[^\w.\-]/gv, '_');
+    const backupName = `${safeName}.undo-backup-${timestamp}`;
+    const backupPath = path.join(undoBackupDir, backupName);
     const cpResult = spawnSync('cp', ['-R', decodedPath, backupPath]);
 
     /* c8 ignore next 3 - Defensive: requires cp command to fail */

@@ -6,6 +6,7 @@
 const {contextBridge, ipcRenderer, shell} = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const {spawnSync} = require('node:child_process');
 
 // With sandbox: false and contextIsolation: true, we can require Node.js modules
@@ -40,6 +41,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     extname: (...args) => path.extname(...args),
     normalize: (p) => path.normalize(p),
     sep: path.sep
+  },
+  os: {
+    tmpdir: () => os.tmpdir()
   },
   process: {
     platform: process.platform,

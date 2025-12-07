@@ -2,8 +2,22 @@
 // Get Node APIs from the preload script
 const {
   fs: {existsSync, rmSync, mkdirSync, writeFileSync, renameSync},
-  spawnSync
+  spawnSync,
+  path,
+  os
 } = globalThis.electronAPI;
+
+// Use same undo backup directory as operations.js
+const undoBackupDir = path.join(os.tmpdir(), 'filebrowser-undo-backups');
+try {
+  if (!existsSync(undoBackupDir)) {
+    mkdirSync(undoBackupDir, {recursive: true});
+  }
+/* c8 ignore next 4 -- Defensive: mkdir failure is rare */
+} catch (err) {
+  // eslint-disable-next-line no-console -- Startup logging
+  console.error('Failed to create undo backup directory:', err);
+}
 
 /**
  * @typedef UndoAction
@@ -124,7 +138,11 @@ export const performRedo = (changePath) => {
       // Redo delete: delete again
       if (existsSync(action.path)) {
         // Create backup for potential undo
-        const backupPath = action.path + '.undo-backup-' + Date.now();
+        const timestamp = Date.now();
+        const safeName = path.basename(action.path).
+          replaceAll(/[^\w.]/gv, '_');
+        const backupName = `${safeName}.undo-backup-${timestamp}`;
+        const backupPath = path.join(undoBackupDir, backupName);
         const cpResult = spawnSync('cp', ['-R', action.path, backupPath]);
         if (cpResult.status === 0) {
           rmSync(action.path, {recursive: true, force: true});
