@@ -14896,6 +14896,12 @@
 	};
 
 	/**
+	 * Get the isCopyingOrMoving flag.
+	 * @returns {boolean}
+	 */
+	const getIsCopyingOrMoving = () => isCopyingOrMoving;
+
+	/**
 	 * Set the isWatcherRefreshing flag.
 	 * @param {boolean} value
 	 */
@@ -14926,12 +14932,12 @@
 
 	/**
 	 * @typedef UndoAction
-	 * @property {'create'|'delete'|'rename'|'move'|'copy'} type
+	 * @property {'create'|'delete'|'rename'|'move'|'copy'|'replace'} type
 	 * @property {string} path - The path involved in the operation
 	 * @property {string} [oldPath] - For rename/move operations
 	 * @property {string} [newPath] - For rename/move operations
 	 * @property {boolean} [wasDirectory] - For delete operations
-	 * @property {string} [backupPath] - For delete operations (temp backup)
+	 * @property {string} [backupPath] - For delete/replace operations (temp backup)
 	 */
 
 	/** @type {UndoAction[]} */
@@ -15000,6 +15006,24 @@
 	      if (action.newPath && action.oldPath && existsSync$2(action.newPath)) {
 	        renameSync$2(action.newPath, action.oldPath);
 	        redoStack.push(action);
+	      }
+	      break;
+	    }
+	    case 'replace': {
+	      // Undo replace: restore the replaced item from backup
+	      if (action.backupPath && existsSync$2(action.backupPath)) {
+	        // Remove the new item
+	        if (existsSync$2(action.path)) {
+	          rmSync$1(action.path, {recursive: true, force: true});
+	        }
+	        // Restore the backed-up item
+	        const cpResult = spawnSync$2(
+	          'cp',
+	          ['-R', action.backupPath, action.path]
+	        );
+	        if (cpResult.status === 0) {
+	          redoStack.push(action);
+	        }
 	      }
 	      break;
 	    }
@@ -15072,6 +15096,15 @@
 	        if (cpResult.status === 0) {
 	          undoStack.push(action);
 	        }
+	      }
+	      break;
+	    }
+	    case 'replace': {
+	      // Redo replace: remove backup and keep the new item
+	      if (action.backupPath && existsSync$2(action.backupPath)) {
+	        // Just remove the backup - the replaced item should already be there
+	        rmSync$1(action.backupPath, {recursive: true, force: true});
+	        undoStack.push({...action, backupPath: undefined});
 	      }
 	      break;
 	    }
@@ -15247,6 +15280,11 @@
 	  }
 	}
 
+	// Track last operation to prevent duplicate dialogs
+	let lastOperationKey = '';
+	let lastOperationTime = 0;
+	let operationCounter = 0;
+
 	/**
 	 * Copy or move an item.
 	 * @param {string} sourcePath
@@ -15254,11 +15292,27 @@
 	 * @param {boolean} isCopy
 	 */
 	function copyOrMoveItem (sourcePath, targetDir, isCopy) {
-	  // Prevent multiple simultaneous copy/move operations
-	  if (isCopyingOrMoving) {
+	  // Check and block IMMEDIATELY before doing anything else
+	  if (operationCounter > 0) {
 	    return;
 	  }
 
+	  // Set counter immediately to block subsequent calls
+	  operationCounter = 1;
+
+	  // Build operation key for deduplication
+	  const operationKey = `${sourcePath}:${targetDir}:${isCopy}`;
+	  const now = Date.now();
+
+	  // Check for duplicate operation within 500ms
+	  if (operationKey === lastOperationKey && now - lastOperationTime < 500) {
+	    operationCounter = 0;
+	    return;
+	  }
+
+	  // Update tracking variables
+	  lastOperationKey = operationKey;
+	  lastOperationTime = now;
 	  setIsCopyingOrMoving(true);
 
 	  const decodedSource = decodeURIComponent(sourcePath);
@@ -15268,16 +15322,79 @@
 
 	  // Silently ignore if dragging to the same location or onto itself
 	  if (decodedSource === targetPath || decodedSource === decodedTargetDir) {
+	    operationCounter = 0;
+	    setIsCopyingOrMoving(false);
+	    return;
+	  }
+
+	  // Prevent moving/copying a folder into its own descendant
+	  if (decodedTargetDir.startsWith(decodedSource + path$2.sep) ||
+	      decodedTargetDir === decodedSource) {
+	    // eslint-disable-next-line no-alert -- User feedback
+	    alert('Cannot copy or move a folder into itself or its descendants.');
+	    operationCounter = 0;
 	    setIsCopyingOrMoving(false);
 	    return;
 	  }
 
 	  // Check if target already exists
 	  if (existsSync$1(targetPath)) {
+	    // Check if source is inside the target that would be replaced
+	    // This would cause the source to be deleted before the operation
+	    if (decodedSource.startsWith(targetPath + path$2.sep) ||
+	        path$2.dirname(decodedSource) === targetPath) {
+	      // eslint-disable-next-line no-alert -- User feedback
+	      alert('Cannot replace a folder with one of its own contents.');
+	      operationCounter = 0;
+	      setIsCopyingOrMoving(false);
+	      return;
+	    }
+
 	    // eslint-disable-next-line no-alert -- User feedback
-	    alert(`"${itemName}" already exists in the destination.`);
-	    setIsCopyingOrMoving(false);
-	    return;
+	    const shouldReplace = confirm(
+	      `"${itemName}" already exists in the destination.\n\n` +
+	      'Click OK to replace the existing item, or Cancel to stop.'
+	    );
+
+	    if (!shouldReplace) {
+	      operationCounter = 0;
+	      setIsCopyingOrMoving(false);
+	      return;
+	    }
+
+	    // Create backup of the existing file/folder for undo
+	    try {
+	      const timestamp = Date.now();
+	      const sanitizedPath = targetPath.replaceAll(/[^a-zA-Z\d]/gv, '_');
+	      const backupPath = path$2.join(
+	        undoBackupDir,
+	        `${sanitizedPath}_${timestamp}`
+	      );
+
+	      // Copy existing item to backup before replacing
+	      const backupResult = spawnSync$1('cp', ['-R', targetPath, backupPath]);
+	      /* c8 ignore next 3 - Defensive: requires backup to fail */
+	      if (backupResult.error || backupResult.status !== 0) {
+	        throw new Error('Failed to create backup');
+	      }
+
+	      // Remove the existing item
+	      rmSync(targetPath, {recursive: true, force: true});
+
+	      // Store backup info for potential undo
+	      emit('pushUndo', {
+	        type: 'replace',
+	        path: targetPath,
+	        backupPath
+	      });
+	    /* c8 ignore next 6 - Defensive: backup failures are rare */
+	    } catch (err) {
+	      // eslint-disable-next-line no-alert -- User feedback
+	      alert(`Failed to replace: ${(/** @type {Error} */ (err)).message}`);
+	      operationCounter = 0;
+	      setIsCopyingOrMoving(false);
+	      return;
+	    }
 	  }
 
 	  try {
@@ -15313,6 +15430,7 @@
 
 	    // Reset flag after a short delay
 	    setTimeout(() => {
+	      operationCounter = 0;
 	      setIsCopyingOrMoving(false);
 	    }, 100);
 	  /* c8 ignore next 7 - Defensive: difficult to trigger errors in cp/rename */
@@ -15322,6 +15440,7 @@
 	      `Failed to ${isCopy ? 'copy' : 'move'}: ` +
 	      (/** @type {Error} */ (err)).message
 	    );
+	    operationCounter = 0;
 	    setIsCopyingOrMoving(false);
 	  }
 	}
@@ -16954,6 +17073,12 @@
 	 * @returns {void}
 	 */
 	function addDragAndDropSupport (element, itemPath, isFolder) {
+	  // Prevent duplicate listener registration
+	  if (element.dataset.dragEnabled) {
+	    return;
+	  }
+	  element.dataset.dragEnabled = 'true';
+
 	  // Make the entire list item draggable (so icon area is draggable too)
 	  element.setAttribute('draggable', 'true');
 
@@ -17046,7 +17171,7 @@
 
 	      const sourcePath = e.dataTransfer?.getData('text/plain');
 	      const targetPath = itemPath;
-	      if (sourcePath && targetPath) {
+	      if (sourcePath && targetPath && !getIsCopyingOrMoving()) {
 	        copyOrMoveItem(sourcePath, targetPath, e.altKey);
 	      }
 	    });
@@ -17437,10 +17562,11 @@
 	            (targetEl.tagName === 'TD' &&
 	             !targetEl.classList.contains('list-item'))) {
 	          e.preventDefault();
+	          e.stopPropagation();
 	          const sourcePath = e.dataTransfer?.getData('text/plain');
 	          /* c8 ignore next -- TS */
 	          const targetDir = iconViewTable.dataset.basePath || '/';
-	          if (sourcePath && targetDir) {
+	          if (sourcePath && targetDir && !getIsCopyingOrMoving()) {
 	            copyOrMoveItem$1(sourcePath, targetDir, e.altKey);
 	          }
 	        }
@@ -17918,59 +18044,66 @@
 	        millerColumnsDiv.setAttribute('tabindex', '0');
 	        millerColumnsDiv.focus();
 
-	        // Add drop support for miller-columns background (empty space)
-	        millerColumnsDiv.addEventListener('dragover', (e) => {
-	          const {target} = e;
-	          const targetEl = /** @type {HTMLElement} */ (target);
-	          // Only handle drops on columns or empty space, not on list items
-	          if (targetEl.classList.contains('miller-column') ||
-	              targetEl === millerColumnsDiv) {
-	            e.preventDefault();
-	            if (e.dataTransfer) {
-	              e.dataTransfer.dropEffect = e.altKey ? 'copy' : 'move';
-	            }
-	          }
-	        });
+	        // Add drop support only if not already added
+	        if (!millerColumnsDiv.dataset.dropHandlerAdded) {
+	          millerColumnsDiv.dataset.dropHandlerAdded = 'true';
 
-	        millerColumnsDiv.addEventListener('drop', (e) => {
-	          const {target} = e;
-	          const targetEl = /** @type {HTMLElement} */ (target);
-	          // Only handle drops on columns or empty space, not on list items
-	          if (targetEl.classList.contains('miller-column') ||
-	              targetEl === millerColumnsDiv) {
-	            e.preventDefault();
-	            const sourcePath = e.dataTransfer?.getData('text/plain');
-
-	            // Determine target directory based on which column was clicked
-	            let targetDir = getBasePath();
-	            if (targetEl.classList.contains('miller-column')) {
-	              // Find the selected item in the previous visible column
-	              const columns = [
-	                ...millerColumnsDiv.querySelectorAll('ul.miller-column')
-	              ];
-	              const visibleColumns = columns.filter(
-	                (col) => !col.classList.contains('miller-collapse')
-	              );
-	              const columnIndex = visibleColumns.indexOf(targetEl);
-	              if (columnIndex > 0) {
-	                const prevColumn = visibleColumns[columnIndex - 1];
-	                const selectedItem = prevColumn.querySelector(
-	                  'li.miller-selected a'
-	                );
-	                if (selectedItem) {
-	                  const selectedEl = /** @type {HTMLElement} */ (selectedItem);
-	                  targetDir = selectedEl.dataset.path
-	                    ? decodeURIComponent(selectedEl.dataset.path)
-	                    : targetDir;
-	                }
+	          // Add drop support for miller-columns background (empty space)
+	          millerColumnsDiv.addEventListener('dragover', (e) => {
+	            const {target} = e;
+	            const targetEl = /** @type {HTMLElement} */ (target);
+	            // Only handle drops on columns or empty space, not on list items
+	            if (targetEl.classList.contains('miller-column') ||
+	                targetEl === millerColumnsDiv) {
+	              e.preventDefault();
+	              if (e.dataTransfer) {
+	                e.dataTransfer.dropEffect = e.altKey ? 'copy' : 'move';
 	              }
 	            }
+	          });
 
-	            if (sourcePath && targetDir) {
-	              copyOrMoveItem$1(sourcePath, targetDir, e.altKey);
+	          millerColumnsDiv.addEventListener('drop', (e) => {
+	            const {target} = e;
+	            const targetEl = /** @type {HTMLElement} */ (target);
+	            // Only handle drops on columns or empty space, not on list items
+	            if (targetEl.classList.contains('miller-column') ||
+	                targetEl === millerColumnsDiv) {
+	              e.preventDefault();
+	              e.stopPropagation();
+	              const sourcePath = e.dataTransfer?.getData('text/plain');
+
+	              // Determine target directory based on which column was clicked
+	              let targetDir = getBasePath();
+	              if (targetEl.classList.contains('miller-column')) {
+	                // Find the selected item in the previous visible column
+	                const columns = [
+	                  ...millerColumnsDiv.querySelectorAll('ul.miller-column')
+	                ];
+	                const visibleColumns = columns.filter(
+	                  (col) => !col.classList.contains('miller-collapse')
+	                );
+	                const columnIndex = visibleColumns.indexOf(targetEl);
+	                if (columnIndex > 0) {
+	                  const prevColumn = visibleColumns[columnIndex - 1];
+	                  const selectedItem = prevColumn.querySelector(
+	                    'li.miller-selected a'
+	                  );
+	                  if (selectedItem) {
+	                    const selectedEl =
+	                      /** @type {HTMLElement} */ (selectedItem);
+	                    targetDir = selectedEl.dataset.path
+	                      ? decodeURIComponent(selectedEl.dataset.path)
+	                      : targetDir;
+	                  }
+	                }
+	              }
+
+	              if (sourcePath && targetDir && !getIsCopyingOrMoving()) {
+	                copyOrMoveItem$1(sourcePath, targetDir, e.altKey);
+	              }
 	            }
-	          }
-	        });
+	          });
+	        } // Close the dropHandlerAdded check
 
 	        // Add keyboard shortcuts for miller columns
 	        const keydownListener = (e) => {

@@ -3,7 +3,6 @@ import {emit} from '../events/eventBus.js';
 import {
   isDeleting,
   setIsDeleting,
-  isCopyingOrMoving,
   setIsCopyingOrMoving
 } from '../state/flags.js';
 
@@ -107,6 +106,11 @@ export function deleteItem (itemPath) {
   }
 }
 
+// Track last operation to prevent duplicate dialogs
+let lastOperationKey = '';
+let lastOperationTime = 0;
+let operationCounter = 0;
+
 /**
  * Copy or move an item.
  * @param {string} sourcePath
@@ -114,11 +118,27 @@ export function deleteItem (itemPath) {
  * @param {boolean} isCopy
  */
 export function copyOrMoveItem (sourcePath, targetDir, isCopy) {
-  // Prevent multiple simultaneous copy/move operations
-  if (isCopyingOrMoving) {
+  // Check and block IMMEDIATELY before doing anything else
+  if (operationCounter > 0) {
     return;
   }
 
+  // Set counter immediately to block subsequent calls
+  operationCounter = 1;
+
+  // Build operation key for deduplication
+  const operationKey = `${sourcePath}:${targetDir}:${isCopy}`;
+  const now = Date.now();
+
+  // Check for duplicate operation within 500ms
+  if (operationKey === lastOperationKey && now - lastOperationTime < 500) {
+    operationCounter = 0;
+    return;
+  }
+
+  // Update tracking variables
+  lastOperationKey = operationKey;
+  lastOperationTime = now;
   setIsCopyingOrMoving(true);
 
   const decodedSource = decodeURIComponent(sourcePath);
@@ -128,16 +148,79 @@ export function copyOrMoveItem (sourcePath, targetDir, isCopy) {
 
   // Silently ignore if dragging to the same location or onto itself
   if (decodedSource === targetPath || decodedSource === decodedTargetDir) {
+    operationCounter = 0;
+    setIsCopyingOrMoving(false);
+    return;
+  }
+
+  // Prevent moving/copying a folder into its own descendant
+  if (decodedTargetDir.startsWith(decodedSource + path.sep) ||
+      decodedTargetDir === decodedSource) {
+    // eslint-disable-next-line no-alert -- User feedback
+    alert('Cannot copy or move a folder into itself or its descendants.');
+    operationCounter = 0;
     setIsCopyingOrMoving(false);
     return;
   }
 
   // Check if target already exists
   if (existsSync(targetPath)) {
+    // Check if source is inside the target that would be replaced
+    // This would cause the source to be deleted before the operation
+    if (decodedSource.startsWith(targetPath + path.sep) ||
+        path.dirname(decodedSource) === targetPath) {
+      // eslint-disable-next-line no-alert -- User feedback
+      alert('Cannot replace a folder with one of its own contents.');
+      operationCounter = 0;
+      setIsCopyingOrMoving(false);
+      return;
+    }
+
     // eslint-disable-next-line no-alert -- User feedback
-    alert(`"${itemName}" already exists in the destination.`);
-    setIsCopyingOrMoving(false);
-    return;
+    const shouldReplace = confirm(
+      `"${itemName}" already exists in the destination.\n\n` +
+      'Click OK to replace the existing item, or Cancel to stop.'
+    );
+
+    if (!shouldReplace) {
+      operationCounter = 0;
+      setIsCopyingOrMoving(false);
+      return;
+    }
+
+    // Create backup of the existing file/folder for undo
+    try {
+      const timestamp = Date.now();
+      const sanitizedPath = targetPath.replaceAll(/[^a-zA-Z\d]/gv, '_');
+      const backupPath = path.join(
+        undoBackupDir,
+        `${sanitizedPath}_${timestamp}`
+      );
+
+      // Copy existing item to backup before replacing
+      const backupResult = spawnSync('cp', ['-R', targetPath, backupPath]);
+      /* c8 ignore next 3 - Defensive: requires backup to fail */
+      if (backupResult.error || backupResult.status !== 0) {
+        throw new Error('Failed to create backup');
+      }
+
+      // Remove the existing item
+      rmSync(targetPath, {recursive: true, force: true});
+
+      // Store backup info for potential undo
+      emit('pushUndo', {
+        type: 'replace',
+        path: targetPath,
+        backupPath
+      });
+    /* c8 ignore next 6 - Defensive: backup failures are rare */
+    } catch (err) {
+      // eslint-disable-next-line no-alert -- User feedback
+      alert(`Failed to replace: ${(/** @type {Error} */ (err)).message}`);
+      operationCounter = 0;
+      setIsCopyingOrMoving(false);
+      return;
+    }
   }
 
   try {
@@ -173,6 +256,7 @@ export function copyOrMoveItem (sourcePath, targetDir, isCopy) {
 
     // Reset flag after a short delay
     setTimeout(() => {
+      operationCounter = 0;
       setIsCopyingOrMoving(false);
     }, 100);
   /* c8 ignore next 7 - Defensive: difficult to trigger errors in cp/rename */
@@ -182,6 +266,7 @@ export function copyOrMoveItem (sourcePath, targetDir, isCopy) {
       `Failed to ${isCopy ? 'copy' : 'move'}: ` +
       (/** @type {Error} */ (err)).message
     );
+    operationCounter = 0;
     setIsCopyingOrMoving(false);
   }
 }

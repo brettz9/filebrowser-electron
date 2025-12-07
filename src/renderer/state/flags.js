@@ -44,6 +44,12 @@ export const setIsCopyingOrMoving = (value) => {
 };
 
 /**
+ * Get the isCopyingOrMoving flag.
+ * @returns {boolean}
+ */
+export const getIsCopyingOrMoving = () => isCopyingOrMoving;
+
+/**
  * Set the isWatcherRefreshing flag.
  * @param {boolean} value
  */

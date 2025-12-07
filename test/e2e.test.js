@@ -6790,10 +6790,14 @@ describe('renderer', () => {
           const targetFolder = document.querySelector(
             'a[data-path*="target-folder"]'
           );
-          if (!targetFolder) return {error: 'target not found'};
+          if (!targetFolder) {
+            return {error: 'target not found'};
+          }
 
           const parent = targetFolder.closest('.list-item');
-          if (!parent) return {error: 'parent not found'};
+          if (!parent) {
+            return {error: 'parent not found'};
+          }
 
           // Simulate dragover event
           const dragEvent = new DragEvent('dragover', {
@@ -6881,7 +6885,9 @@ describe('renderer', () => {
             'a[data-path*="folder2"]'
           )?.closest('.list-item');
 
-          if (!folder1 || !folder2) return;
+          if (!folder1 || !folder2) {
+            return;
+          }
 
           // Start hovering over folder1
           const dragEvent1 = new DragEvent('dragover', {
@@ -6979,14 +6985,16 @@ describe('renderer', () => {
 
         // Simulate drag by dispatching dragover event on the target cell
         const result = await page.evaluate(() => {
-          const targetCell = Array.from(
-            document.querySelectorAll('td.list-item')
-          ).find((cell) => {
+          const targetCell = [
+            ...document.querySelectorAll('td.list-item')
+          ].find((cell) => {
             const link = cell.querySelector('a[data-path*="target"]');
             return link !== null;
           });
 
-          if (!targetCell) return {error: 'target not found'};
+          if (!targetCell) {
+            return {error: 'target not found'};
+          }
 
           // Simulate dragover event
           const dragEvent = new DragEvent('dragover', {

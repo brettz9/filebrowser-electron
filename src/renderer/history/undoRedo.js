@@ -21,12 +21,12 @@ try {
 
 /**
  * @typedef UndoAction
- * @property {'create'|'delete'|'rename'|'move'|'copy'} type
+ * @property {'create'|'delete'|'rename'|'move'|'copy'|'replace'} type
  * @property {string} path - The path involved in the operation
  * @property {string} [oldPath] - For rename/move operations
  * @property {string} [newPath] - For rename/move operations
  * @property {boolean} [wasDirectory] - For delete operations
- * @property {string} [backupPath] - For delete operations (temp backup)
+ * @property {string} [backupPath] - For delete/replace operations (temp backup)
  */
 
 /** @type {UndoAction[]} */
@@ -95,6 +95,24 @@ export const performUndo = (changePath) => {
       if (action.newPath && action.oldPath && existsSync(action.newPath)) {
         renameSync(action.newPath, action.oldPath);
         redoStack.push(action);
+      }
+      break;
+    }
+    case 'replace': {
+      // Undo replace: restore the replaced item from backup
+      if (action.backupPath && existsSync(action.backupPath)) {
+        // Remove the new item
+        if (existsSync(action.path)) {
+          rmSync(action.path, {recursive: true, force: true});
+        }
+        // Restore the backed-up item
+        const cpResult = spawnSync(
+          'cp',
+          ['-R', action.backupPath, action.path]
+        );
+        if (cpResult.status === 0) {
+          redoStack.push(action);
+        }
       }
       break;
     }
@@ -167,6 +185,15 @@ export const performRedo = (changePath) => {
         if (cpResult.status === 0) {
           undoStack.push(action);
         }
+      }
+      break;
+    }
+    case 'replace': {
+      // Redo replace: remove backup and keep the new item
+      if (action.backupPath && existsSync(action.backupPath)) {
+        // Just remove the backup - the replaced item should already be there
+        rmSync(action.backupPath, {recursive: true, force: true});
+        undoStack.push({...action, backupPath: undefined});
       }
       break;
     }
