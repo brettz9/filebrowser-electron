@@ -87,9 +87,6 @@ done
 
 ## Misc. bugs
 
-1. Prevent error upon dragging bad condition
-1. Sometime problem selecting folders to drag them
-
 1. Provide drag-and-drop files/folders visual feedback
 1. Allow navigating into folders during drag-and-drop
 

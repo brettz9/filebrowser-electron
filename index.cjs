@@ -16882,6 +16882,7 @@
 	 * @returns {void}
 	 */
 	function addDragAndDropSupport (element, itemPath, isFolder) {
+	  // Make the entire list item draggable (so icon area is draggable too)
 	  element.setAttribute('draggable', 'true');
 
 	  element.addEventListener('dragstart', (e) => {
@@ -16893,7 +16894,8 @@
 
 	  // Only allow drop on folders
 	  if (isFolder) {
-	    element.addEventListener('dragover', (e) => {
+	    const dropTarget = element;
+	    dropTarget.addEventListener('dragover', (e) => {
 	      e.preventDefault();
 	      /* c8 ignore next 3 -- dataTransfer always present in modern browsers */
 	      if (e.dataTransfer) {
@@ -16901,8 +16903,9 @@
 	      }
 	    });
 
-	    element.addEventListener('drop', (e) => {
+	    dropTarget.addEventListener('drop', (e) => {
 	      e.preventDefault();
+	      e.stopPropagation(); // Prevent bubbling to parent drop handlers
 	      const sourcePath = e.dataTransfer?.getData('text/plain');
 	      const targetPath = itemPath;
 	      if (sourcePath && targetPath) {
@@ -17477,6 +17480,11 @@
 	              }
 	            }, [title]]
 	        ]);
+
+	        // Add drag-and-drop support immediately after creating the item
+	        const itemPath = childDirectory + '/' + encodeURIComponent(title);
+	        addDragAndDropSupport(li, itemPath, isDir);
+
 	        getIconDataURLForFile(
 	          path.join(childDirectory, title)
 	        ).then((url) => {
