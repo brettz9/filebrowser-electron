@@ -13952,6 +13952,7 @@
 	 *   y?: number,
 	 *   width?: number,
 	 *   height?: number,
+	 *   zIndex?: number,
 	 *   color?: string,
 	 *   html?: string,
 	 *   title?: string,
@@ -14233,6 +14234,7 @@
 	    const y = options.y || Math.random() * (window.innerHeight - 200);
 	    const width = options.width || 200;
 	    const height = options.height || 150;
+	    const zIndex = options.zIndex || 1;
 	    const color = options.color || this.defaultColor;
 	    const html = options.html || '';
 	    const title = options.title || '';
@@ -14243,6 +14245,7 @@
 	    note.style.top = `${y}px`;
 	    note.style.width = `${width}px`;
 	    note.style.minHeight = `${height}px`;
+	    note.style.zIndex = String(zIndex);
 	    note.style.background = color;
 
 	    // Store original height for collapse/expand
@@ -14644,6 +14647,7 @@
 	      y: Number.parseInt(n.element.style.top),
 	      width: n.element.offsetWidth,
 	      height: n.element.offsetHeight,
+	      zIndex: Number.parseInt(n.element.style.zIndex || '1'),
 	      collapsed: n.element.classList.contains('collapsed'),
 	      metadata: n.metadata || {}
 	    }));
@@ -14670,11 +14674,13 @@
 	      ? this.notes.filter((...args) => {
 	        return filter(...args);
 	      })
-	      : this.notes;
+	      : [...this.notes];
 	    notes.forEach((n) => {
 	      n.element.remove();
 	      const idx = this.notes.indexOf(n);
-	      this.notes.splice(idx, 1);
+	      if (idx !== -1) {
+	        this.notes.splice(idx, 1);
+	      }
 	    });
 	  }
 	}

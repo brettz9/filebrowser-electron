@@ -93,7 +93,6 @@ done
 1. Add breadcrumbs for both views
 1. Ensure copy-paste in context menu
 1. Stickies
-    1. Retain z-index of stickies
     1. Fix icon view and local sticky note creation at root
     1. Fix column view and local sticky note creation at root
     1. Allow escape key in column view (or clicking off folder at root) to show
