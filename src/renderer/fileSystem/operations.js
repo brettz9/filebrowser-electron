@@ -126,8 +126,8 @@ export function copyOrMoveItem (sourcePath, targetDir, isCopy) {
   const itemName = path.basename(decodedSource);
   const targetPath = path.join(decodedTargetDir, itemName);
 
-  // Silently ignore if dragging to the same location
-  if (decodedSource === targetPath) {
+  // Silently ignore if dragging to the same location or onto itself
+  if (decodedSource === targetPath || decodedSource === decodedTargetDir) {
     setIsCopyingOrMoving(false);
     return;
   }

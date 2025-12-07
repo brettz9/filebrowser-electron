@@ -15260,8 +15260,8 @@
 	  const itemName = path$2.basename(decodedSource);
 	  const targetPath = path$2.join(decodedTargetDir, itemName);
 
-	  // Silently ignore if dragging to the same location
-	  if (decodedSource === targetPath) {
+	  // Silently ignore if dragging to the same location or onto itself
+	  if (decodedSource === targetPath || decodedSource === decodedTargetDir) {
 	    setIsCopyingOrMoving(false);
 	    return;
 	  }
