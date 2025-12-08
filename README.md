@@ -43,6 +43,7 @@ done
 - **Rename**: Rename files and folders in place
 - **Copy/Move**:
   - Drag-and-drop files/folders (hold **Option/Alt** key to copy instead of move)
+  - Drag-and-drop files/folders onto **bash** (.sh) or **JavaScript** (.js, .cjs, .mjs) files to execute them with the dropped item as an argument
   - Keyboard shortcuts: **Cmd+C** to copy, **Cmd+X** to cut, **Cmd+V** to paste
   - Context menu: Right-click on files/folders for Cut, Copy, and Paste options
   - Replace confirmation: When pasting to a location with an existing file/folder of the same name, you'll be prompted to replace or cancel
@@ -83,10 +84,6 @@ done
     allowed overriding browser's `file:///` browser (not only for
     directories, but also to allow injecting a button to allow editing
     browsed files as well)
-
-## Misc. features
-
-1. Option to drag-and-drop files onto bash or JavaScript files
 
 ## Misc. bugs
 

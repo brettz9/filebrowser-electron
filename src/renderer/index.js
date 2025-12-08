@@ -43,6 +43,7 @@ import {
   showFolderContextMenu as showFolderContextMenuOp,
   showFileContextMenu as showFileContextMenuOp
 } from './ui/contextMenus.js';
+import {openNewTerminalWithCommand} from './terminal/terminal.js';
 
 // Get Node APIs from the preload script
 const {
@@ -171,19 +172,28 @@ function addDragAndDropSupport (element, itemPath, isFolder) {
     currentHoverTarget = null;
   });
 
-  // Only allow drop on folders
-  if (isFolder) {
+  // Determine if this is an executable file (bash or JavaScript)
+  const decodedPath = decodeURIComponent(itemPath);
+  const ext = path.extname(decodedPath).toLowerCase();
+  const isExecutableFile = !isFolder &&
+    (ext === '.sh' || ext === '.js' || ext === '.cjs' || ext === '.mjs');
+
+  // Allow drop on folders or executable files
+  if (isFolder || isExecutableFile) {
     const dropTarget = element;
     dropTarget.addEventListener('dragover', (e) => {
       e.preventDefault();
       dropTarget.classList.add('drag-over');
       /* c8 ignore next 3 -- dataTransfer always present in modern browsers */
       if (e.dataTransfer) {
-        e.dataTransfer.dropEffect = e.altKey ? 'copy' : 'move';
+        // For executable files, show copy effect to indicate execution
+        e.dataTransfer.dropEffect = isExecutableFile
+          ? 'copy'
+          : (e.altKey ? 'copy' : 'move');
       }
 
-      // Set up hover-to-open timer if not already hovering over this target
-      if (currentHoverTarget !== dropTarget) {
+      // Set up hover-to-open timer only for folders
+      if (isFolder && currentHoverTarget !== dropTarget) {
         // Clear any existing timer
         if (hoverOpenTimer) {
           clearTimeout(hoverOpenTimer);
@@ -194,9 +204,9 @@ function addDragAndDropSupport (element, itemPath, isFolder) {
         // Set timer to open folder after 1 second of hovering
         hoverOpenTimer = setTimeout(() => {
           // Navigate into the folder
-          const decodedPath = decodeURIComponent(itemPath);
+          const navPath = decodeURIComponent(itemPath);
           globalThis.location.hash = `#path=${encodeURIComponent(
-            decodedPath
+            navPath
           )}`;
         }, 1000);
       }
@@ -235,9 +245,40 @@ function addDragAndDropSupport (element, itemPath, isFolder) {
       currentHoverTarget = null;
 
       const sourcePath = e.dataTransfer?.getData('text/plain');
-      const targetPath = itemPath;
-      if (sourcePath && targetPath && !getIsCopyingOrMoving()) {
-        copyOrMoveItemOp(sourcePath, targetPath, e.altKey);
+
+      if (isExecutableFile && sourcePath) {
+        // Execute the file with the dropped file/folder as argument
+        const targetScriptPath = decodeURIComponent(itemPath);
+        const sourcePathDecoded = decodeURIComponent(sourcePath);
+
+        try {
+          if (ext === '.sh') {
+            // Execute bash script
+            /* c8 ignore next 3 -- Hard to test interactive execution */
+            openNewTerminalWithCommand(
+              'bash', targetScriptPath, sourcePathDecoded
+            );
+          } else {
+            // Execute JavaScript file with node
+            /* c8 ignore next 3 -- Hard to test interactive execution */
+            openNewTerminalWithCommand(
+              'node', targetScriptPath, sourcePathDecoded
+            );
+          }
+        } catch (err) {
+          // eslint-disable-next-line no-console -- User feedback
+          console.error('Failed to execute script:', err);
+          // eslint-disable-next-line no-alert -- User feedback
+          alert(`Failed to execute script: ${
+            (/** @type {Error} */ (err)).message
+          }`);
+        }
+      } else if (isFolder) {
+        // Folder drop: copy or move
+        const targetPath = itemPath;
+        if (sourcePath && targetPath && !getIsCopyingOrMoving()) {
+          copyOrMoveItemOp(sourcePath, targetPath, e.altKey);
+        }
       }
     });
   }

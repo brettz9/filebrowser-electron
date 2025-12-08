@@ -14929,7 +14929,7 @@
 	// Get Node APIs from the preload script
 	const {
 	  fs: {existsSync: existsSync$2, rmSync: rmSync$1, mkdirSync: mkdirSync$2, writeFileSync: writeFileSync$1, renameSync: renameSync$2},
-	  spawnSync: spawnSync$2,
+	  spawnSync: spawnSync$3,
 	  path: path$3,
 	  os: os$1
 	} = globalThis.electronAPI;
@@ -15004,7 +15004,7 @@
 	    case 'delete': {
 	      // Undo delete: restore from backup
 	      if (action.backupPath && existsSync$2(action.backupPath)) {
-	        const cpResult = spawnSync$2(
+	        const cpResult = spawnSync$3(
 	          'cp',
 	          ['-R', action.backupPath, action.path]
 	        );
@@ -15033,7 +15033,7 @@
 	          rmSync$1(action.path, {recursive: true, force: true});
 	        }
 	        // Restore the backed-up item
-	        const cpResult = spawnSync$2(
+	        const cpResult = spawnSync$3(
 	          'cp',
 	          ['-R', action.backupPath, action.path]
 	        );
@@ -15088,7 +15088,7 @@
 	          replaceAll(/[^\w.]/gv, '_');
 	        const backupName = `${safeName}.undo-backup-${timestamp}`;
 	        const backupPath = path$3.join(undoBackupDir$1, backupName);
-	        const cpResult = spawnSync$2('cp', ['-R', action.path, backupPath]);
+	        const cpResult = spawnSync$3('cp', ['-R', action.path, backupPath]);
 	        if (cpResult.status === 0) {
 	          rmSync$1(action.path, {recursive: true, force: true});
 	          undoStack.push({...action, backupPath});
@@ -15108,7 +15108,7 @@
 	    case 'copy': {
 	      // Redo copy: copy again
 	      if (action.oldPath && !existsSync$2(action.path)) {
-	        const cpResult = spawnSync$2('cp', ['-R', action.oldPath, action.path]);
+	        const cpResult = spawnSync$3('cp', ['-R', action.oldPath, action.path]);
 	        if (cpResult.status === 0) {
 	          undoStack.push(action);
 	        }
@@ -15200,7 +15200,7 @@
 	const {
 	  fs: {existsSync: existsSync$1, lstatSync, rmSync, renameSync: renameSync$1, mkdirSync: mkdirSync$1},
 	  path: path$2,
-	  spawnSync: spawnSync$1,
+	  spawnSync: spawnSync$2,
 	  os
 	} = globalThis.electronAPI;
 
@@ -15250,7 +15250,7 @@
 	      replaceAll(/[^\w.\-]/gv, '_');
 	    const backupName = `${safeName}.undo-backup-${timestamp}`;
 	    const backupPath = path$2.join(undoBackupDir, backupName);
-	    const cpResult = spawnSync$1('cp', ['-R', decodedPath, backupPath]);
+	    const cpResult = spawnSync$2('cp', ['-R', decodedPath, backupPath]);
 
 	    /* c8 ignore next 3 - Defensive: requires cp command to fail */
 	    if (cpResult.error || cpResult.status !== 0) {
@@ -15388,7 +15388,7 @@
 	      );
 
 	      // Copy existing item to backup before replacing
-	      const backupResult = spawnSync$1('cp', ['-R', targetPath, backupPath]);
+	      const backupResult = spawnSync$2('cp', ['-R', targetPath, backupPath]);
 	      /* c8 ignore next 3 - Defensive: requires backup to fail */
 	      if (backupResult.error || backupResult.status !== 0) {
 	        throw new Error('Failed to create backup');
@@ -15416,7 +15416,7 @@
 	  try {
 	    if (isCopy) {
 	      // Copy operation using cp -R for recursive copy
-	      const cpResult = spawnSync$1('cp', ['-R', decodedSource, targetPath]);
+	      const cpResult = spawnSync$2('cp', ['-R', decodedSource, targetPath]);
 	      /* c8 ignore next 3 - Defensive: requires cp command to fail */
 	      if (cpResult.error || cpResult.status !== 0) {
 	        throw new Error(cpResult.stderr?.toString() || 'Copy failed');
@@ -17068,6 +17068,61 @@
 	  }
 	}
 
+	/* eslint-disable n/no-sync -- For performance */
+
+	// Get Node APIs from the preload script
+	const {
+	  spawnSync: spawnSync$1
+	} = globalThis.electronAPI;
+
+	/**
+	 * Escape a string for safe use in AppleScript string literals.
+	 * @param {string} str - The string to escape
+	 * @returns {string} The escaped string
+	 */
+	function escapeAppleScript (str) {
+	  // Escape backslashes first, then quotes
+	  return str.replaceAll('\\', '\\\\').
+	    replaceAll('"', String.raw`\"`);
+	}
+
+	/**
+	 * Escape a string for safe use in shell commands.
+	 * @param {string} str - The string to escape
+	 * @returns {string} The escaped string safe for shell
+	 */
+	function escapeShell (str) {
+	  // Use single quotes and escape any single quotes in the string
+	  return `'${str.replaceAll("'", String.raw`'\''`)}'`;
+	}
+
+	/**
+	 * @param {string} executable
+	 * @param {string} scriptPath - Path to the script
+	 * @param {string} arg - Argument to pass to the script
+	 * @returns {void}
+	 */
+	function openNewTerminalWithCommand (executable, scriptPath, arg) {
+	  // Properly escape both arguments for shell
+	  const shellCommand = `${executable} ${
+    escapeShell(scriptPath)
+  } ${
+    escapeShell(arg)
+  }`;
+	  // Then escape the whole command for AppleScript
+	  const escapedCommand = escapeAppleScript(shellCommand);
+	  const appleScript = `
+    tell application "Terminal"
+        do script "${escapedCommand}"
+        activate
+    end tell
+  `;
+
+	  spawnSync$1('osascript', ['-e', appleScript], {
+	    stdio: 'inherit'
+	  });
+	}
+
 	/* eslint-disable promise/prefer-await-to-then,
 	  promise/catch-or-return -- Needed for performance */
 
@@ -17198,19 +17253,28 @@
 	    currentHoverTarget = null;
 	  });
 
-	  // Only allow drop on folders
-	  if (isFolder) {
+	  // Determine if this is an executable file (bash or JavaScript)
+	  const decodedPath = decodeURIComponent(itemPath);
+	  const ext = path.extname(decodedPath).toLowerCase();
+	  const isExecutableFile = !isFolder &&
+	    (ext === '.sh' || ext === '.js' || ext === '.cjs' || ext === '.mjs');
+
+	  // Allow drop on folders or executable files
+	  if (isFolder || isExecutableFile) {
 	    const dropTarget = element;
 	    dropTarget.addEventListener('dragover', (e) => {
 	      e.preventDefault();
 	      dropTarget.classList.add('drag-over');
 	      /* c8 ignore next 3 -- dataTransfer always present in modern browsers */
 	      if (e.dataTransfer) {
-	        e.dataTransfer.dropEffect = e.altKey ? 'copy' : 'move';
+	        // For executable files, show copy effect to indicate execution
+	        e.dataTransfer.dropEffect = isExecutableFile
+	          ? 'copy'
+	          : (e.altKey ? 'copy' : 'move');
 	      }
 
-	      // Set up hover-to-open timer if not already hovering over this target
-	      if (currentHoverTarget !== dropTarget) {
+	      // Set up hover-to-open timer only for folders
+	      if (isFolder && currentHoverTarget !== dropTarget) {
 	        // Clear any existing timer
 	        if (hoverOpenTimer) {
 	          clearTimeout(hoverOpenTimer);
@@ -17221,9 +17285,9 @@
 	        // Set timer to open folder after 1 second of hovering
 	        hoverOpenTimer = setTimeout(() => {
 	          // Navigate into the folder
-	          const decodedPath = decodeURIComponent(itemPath);
+	          const navPath = decodeURIComponent(itemPath);
 	          globalThis.location.hash = `#path=${encodeURIComponent(
-            decodedPath
+            navPath
           )}`;
 	        }, 1000);
 	      }
@@ -17262,9 +17326,40 @@
 	      currentHoverTarget = null;
 
 	      const sourcePath = e.dataTransfer?.getData('text/plain');
-	      const targetPath = itemPath;
-	      if (sourcePath && targetPath && !getIsCopyingOrMoving()) {
-	        copyOrMoveItem(sourcePath, targetPath, e.altKey);
+
+	      if (isExecutableFile && sourcePath) {
+	        // Execute the file with the dropped file/folder as argument
+	        const targetScriptPath = decodeURIComponent(itemPath);
+	        const sourcePathDecoded = decodeURIComponent(sourcePath);
+
+	        try {
+	          if (ext === '.sh') {
+	            // Execute bash script
+	            /* c8 ignore next 3 -- Hard to test interactive execution */
+	            openNewTerminalWithCommand(
+	              'bash', targetScriptPath, sourcePathDecoded
+	            );
+	          } else {
+	            // Execute JavaScript file with node
+	            /* c8 ignore next 3 -- Hard to test interactive execution */
+	            openNewTerminalWithCommand(
+	              'node', targetScriptPath, sourcePathDecoded
+	            );
+	          }
+	        } catch (err) {
+	          // eslint-disable-next-line no-console -- User feedback
+	          console.error('Failed to execute script:', err);
+	          // eslint-disable-next-line no-alert -- User feedback
+	          alert(`Failed to execute script: ${
+            (/** @type {Error} */ (err)).message
+          }`);
+	        }
+	      } else if (isFolder) {
+	        // Folder drop: copy or move
+	        const targetPath = itemPath;
+	        if (sourcePath && targetPath && !getIsCopyingOrMoving()) {
+	          copyOrMoveItem(sourcePath, targetPath, e.altKey);
+	        }
 	      }
 	    });
 	  }
