@@ -9,7 +9,8 @@ import path from 'node:path';
 // import {setTimeout} from 'node:timers/promises';
 import {expect, test} from '@playwright/test';
 
-import {initialize, coverage} from './initialize.js';
+import {initialize, coverage} from './utils/initialize.js';
+import {closeWindow} from './utils/closeWindow.js';
 
 /**
  * @typedef {typeof globalThis & {
@@ -3385,6 +3386,8 @@ describe('renderer', () => {
 
       // Context menu should be hidden after clicking
       await expect(contextMenu).not.toBeVisible();
+
+      closeWindow('Users');
     });
 
     test('context menu "Rename" option triggers rename mode', async () => {

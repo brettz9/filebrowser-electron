@@ -84,8 +84,3 @@ done
     allowed overriding browser's `file:///` browser (not only for
     directories, but also to allow injecting a button to allow editing
     browsed files as well)
-
-## Misc. bugs
-
-1. Testing
-    1. Use AppleScript to clean up opened Finder windows from tests?

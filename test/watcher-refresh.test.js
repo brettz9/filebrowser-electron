@@ -4,7 +4,7 @@
     as deleting own files */
 
 import {test, expect} from '@playwright/test';
-import {initialize, coverage} from './initialize.js';
+import {initialize, coverage} from './utils/initialize.js';
 
 const {beforeEach, afterEach, describe} = test;
 

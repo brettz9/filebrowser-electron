@@ -17073,6 +17073,7 @@
 	// Get Node APIs from the preload script
 	const {
 	  spawnSync: spawnSync$1
+	  // @ts-expect-error Ok
 	} = globalThis.electronAPI;
 
 	/**
