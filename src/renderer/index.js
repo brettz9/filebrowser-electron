@@ -1,8 +1,10 @@
 /* eslint-disable promise/prefer-await-to-then,
+  n/no-sync,
   promise/catch-or-return -- Needed for performance */
 import {jml} from 'jamilih';
 import jQuery from 'jquery';
 import addMillerColumnPlugin from 'miller-columns';
+import {filesize} from 'filesize';
 import {chunk} from './utils/array.js';
 import {$, $$} from './utils/dom.js';
 // eslint-disable-next-line no-shadow -- Importing storage as `localStorage`
@@ -48,7 +50,7 @@ import {openNewTerminalWithCommand} from './terminal/terminal.js';
 // Get Node APIs from the preload script
 const {
   fs: {
-    mkdirSync, writeFileSync, existsSync, renameSync
+    mkdirSync, writeFileSync, existsSync, renameSync, lstatSync
   },
   path,
   // eslint-disable-next-line no-shadow -- Different process
@@ -57,7 +59,9 @@ const {
   shell,
   getOpenWithApps,
   getAppIcons,
-  getIconDataURLForFile
+  getIconDataURLForFile,
+  getFileKind,
+  getFileMetadata
 } = globalThis.electronAPI;
 
 // Ensure jamilih uses the browser's DOM instead of jsdom
@@ -821,11 +825,52 @@ function addItems (result, basePath, currentBasePath) {
   const parentMap = new WeakMap();
   const childMap = new WeakMap();
   const columnsInstance = millerColumns.millerColumns({
-    breadcrumbRoot: '/',
     // Options:
-    // preview () {
-    //   return 'preview placeholder';
-    // },
+    breadcrumbRoot: '/',
+    preview ($item) {
+      const elem = $item.find('[data-path]')[0];
+      const pth = decodeURIComponent(elem.dataset.path);
+      const lstat = lstatSync(pth);
+      const kind = getFileKind(pth);
+      const metadata = getFileMetadata(pth);
+
+      // Also has `metadata.ItemDateAdded` (date added) but doesn't
+      //   show on preview
+      // Also has `metadata.ItemFinderComment` (comment) but doesn't
+      //   show on preview
+
+      console.log('metadata2', metadata);
+      /**
+       * @param {number} timestamp
+       * @returns {string}
+       */
+      function getFormattedDate (timestamp) {
+        return new Date(timestamp).toLocaleString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: 'numeric',
+          hour12: true
+        });
+      }
+      return `<div><b>${elem.textContent}</b></div>
+<div>${kind} - ${filesize(lstat.size)}</div>
+<div><b>Information</b></div>
+<table>
+  <tr><td>Created</td><td>${getFormattedDate(lstat.birthtimeMs)}</td></tr>
+  <tr><td>Modified</td><td>${getFormattedDate(lstat.mtimeMs)}</td></tr>
+  <tr><td>Last opened</td><td>${
+    getFormattedDate(metadata.ItemLastUsedDate)
+  }</td></tr>${
+    metadata.ItemVersion
+      ? `<tr><td>Version</td><td>${metadata.ItemVersion}</td></tr>`
+      : ''
+  }</table>
+<div><b>Tags</b></div>
+`;
+    },
     animation () {
       // No-op to avoid need for timeouts and jarring redraws
     },

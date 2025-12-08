@@ -1,3 +1,5 @@
+/* eslint-disable n/no-sync -- Needed for performance */
+
 // Get Node APIs from the preload script
 const {
   fs: {readdirSync, lstatSync},
@@ -26,6 +28,34 @@ export function getBasePath () {
 }
 
 /**
+ * @param {string} folderPath
+ * @returns {boolean}
+ */
+function isMacApp (folderPath) {
+  try {
+    const stats = lstatSync(folderPath);
+
+    if (!stats.isDirectory()) {
+      return false; // Not a directory, so not an app bundle
+    }
+
+    const contentsPath = path.join(folderPath, 'Contents');
+    const macOSPath = path.join(contentsPath, 'MacOS');
+    const infoPlistPath = path.join(contentsPath, 'Info.plist');
+
+    // Check for the presence of key directories and files
+    const contentsExists = lstatSync(contentsPath).isDirectory();
+    const macOSExists = lstatSync(macOSPath).isDirectory();
+    const infoPlistExists = lstatSync(infoPlistPath).isFile();
+
+    return contentsExists && macOSExists && infoPlistExists;
+  } catch (error) {
+    // Handle errors like path not found
+    return false;
+  }
+}
+
+/**
  * @typedef {[isDir: boolean, childDir: string, title: string]} Result
  */
 
@@ -35,13 +65,13 @@ export function getBasePath () {
  * @returns {Result[]}
  */
 export function readDirectory (basePath) {
-  // eslint-disable-next-line n/no-sync -- Needed for performance
   return readdirSync(basePath).
     map((fileOrDir) => {
-      // eslint-disable-next-line n/no-sync -- Needed for performance
-      const stat = lstatSync(path.join(basePath, fileOrDir));
+      const fileOrDirPath = path.join(basePath, fileOrDir);
+      const stat = lstatSync(fileOrDirPath);
+      const isDir = stat.isDirectory() && !isMacApp(fileOrDirPath);
       return /** @type {Result} */ (
-        [stat.isDirectory() || stat.isSymbolicLink(), basePath, fileOrDir]
+        [isDir || stat.isSymbolicLink(), basePath, fileOrDir]
       );
     }).toSorted(([, , a], [, , b]) => {
       return a.localeCompare(b, undefined, {sensitivity: 'base'});

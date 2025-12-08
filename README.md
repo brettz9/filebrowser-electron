@@ -84,3 +84,9 @@ done
     allowed overriding browser's `file:///` browser (not only for
     directories, but also to allow injecting a button to allow editing
     browsed files as well)
+
+## Misc. to-dos
+
+1. Get Mac Category for metadata (apps have)
+1. Allow "Show package contents" context menu for apps
+1. Key commands: shift-cmd-H for Home, shift-cmd-D for Desktop, shift-cmd-A for Applications

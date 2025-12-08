@@ -8,6 +8,19 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const {spawnSync} = require('node:child_process');
+const mdls = require('mdls-ts');
+
+// Try to directly load the native binding for mdls-ts
+let mdlsNative = null;
+try {
+  const mdlsPath = require.resolve('mdls-ts');
+  const mdlsDir = path.dirname(mdlsPath);
+  const nativePath = path.join(mdlsDir, 'build', 'Release', 'mdls_native.node');
+  mdlsNative = require(nativePath);
+  console.log('Successfully loaded native mdls binding directly');
+} catch (err) {
+  console.log('Failed to load native mdls binding:', err.message);
+}
 
 // With sandbox: false and contextIsolation: true, we can require Node.js modules
 // in the preload and expose them synchronously via contextBridge
@@ -27,7 +40,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return {
         isDirectory: () => stat.isDirectory(),
         isSymbolicLink: () => stat.isSymbolicLink(),
-        isFile: () => stat.isFile()
+        isFile: () => stat.isFile(),
+        mtimeMs: stat.mtimeMs,
+        birthtimeMs: stat.birthtimeMs,
+        size: stat.size
       };
     },
     rmSync: (...args) => fs.rmSync(...args),
@@ -52,6 +68,82 @@ contextBridge.exposeInMainWorld('electronAPI', {
     versions: process.versions
   },
   spawnSync: (...args) => spawnSync(...args),
+  getFileMetadata: (filePath) => {
+    const metadata = mdls.mdlsSync(
+      filePath,
+      '-name kMDItemLastUsedDate -name kMDItemDateAdded -name kMDItemVersion -name kMDItemFinderComment'
+    );
+
+    console.log('metadata', metadata);
+
+    // This returns an object like:
+    // {
+    //   ItemLastUsedDate: Date | null,
+    //   ItemDateAdded: Date | null,
+    //   ItemVersion: string | null,
+    //   ItemFinderComment: string | null
+    // }
+    return metadata;
+  },
+  getFileKind: (filePath) => {
+    // Get the "Kind" string as shown in Finder (e.g., "Folder", "PNG Image")
+    try {
+      // Get the UTI (Uniform Type Identifier) for the file
+      const uti = mdlsNative ? mdlsNative.getUTI(filePath) : mdls.getUTI(filePath);
+
+      if (uti) {
+        // Use native method to get localized description from NSWorkspace
+        if (mdlsNative && mdlsNative.getLocalizedDescription) {
+          const localizedDesc = mdlsNative.getLocalizedDescription(uti);
+          if (localizedDesc) {
+            return localizedDesc;
+          }
+        }
+      }
+
+      // Fallback to kMDItemKind for system-provided descriptions
+      const kindResult = spawnSync('mdls', [
+        '-name', 'kMDItemKind', '-raw', filePath
+      ], {
+        encoding: 'utf8'
+      });
+
+      if (kindResult.status === 0 && kindResult.stdout && kindResult.stdout !== '(null)') {
+        return kindResult.stdout.trim();
+      }
+
+      // Final fallback: use file extension for basic kind detection
+      const ext = path.extname(filePath).toLowerCase();
+      const stat = fs.lstatSync(filePath);
+      if (stat.isDirectory()) {
+        return 'Folder';
+      }
+      if (stat.isSymbolicLink()) {
+        return 'Alias';
+      }
+      // Basic extension mapping as fallback
+      const extMap = {
+        '.txt': 'Plain Text',
+        '.js': 'JavaScript Source',
+        '.cjs': 'JavaScript Source',
+        '.mjs': 'JavaScript Source',
+        '.json': 'JSON File',
+        '.md': 'Markdown Document',
+        '.html': 'HTML Document',
+        '.css': 'CSS File',
+        '.sh': 'Shell Script',
+        '.jpg': 'JPEG Image',
+        '.jpeg': 'JPEG Image',
+        '.png': 'PNG Image',
+        '.gif': 'GIF Image',
+        '.pdf': 'PDF Document'
+      };
+      return extMap[ext] || 'Document';
+    } catch (err) {
+      console.log('err', err);
+      return 'Unknown';
+    }
+  },
   shell: {
     openPath: (pathToOpen) => shell.openPath(pathToOpen),
     showItemInFolder: (fullPath) => shell.showItemInFolder(fullPath),
