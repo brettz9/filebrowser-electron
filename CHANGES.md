@@ -1,5 +1,15 @@
 # CHANGES to filebrowser-electron
 
+## 0.9.0 (unreleased)
+
+- feat: move/copy/cut
+- feat: undo/redo
+- feat: add breadcrumbs for icon view
+- feat: option to drag-and-drop files onto bash or JavaScript files
+- fix: properly restore position after external file/folder creation/deletions
+- fix: sticky notes at root
+- fix: misc. fixes
+
 ## 0.8.0
 
 - Switch to AGPL-3.0-only
