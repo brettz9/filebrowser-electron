@@ -788,6 +788,29 @@ function addItems (result, basePath, currentBasePath) {
     animation () {
       // No-op to avoid need for timeouts and jarring redraws
     },
+    reset () {
+      // Update URL to root when escape key resets to root
+      const rootPath = '/';
+      history.replaceState(
+        null,
+        '',
+        location.pathname + '#path=' + encodeURIComponent(rootPath)
+      );
+
+      // Load sticky notes for root path
+      const saved = localStorage.getItem(`stickyNotes-local-${rootPath}`);
+      stickyNotes.clear(({metadata}) => {
+        return metadata.type === 'local';
+      });
+      if (saved) {
+        stickyNotes.loadNotes(JSON.parse(saved));
+        stickyNotes.notes.forEach((note) => {
+          if (note.metadata.type === 'local') {
+            addLocalStickyInputListeners(note, rootPath);
+          }
+        });
+      }
+    },
     // @ts-ignore Sometime bugginess
     current ($item /* , $cols */) {
       /**

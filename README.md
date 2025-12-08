@@ -90,10 +90,5 @@ done
 
 ## Misc. bugs
 
-1. Stickies
-    1. Fix icon view and local sticky note creation at root
-    1. Fix column view and local sticky note creation at root
-    1. Allow escape key in column view (or clicking off folder at root) to show
-        local sticky for root
 1. Testing
     1. Use AppleScript to clean up opened Finder windows from tests?
