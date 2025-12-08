@@ -90,7 +90,6 @@ done
 
 ## Misc. bugs
 
-1. After deleting an external file, prompting a refresh, the scroll should be back to the exact coordinates as before if that is in the viewport
 1. Stickies
     1. Fix icon view and local sticky note creation at root
     1. Fix column view and local sticky note creation at root

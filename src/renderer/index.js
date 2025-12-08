@@ -300,6 +300,36 @@ function changePath () {
   const currentBasePath = getBasePath();
   const basePath = view === 'icon-view' ? currentBasePath : '/';
 
+  // Save scroll positions of selected items before refresh
+  const scrollPositions = new Map();
+  if (view === 'three-columns') {
+    const selectedItems = $$('.miller-columns li.miller-selected');
+    selectedItems.forEach((item) => {
+      const link = item.querySelector('a[data-path], span[data-path]');
+      if (link) {
+        const dataPath = link.dataset.path;
+        const column = item.closest('ul.miller-column');
+        if (column && dataPath) {
+          // Get the column index to identify it after refresh
+          const allColumns = $$('.miller-column');
+          const columnIndex = [...allColumns].indexOf(column);
+
+          // Calculate position within the scrollable area
+          // offsetTop is relative to the column's content
+          // scrollTop is how much we've scrolled
+          // The item's position in the viewport is: offsetTop - scrollTop
+          const viewportPosition = item.offsetTop - column.scrollTop;
+
+          scrollPositions.set(dataPath, {
+            columnIndex,
+            viewportPosition,
+            columnScrollTop: column.scrollTop
+          });
+        }
+      }
+    });
+  }
+
   const localSaved = localStorage.getItem(`stickyNotes-local-${basePath}`);
   stickyNotes.clear(({metadata}) => {
     return metadata.type === 'local';
@@ -315,6 +345,51 @@ function changePath () {
 
   const result = readDirectory(basePath);
   addItems(result, basePath, currentBasePath);
+
+  // Restore scroll positions after refresh
+  if (view === 'three-columns' && scrollPositions.size > 0) {
+    // Use triple requestAnimationFrame to run after the path navigation
+    // scrollIntoView calls (which use double requestAnimationFrame)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const allLinks = $$('a[data-path], span[data-path]');
+
+          scrollPositions.forEach((savedPosition, dataPath) => {
+            // Find by direct comparison since CSS.escape breaks on paths
+            const link = allLinks.find((l) => l.dataset.path === dataPath);
+
+            if (link) {
+              const item = link.closest('li');
+              const column = link.closest('ul.miller-column');
+
+              // Verify we're in the same column by index
+              const allColumns = $$('.miller-column');
+              const columnIndex = [...allColumns].indexOf(column);
+
+              if (item && column &&
+                  columnIndex === savedPosition.columnIndex) {
+                // To maintain the same viewport position:
+                // We want: newOffsetTop - newScrollTop = viewportPosition
+                // So: newScrollTop = newOffsetTop - viewportPosition
+                const targetScrollTop =
+                  item.offsetTop - savedPosition.viewportPosition;
+
+                // Clamp to valid scroll range
+                // (can't scroll negative or beyond content)
+                const maxScroll = column.scrollHeight - column.clientHeight;
+                const newScrollTop =
+                  Math.max(0, Math.min(targetScrollTop, maxScroll));
+
+                // Adjust scroll to maintain the same visual position
+                column.scrollTop = newScrollTop;
+              }
+            }
+          });
+        });
+      });
+    });
+  }
 
   // Setup watcher for the current directory being viewed
   // (not basePath which could be / in list view)
