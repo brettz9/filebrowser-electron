@@ -16,6 +16,7 @@ import {
   addLocalStickyInputListeners,
   addGlobalStickyInputListeners
 } from './stickyNotes/manager.js';
+import {getMacAppCategory} from './macApp/macApp.js';
 import {getClipboard, setClipboard} from './state/clipboard.js';
 import {
   $columns,
@@ -833,13 +834,14 @@ function addItems (result, basePath, currentBasePath) {
       const lstat = lstatSync(pth);
       const kind = getFileKind(pth);
       const metadata = getFileMetadata(pth);
+      const category = getMacAppCategory(pth);
 
       // Also has `metadata.ItemDateAdded` (date added) but doesn't
       //   show on preview
       // Also has `metadata.ItemFinderComment` (comment) but doesn't
       //   show on preview
 
-      console.log('metadata2', metadata);
+      console.log('metadata2', metadata, category);
       /**
        * @param {number} timestamp
        * @returns {string}
@@ -866,6 +868,10 @@ function addItems (result, basePath, currentBasePath) {
   }</td></tr>${
     metadata.ItemVersion
       ? `<tr><td>Version</td><td>${metadata.ItemVersion}</td></tr>`
+      : ''
+  }${
+    category
+      ? `<tr><td>Category</td><td>${category}</td></tr>`
       : ''
   }</table>
 <div><b>Tags</b></div>

@@ -144,6 +144,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return 'Unknown';
     }
   },
+  getLocalizedUTIDescription: (uti) => {
+    // Get localized description for any UTI (file types, app categories, etc.)
+    try {
+      if (mdlsNative && mdlsNative.getLocalizedDescription) {
+        return mdlsNative.getLocalizedDescription(uti);
+      }
+      // Fallback: return the UTI as-is if native binding not available
+      return uti;
+    } catch (err) {
+      console.log('Error getting localized UTI description:', err);
+      return uti;
+    }
+  },
   shell: {
     openPath: (pathToOpen) => shell.openPath(pathToOpen),
     showItemInFolder: (fullPath) => shell.showItemInFolder(fullPath),

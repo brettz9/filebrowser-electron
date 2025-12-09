@@ -1,5 +1,7 @@
 /* eslint-disable n/no-sync -- Needed for performance */
 
+import {isMacApp} from '../macApp/macApp.js';
+
 // Get Node APIs from the preload script
 const {
   fs: {readdirSync, lstatSync},
@@ -25,34 +27,6 @@ export function getBasePath () {
   return path.normalize(
     params.has('path') ? params.get('path') + '/' : '/'
   );
-}
-
-/**
- * @param {string} folderPath
- * @returns {boolean}
- */
-function isMacApp (folderPath) {
-  try {
-    const stats = lstatSync(folderPath);
-
-    if (!stats.isDirectory()) {
-      return false; // Not a directory, so not an app bundle
-    }
-
-    const contentsPath = path.join(folderPath, 'Contents');
-    const macOSPath = path.join(contentsPath, 'MacOS');
-    const infoPlistPath = path.join(contentsPath, 'Info.plist');
-
-    // Check for the presence of key directories and files
-    const contentsExists = lstatSync(contentsPath).isDirectory();
-    const macOSExists = lstatSync(macOSPath).isDirectory();
-    const infoPlistExists = lstatSync(infoPlistPath).isFile();
-
-    return contentsExists && macOSExists && infoPlistExists;
-  } catch (error) {
-    // Handle errors like path not found
-    return false;
-  }
 }
 
 /**
