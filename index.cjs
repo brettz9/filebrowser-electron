@@ -30344,13 +30344,21 @@
 <div class="miller-preview-content">
   <pre style="${preStyle}">${escaped}</pre>
 </div>`;
-	          } catch {
-	            previewContent = '<div>Cannot preview file</div>';
+	          } catch (err) {
+	            const errMsg = err && typeof err === 'object' && 'message' in err
+	              ? String(err.message)
+	              : 'Unknown error';
+	            previewContent = `<div>Cannot preview file: ${errMsg}</div>`;
 	          }
 	        }
 	      }
 
-	      return `<div><b>${elem.textContent}</b></div>
+	      const escapedName = elem.textContent.
+	        replaceAll('&', '&amp;').
+	        replaceAll('<', '&lt;').
+	        replaceAll('>', '&gt;');
+
+	      return `<div><b>${escapedName}</b></div>
 <div>${kind} - ${filesize(lstat.size)}</div>
 ${previewContent}
 <div><b>Information</b></div>
