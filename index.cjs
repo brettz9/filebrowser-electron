@@ -25480,7 +25480,7 @@
 
 	// Get Node APIs from the preload script
 	const {
-	  fs: {existsSync: existsSync$3, readFileSync, lstatSync: lstatSync$4},
+	  fs: {existsSync: existsSync$3, readFileSync: readFileSync$1, lstatSync: lstatSync$4},
 	  path: path$6,
 	  getLocalizedUTIDescription
 	} = globalThis.electronAPI;
@@ -25530,7 +25530,7 @@
 	  }
 
 	  try {
-	    const plistContent = readFileSync(infoPlistPath, 'utf8');
+	    const plistContent = readFileSync$1(infoPlistPath, 'utf8');
 	    const parsedPlist = plist.parse(plistContent);
 	    const category = parsedPlist.LSApplicationCategoryType;
 
@@ -28888,7 +28888,8 @@
 	// Get Node APIs from the preload script
 	const {
 	  fs: {
-	    lstatSync: lstatSync$1
+	    lstatSync: lstatSync$1,
+	    readFileSync
 	  },
 	  path: path$1,
 	  getFileKind: getFileKind$1,
@@ -29276,9 +29277,94 @@ result;
 	              }, ['Change All...']]
 	            ]]
 	          ]
+	          : []),
+
+	        // Preview
+	        ...(lstat.isFile()
+	          ? [
+	            ['div', [
+	              'Preview:',
+	              ['br'],
+	              ['div', {
+	                class: 'info-window-preview',
+	                style: {
+	                  maxWidth: '100%',
+	                  maxHeight: '300px',
+	                  overflow: 'auto',
+	                  border: '1px solid #ccc',
+	                  padding: '8px',
+	                  backgroundColor: '#f9f9f9'
+	                }
+	              }, [
+	                (() => {
+	                  // Get UTI/MIME type
+	                  const utiResult = spawnSync$1(
+	                    'mdls',
+	                    ['-name', 'kMDItemContentType', '-raw', pth],
+	                    {encoding: 'utf8'}
+	                  );
+	                  const uti = utiResult.stdout?.trim() || '';
+
+	                  // Image types
+	                  if ((/image|png|jpeg|gif|svg|webp|bmp|tiff/v).
+	                    test(uti)) {
+	                    return ['img', {
+	                      src: `file://${pth}`,
+	                      style: {
+	                        maxWidth: '100%',
+	                        maxHeight: '280px',
+	                        objectFit: 'contain'
+	                      }
+	                    }];
+	                  }
+
+	                  // PDF
+	                  if ((/pdf/v).test(uti)) {
+	                    return ['embed', {
+	                      src: `file://${pth}`,
+	                      type: 'application/pdf',
+	                      style: {
+	                        width: '100%',
+	                        height: '280px'
+	                      }
+	                    }];
+	                  }
+
+	                  // Text-based files
+	                  if ((/text|json|xml|javascript|source/v).test(uti) ||
+	                    (/\.(?:txt|md|js|ts|html|css|json|xml|sh|py|rb)$/iv).
+	                      test(pth)) {
+	                    try {
+	                      const content = readFileSync(pth, 'utf8');
+	                      const preview = content.length > 5000
+	                        ? content.slice(0, 5000) + '\n\n[... truncated]'
+	                        : content;
+	                      return ['pre', {
+	                        style: {
+	                          margin: 0,
+	                          whiteSpace: 'pre-wrap',
+	                          wordBreak: 'break-word',
+	                          fontSize: '11px',
+	                          fontFamily: 'monospace'
+	                        }
+	                      }, [preview]];
+	                    } catch {
+	                      return ['div', ['Cannot preview file']];
+	                    }
+	                  }
+
+	                  // Default: show file info
+	                  return ['div', [
+	                    'Preview not available for this file type',
+	                    ['br'],
+	                    ['small', [`Type: ${uti || 'Unknown'}`]]
+	                  ]];
+	                })()
+	              ]]
+	            ]]
+	          ]
 	          : [])
 
-	        // Todo: Preview
 	        // Todo: Sharing & Permissions
 	      ]]
 	    ]]
