@@ -46,6 +46,7 @@ import {
   showFolderContextMenu as showFolderContextMenuOp,
   showFileContextMenu as showFileContextMenuOp
 } from './ui/contextMenus.js';
+import {showInfoWindow} from './ui/infoWindow.js';
 import {openNewTerminalWithCommand} from './terminal/terminal.js';
 
 // Get Node APIs from the preload script
@@ -569,7 +570,8 @@ function addItems (result, basePath, currentBasePath) {
         deleteItem,
         getClipboard,
         setClipboard,
-        copyOrMoveItem
+        copyOrMoveItem,
+        showInfoWindow
       },
       e
     );
@@ -591,7 +593,8 @@ function addItems (result, basePath, currentBasePath) {
         getClipboard,
         setClipboard,
         copyOrMoveItem,
-        path
+        path,
+        showInfoWindow
       },
       e
     );
@@ -740,6 +743,18 @@ function addItems (result, basePath, currentBasePath) {
           /* c8 ignore next -- TS */
           const folderPath = iconViewTable.dataset.basePath || '/';
           createNewFolder(folderPath);
+
+        // Cmd+I to show info window
+        } else if (e.metaKey && e.key === 'i') {
+          const selectedRow = iconViewTable.querySelector('tr.selected');
+          if (selectedRow) {
+            e.preventDefault();
+            const selectedEl = /** @type {HTMLElement} */ (selectedRow);
+            const itemPath = selectedEl.dataset.path;
+            if (itemPath) {
+              showInfoWindow({jml, itemPath});
+            }
+          }
 
         // Cmd+C to copy selected item
         } else if (e.metaKey && e.key === 'c') {
@@ -1171,6 +1186,10 @@ function addItems (result, basePath, currentBasePath) {
 
     if (e.metaKey && e.key === 'o' && pth) {
       shell.openPath(pth);
+    // Cmd+I to show info window
+    } else if (e.metaKey && e.key === 'i' && pth) {
+      e.preventDefault();
+      showInfoWindow({jml, itemPath: pth});
     // Cmd+Delete to delete selected item
     } else if (e.metaKey && e.key === 'Backspace' && pth) {
       e.preventDefault();

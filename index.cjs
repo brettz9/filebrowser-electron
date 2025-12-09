@@ -28127,6 +28127,16 @@
 	 *   onComplete?: () => void) => void} deps.startRename - startRename fn
 	 * @param {(itemPath: string) => void} deps.deleteItem
 	 *   deleteItem function
+	 * @param {() => {path: string, isCopy: boolean}|null} deps.getClipboard
+	 *   getClipboard function
+	 * @param {(clip: {path: string, isCopy: boolean}) => void} deps.setClipboard
+	 *   setClipboard function
+	 * @param {(sourcePath: string, targetDir: string,
+	 *   isCopy: boolean) => void} deps.copyOrMoveItem - copyOrMoveItem function
+	 * @param {(info: {
+	 *   jml: import('jamilih').jml,
+	 *   itemPath: string
+	 * }) => void} deps.showInfoWindow - showInfoWindow fn
 	 * @param {Event} e - Context menu event
 	 * @returns {void}
 	 */
@@ -28135,7 +28145,7 @@
 	    jml, jQuery, path, shell, existsSync, writeFileSync,
 	    decodeURIComponentFn, encodeURIComponentFn,
 	    changePath, startRename, deleteItem,
-	    getClipboard, setClipboard, copyOrMoveItem
+	    getClipboard, setClipboard, copyOrMoveItem, showInfoWindow
 	  },
 	  e
 	) {
@@ -28186,21 +28196,23 @@
 	    }, [
 	      'Copy'
 	    ]],
-	    ...(getClipboard() ? [['li', {
-	      class: 'context-menu-item',
-	      $on: {
-	        click () {
-	          customContextMenu.style.display = 'none';
-	          const clip = getClipboard();
-	          if (clip) {
-	            const targetDir = decodeURIComponentFn(pth);
-	            copyOrMoveItem(clip.path, targetDir, clip.isCopy);
+	    ...(getClipboard()
+	      ? [['li', {
+	        class: 'context-menu-item',
+	        $on: {
+	          click () {
+	            customContextMenu.style.display = 'none';
+	            const clip = getClipboard();
+	            if (clip) {
+	              const targetDir = decodeURIComponentFn(pth);
+	              copyOrMoveItem(clip.path, targetDir, clip.isCopy);
+	            }
 	          }
 	        }
-	      }
-	    }, [
-	      'Paste'
-	    ]]] : []),
+	      }, [
+	        'Paste'
+	      ]]]
+	      : []),
 	    ['li', {
 	      class: 'context-menu-item',
 	      $on: {
@@ -28339,6 +28351,17 @@
 	    ['li', {
 	      class: 'context-menu-item',
 	      $on: {
+	        click () {
+	          customContextMenu.style.display = 'none';
+	          showInfoWindow({jml, itemPath: pth});
+	        }
+	      }
+	    }, [
+	      'Get Info'
+	    ]],
+	    ['li', {
+	      class: 'context-menu-item',
+	      $on: {
 	        click (ev) {
 	          ev.stopPropagation();
 	          customContextMenu.style.display = 'none';
@@ -28407,6 +28430,15 @@
 	 *   onComplete?: () => void) => void} deps.startRename - startRename fn
 	 * @param {(itemPath: string) => void} deps.deleteItem
 	 *   deleteItem function
+	 * @param {() => {path: string, isCopy: boolean}|null} deps.getClipboard
+	 *   getClipboard function
+	 * @param {(clip: {path: string, isCopy: boolean}) => void} deps.setClipboard
+	 *   setClipboard function
+	 * @param {(sourcePath: string, targetDir: string,
+	 *   isCopy: boolean) => void} deps.copyOrMoveItem - copyOrMoveItem function
+	 * @param {typeof import('path')} deps.path - Node path module
+	 * @param {(info: {jml: import('jamilih').jml,
+	 *   itemPath: string}) => void} deps.showInfoWindow - showInfoWindow fn
 	 * @param {Event} e - Context menu event
 	 * @returns {Promise<void>}
 	 */
@@ -28414,7 +28446,8 @@
 	  {
 	    jml, shell, spawnSync, getOpenWithApps, getAppIcons,
 	    startRename, deleteItem,
-	    getClipboard, setClipboard, copyOrMoveItem, path: pathModule
+	    getClipboard, setClipboard, copyOrMoveItem, path: pathModule,
+	    showInfoWindow
 	  },
 	  e
 	) {
@@ -28508,21 +28541,23 @@
 	    }, [
 	      'Copy'
 	    ]],
-	    ...(getClipboard() ? [['li', {
-	      class: 'context-menu-item',
-	      $on: {
-	        click () {
-	          customContextMenu.style.display = 'none';
-	          const clip = getClipboard();
-	          if (clip) {
-	            const targetDir = pathModule.dirname(pth);
-	            copyOrMoveItem(clip.path, targetDir, clip.isCopy);
+	    ...(getClipboard()
+	      ? [['li', {
+	        class: 'context-menu-item',
+	        $on: {
+	          click () {
+	            customContextMenu.style.display = 'none';
+	            const clip = getClipboard();
+	            if (clip) {
+	              const targetDir = pathModule.dirname(pth);
+	              copyOrMoveItem(clip.path, targetDir, clip.isCopy);
+	            }
 	          }
 	        }
-	      }
-	    }, [
-	      'Paste'
-	    ]]] : []),
+	      }, [
+	        'Paste'
+	      ]]]
+	      : []),
 	    ['li', {
 	      class: 'context-menu-item',
 	      $on: {
@@ -28539,6 +28574,17 @@
 	      }
 	    }, [
 	      'Rename'
+	    ]],
+	    ['li', {
+	      class: 'context-menu-item',
+	      $on: {
+	        click () {
+	          customContextMenu.style.display = 'none';
+	          showInfoWindow({jml, itemPath: pth});
+	        }
+	      }
+	    }, [
+	      'Get Info'
 	    ]],
 	    ['li', {
 	      class: 'context-menu-item',
@@ -28731,6 +28777,97 @@
 	        });
 	      });
 	    }
+	  }
+	}
+
+	/**
+	 * Create and show an info window for a file or folder.
+	 *
+	 * @param {object} deps - Dependencies
+	 * @param {import('jamilih').jml} deps.jml - jamilih jml function
+	 * @param {string} deps.itemPath - Path to the file or folder
+	 * @returns {void}
+	 */
+	function showInfoWindow ({jml, itemPath}) {
+	  // Create a draggable info window
+	  const infoWindow = jml('div', {
+	    class: 'info-window'
+	  }, [
+	    // Title bar with close button
+	    ['div', {
+	      class: 'info-window-header'
+	    }, [
+	      ['h3', ['Info']],
+	      ['button', {
+	        class: 'info-window-close',
+	        $on: {
+	          click () {
+	            infoWindow.remove();
+	          }
+	        }
+	      }, ['×']]
+	    ]],
+	    // Content area (to be populated with metadata)
+	    ['div', {
+	      class: 'info-window-content',
+	      dataset: {
+	        path: itemPath
+	      }
+	    }, [
+	      ['p', ['Loading metadata...']]
+	    ]]
+	  ], document.body);
+
+	  // Make the window draggable
+	  const header = infoWindow.querySelector('.info-window-header');
+	  let isDragging = false;
+	  let currentX;
+	  let currentY;
+	  let initialX;
+	  let initialY;
+
+	  header.addEventListener('mousedown', (e) => {
+	    isDragging = true;
+	    initialX = e.clientX - infoWindow.offsetLeft;
+	    initialY = e.clientY - infoWindow.offsetTop;
+	    infoWindow.style.cursor = 'move';
+	  });
+
+	  document.addEventListener('mousemove', (e) => {
+	    if (isDragging) {
+	      e.preventDefault();
+	      currentX = e.clientX - initialX;
+	      currentY = e.clientY - initialY;
+	      infoWindow.style.left = currentX + 'px';
+	      infoWindow.style.top = currentY + 'px';
+	    }
+	  });
+
+	  document.addEventListener('mouseup', () => {
+	    isDragging = false;
+	    infoWindow.style.cursor = 'default';
+	  });
+
+	  // Bring window to front when clicked
+	  infoWindow.addEventListener('mousedown', () => {
+	    // Find max z-index of all info windows
+	    const allInfoWindows = document.querySelectorAll('.info-window');
+	    let maxZ = 10000;
+	    allInfoWindows.forEach((win) => {
+	      const z = Number.parseInt(win.style.zIndex || '10000');
+	      if (z > maxZ) {
+	        maxZ = z;
+	      }
+	    });
+	    infoWindow.style.zIndex = (maxZ + 1).toString();
+	  });
+
+	  // Offset each new window slightly
+	  const existingWindows = document.querySelectorAll('.info-window');
+	  if (existingWindows.length > 1) {
+	    const offset = (existingWindows.length - 1) * 30;
+	    infoWindow.style.left = (100 + offset) + 'px';
+	    infoWindow.style.top = (100 + offset) + 'px';
 	  }
 	}
 
@@ -29315,7 +29452,8 @@
 	        deleteItem: deleteItem$1,
 	        getClipboard,
 	        setClipboard,
-	        copyOrMoveItem: copyOrMoveItem$1
+	        copyOrMoveItem: copyOrMoveItem$1,
+	        showInfoWindow
 	      },
 	      e
 	    );
@@ -29337,7 +29475,8 @@
 	        getClipboard,
 	        setClipboard,
 	        copyOrMoveItem: copyOrMoveItem$1,
-	        path
+	        path,
+	        showInfoWindow
 	      },
 	      e
 	    );
@@ -29486,6 +29625,18 @@
 	          /* c8 ignore next -- TS */
 	          const folderPath = iconViewTable.dataset.basePath || '/';
 	          createNewFolder$1(folderPath);
+
+	        // Cmd+I to show info window
+	        } else if (e.metaKey && e.key === 'i') {
+	          const selectedRow = iconViewTable.querySelector('tr.selected');
+	          if (selectedRow) {
+	            e.preventDefault();
+	            const selectedEl = /** @type {HTMLElement} */ (selectedRow);
+	            const itemPath = selectedEl.dataset.path;
+	            if (itemPath) {
+	              showInfoWindow({jml: jmlExports.jml, itemPath});
+	            }
+	          }
 
 	        // Cmd+C to copy selected item
 	        } else if (e.metaKey && e.key === 'c') {
@@ -29917,6 +30068,10 @@
 
 	    if (e.metaKey && e.key === 'o' && pth) {
 	      shell.openPath(pth);
+	    // Cmd+I to show info window
+	    } else if (e.metaKey && e.key === 'i' && pth) {
+	      e.preventDefault();
+	      showInfoWindow({jml: jmlExports.jml, itemPath: pth});
 	    // Cmd+Delete to delete selected item
 	    } else if (e.metaKey && e.key === 'Backspace' && pth) {
 	      e.preventDefault();

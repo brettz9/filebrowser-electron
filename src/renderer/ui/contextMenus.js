@@ -22,6 +22,16 @@ import {pushUndo} from '../history/undoRedo.js';
  *   onComplete?: () => void) => void} deps.startRename - startRename fn
  * @param {(itemPath: string) => void} deps.deleteItem
  *   deleteItem function
+ * @param {() => {path: string, isCopy: boolean}|null} deps.getClipboard
+ *   getClipboard function
+ * @param {(clip: {path: string, isCopy: boolean}) => void} deps.setClipboard
+ *   setClipboard function
+ * @param {(sourcePath: string, targetDir: string,
+ *   isCopy: boolean) => void} deps.copyOrMoveItem - copyOrMoveItem function
+ * @param {(info: {
+ *   jml: import('jamilih').jml,
+ *   itemPath: string
+ * }) => void} deps.showInfoWindow - showInfoWindow fn
  * @param {Event} e - Context menu event
  * @returns {void}
  */
@@ -30,7 +40,7 @@ export function showFolderContextMenu (
     jml, jQuery, path, shell, existsSync, writeFileSync,
     decodeURIComponentFn, encodeURIComponentFn,
     changePath, startRename, deleteItem,
-    getClipboard, setClipboard, copyOrMoveItem
+    getClipboard, setClipboard, copyOrMoveItem, showInfoWindow
   },
   e
 ) {
@@ -81,21 +91,23 @@ export function showFolderContextMenu (
     }, [
       'Copy'
     ]],
-    ...(getClipboard() ? [['li', {
-      class: 'context-menu-item',
-      $on: {
-        click () {
-          customContextMenu.style.display = 'none';
-          const clip = getClipboard();
-          if (clip) {
-            const targetDir = decodeURIComponentFn(pth);
-            copyOrMoveItem(clip.path, targetDir, clip.isCopy);
+    ...(getClipboard()
+      ? [['li', {
+        class: 'context-menu-item',
+        $on: {
+          click () {
+            customContextMenu.style.display = 'none';
+            const clip = getClipboard();
+            if (clip) {
+              const targetDir = decodeURIComponentFn(pth);
+              copyOrMoveItem(clip.path, targetDir, clip.isCopy);
+            }
           }
         }
-      }
-    }, [
-      'Paste'
-    ]]] : []),
+      }, [
+        'Paste'
+      ]]]
+      : []),
     ['li', {
       class: 'context-menu-item',
       $on: {
@@ -234,6 +246,17 @@ export function showFolderContextMenu (
     ['li', {
       class: 'context-menu-item',
       $on: {
+        click () {
+          customContextMenu.style.display = 'none';
+          showInfoWindow({jml, itemPath: pth});
+        }
+      }
+    }, [
+      'Get Info'
+    ]],
+    ['li', {
+      class: 'context-menu-item',
+      $on: {
         click (ev) {
           ev.stopPropagation();
           customContextMenu.style.display = 'none';
@@ -302,6 +325,15 @@ export function showFolderContextMenu (
  *   onComplete?: () => void) => void} deps.startRename - startRename fn
  * @param {(itemPath: string) => void} deps.deleteItem
  *   deleteItem function
+ * @param {() => {path: string, isCopy: boolean}|null} deps.getClipboard
+ *   getClipboard function
+ * @param {(clip: {path: string, isCopy: boolean}) => void} deps.setClipboard
+ *   setClipboard function
+ * @param {(sourcePath: string, targetDir: string,
+ *   isCopy: boolean) => void} deps.copyOrMoveItem - copyOrMoveItem function
+ * @param {typeof import('path')} deps.path - Node path module
+ * @param {(info: {jml: import('jamilih').jml,
+ *   itemPath: string}) => void} deps.showInfoWindow - showInfoWindow fn
  * @param {Event} e - Context menu event
  * @returns {Promise<void>}
  */
@@ -309,7 +341,8 @@ export async function showFileContextMenu (
   {
     jml, shell, spawnSync, getOpenWithApps, getAppIcons,
     startRename, deleteItem,
-    getClipboard, setClipboard, copyOrMoveItem, path: pathModule
+    getClipboard, setClipboard, copyOrMoveItem, path: pathModule,
+    showInfoWindow
   },
   e
 ) {
@@ -403,21 +436,23 @@ export async function showFileContextMenu (
     }, [
       'Copy'
     ]],
-    ...(getClipboard() ? [['li', {
-      class: 'context-menu-item',
-      $on: {
-        click () {
-          customContextMenu.style.display = 'none';
-          const clip = getClipboard();
-          if (clip) {
-            const targetDir = pathModule.dirname(pth);
-            copyOrMoveItem(clip.path, targetDir, clip.isCopy);
+    ...(getClipboard()
+      ? [['li', {
+        class: 'context-menu-item',
+        $on: {
+          click () {
+            customContextMenu.style.display = 'none';
+            const clip = getClipboard();
+            if (clip) {
+              const targetDir = pathModule.dirname(pth);
+              copyOrMoveItem(clip.path, targetDir, clip.isCopy);
+            }
           }
         }
-      }
-    }, [
-      'Paste'
-    ]]] : []),
+      }, [
+        'Paste'
+      ]]]
+      : []),
     ['li', {
       class: 'context-menu-item',
       $on: {
@@ -434,6 +469,17 @@ export async function showFileContextMenu (
       }
     }, [
       'Rename'
+    ]],
+    ['li', {
+      class: 'context-menu-item',
+      $on: {
+        click () {
+          customContextMenu.style.display = 'none';
+          showInfoWindow({jml, itemPath: pth});
+        }
+      }
+    }, [
+      'Get Info'
     ]],
     ['li', {
       class: 'context-menu-item',

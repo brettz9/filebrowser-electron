@@ -127,3 +127,65 @@ nav button.selected {
 .context-menu-item.has-submenu:hover .context-submenu {
   display: block;
 }
+
+/* Info Window */
+.info-window {
+  position: fixed;
+  top: 100px;
+  left: 100px;
+  width: 400px;
+  min-height: 300px;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+}
+
+.info-window-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: move;
+  background-color: #f5f5f5;
+  border-radius: 8px 8px 0 0;
+}
+
+.info-window-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.info-window-close {
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+}
+
+.info-window-close:hover {
+  color: #000;
+}
+
+.info-window-content {
+  padding: 16px;
+  flex: 1;
+  overflow: auto;
+}
+
+.info-window-content p {
+  margin: 0;
+  color: #666;
+}
