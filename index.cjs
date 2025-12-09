@@ -26612,7 +26612,7 @@
 	// Get Node APIs from the preload script
 	const {
 	  fs: {existsSync: existsSync$2, rmSync: rmSync$1, mkdirSync: mkdirSync$2, writeFileSync: writeFileSync$1, renameSync: renameSync$2},
-	  spawnSync: spawnSync$3,
+	  spawnSync: spawnSync$4,
 	  path: path$4,
 	  os: os$1
 	} = globalThis.electronAPI;
@@ -26687,7 +26687,7 @@
 	    case 'delete': {
 	      // Undo delete: restore from backup
 	      if (action.backupPath && existsSync$2(action.backupPath)) {
-	        const cpResult = spawnSync$3(
+	        const cpResult = spawnSync$4(
 	          'cp',
 	          ['-R', action.backupPath, action.path]
 	        );
@@ -26716,7 +26716,7 @@
 	          rmSync$1(action.path, {recursive: true, force: true});
 	        }
 	        // Restore the backed-up item
-	        const cpResult = spawnSync$3(
+	        const cpResult = spawnSync$4(
 	          'cp',
 	          ['-R', action.backupPath, action.path]
 	        );
@@ -26771,7 +26771,7 @@
 	          replaceAll(/[^\w.]/gv, '_');
 	        const backupName = `${safeName}.undo-backup-${timestamp}`;
 	        const backupPath = path$4.join(undoBackupDir$1, backupName);
-	        const cpResult = spawnSync$3('cp', ['-R', action.path, backupPath]);
+	        const cpResult = spawnSync$4('cp', ['-R', action.path, backupPath]);
 	        if (cpResult.status === 0) {
 	          rmSync$1(action.path, {recursive: true, force: true});
 	          undoStack.push({...action, backupPath});
@@ -26791,7 +26791,7 @@
 	    case 'copy': {
 	      // Redo copy: copy again
 	      if (action.oldPath && !existsSync$2(action.path)) {
-	        const cpResult = spawnSync$3('cp', ['-R', action.oldPath, action.path]);
+	        const cpResult = spawnSync$4('cp', ['-R', action.oldPath, action.path]);
 	        if (cpResult.status === 0) {
 	          undoStack.push(action);
 	        }
@@ -26883,7 +26883,7 @@
 	const {
 	  fs: {existsSync: existsSync$1, lstatSync: lstatSync$2, rmSync, renameSync: renameSync$1, mkdirSync: mkdirSync$1},
 	  path: path$3,
-	  spawnSync: spawnSync$2,
+	  spawnSync: spawnSync$3,
 	  os
 	} = globalThis.electronAPI;
 
@@ -26933,7 +26933,7 @@
 	      replaceAll(/[^\w.\-]/gv, '_');
 	    const backupName = `${safeName}.undo-backup-${timestamp}`;
 	    const backupPath = path$3.join(undoBackupDir, backupName);
-	    const cpResult = spawnSync$2('cp', ['-R', decodedPath, backupPath]);
+	    const cpResult = spawnSync$3('cp', ['-R', decodedPath, backupPath]);
 
 	    /* c8 ignore next 3 - Defensive: requires cp command to fail */
 	    if (cpResult.error || cpResult.status !== 0) {
@@ -27071,7 +27071,7 @@
 	      );
 
 	      // Copy existing item to backup before replacing
-	      const backupResult = spawnSync$2('cp', ['-R', targetPath, backupPath]);
+	      const backupResult = spawnSync$3('cp', ['-R', targetPath, backupPath]);
 	      /* c8 ignore next 3 - Defensive: requires backup to fail */
 	      if (backupResult.error || backupResult.status !== 0) {
 	        throw new Error('Failed to create backup');
@@ -27099,7 +27099,7 @@
 	  try {
 	    if (isCopy) {
 	      // Copy operation using cp -R for recursive copy
-	      const cpResult = spawnSync$2('cp', ['-R', decodedSource, targetPath]);
+	      const cpResult = spawnSync$3('cp', ['-R', decodedSource, targetPath]);
 	      /* c8 ignore next 3 - Defensive: requires cp command to fail */
 	      if (cpResult.error || cpResult.status !== 0) {
 	        throw new Error(cpResult.stderr?.toString() || 'Copy failed');
@@ -28801,7 +28801,7 @@
 
 	// Get Node APIs from the preload script
 	const {
-	  spawnSync: spawnSync$1
+	  spawnSync: spawnSync$2
 	  // @ts-expect-error Ok
 	} = globalThis.electronAPI;
 
@@ -28845,14 +28845,13 @@
   `;
 
 	  // We pass the script as arguments to osascript
-	  const result = spawnSync$1(
+	  const result = spawnSync$2(
 	    'osascript', ['-e', appleScript], {encoding: 'utf8', stdio: 'inherit'}
 	  );
 
 	  if (result.status !== 0) {
+	    // eslint-disable-next-line no-console -- Debugging
 	    console.error(`Error setting comment: ${result.stderr}`);
-	  } else {
-	    console.log(`Comment set successfully for: ${filePath}`);
 	  }
 	}
 
@@ -28878,7 +28877,7 @@
     end tell
   `;
 
-	  spawnSync$1('osascript', ['-e', appleScript], {
+	  spawnSync$2('osascript', ['-e', appleScript], {
 	    stdio: 'inherit'
 	  });
 	}
@@ -28893,7 +28892,10 @@
 	  },
 	  path: path$1,
 	  getFileKind: getFileKind$1,
-	  getFileMetadata: getFileMetadata$1
+	  getFileMetadata: getFileMetadata$1,
+	  getOpenWithApps: getOpenWithApps$1,
+	  getAppIcons: getAppIcons$1,
+	  spawnSync: spawnSync$1
 	} = globalThis.electronAPI;
 
 	/**
@@ -28902,14 +28904,38 @@
 	 * @param {object} deps - Dependencies
 	 * @param {import('jamilih').jml} deps.jml - jamilih jml function
 	 * @param {string} deps.itemPath - Path to the file or folder
-	 * @returns {void}
+	 * @returns {Promise<void>}
 	 */
-	function showInfoWindow ({jml, itemPath}) {
+	async function showInfoWindow ({jml, itemPath}) {
 	  const pth = decodeURIComponent(itemPath);
 	  const baseName = path$1.basename(pth);
 	  const lstat = lstatSync$1(pth);
 	  const kind = getFileKind$1(pth);
 	  const metadata = getFileMetadata$1(pth);
+
+	  // Get open with apps for files (not folders)
+	  let defaultApp = null;
+	  let apps = [];
+	  if (lstat.isFile()) {
+	    const appsOrig = await getOpenWithApps$1(pth);
+	    const icons = await getAppIcons$1(appsOrig);
+
+	    // Add icons to apps
+	    const appsWithIcons = appsOrig.map((app, idx) => {
+	      app.image = icons[idx];
+	      return app;
+	    });
+
+	    // Find default app and filter
+	    apps = appsWithIcons.filter((app) => {
+	      if (app.isSystemDefault) {
+	        defaultApp = app;
+	      }
+	      return !app.isSystemDefault;
+	    }).toSorted((a, b) => {
+	      return a.name.localeCompare(b.name);
+	    });
+	  }
 
 	  // Create a draggable info window
 	  const infoWindow = jml('div', {
@@ -29057,8 +29083,201 @@
 	          }, [
 	            metadata.ItemFinderComment ?? ''
 	          ]]
-	        ]]
-	        // Todo: Open with: and Change All...
+	        ]],
+	        ...(lstat.isFile() && defaultApp
+	          ? [
+	            ['div', [
+	              'Open with:',
+	              ['br'],
+	              ['select', {
+	                $on: {
+	                  change () {
+	                    const selectedPath = this.value;
+	                    if (selectedPath) {
+	                      // Get bundle identifier from app path
+	                      const bundleResult = spawnSync$1(
+	                        '/usr/libexec/PlistBuddy',
+	                        [
+	                          '-c',
+	                          'Print CFBundleIdentifier',
+	                          `${selectedPath}/Contents/Info.plist`
+	                        ],
+	                        {encoding: 'utf8'}
+	                      );
+
+	                      if (bundleResult.status === 0 &&
+	                        bundleResult.stdout) {
+	                        const bundleId = bundleResult.stdout.trim();
+
+	                        // Create binary plist with required structure
+	                        const plistXml = String.raw`<?xml version="1.0" ` +
+	                          String.raw`encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>version</key>
+  <integer>0</integer>
+  <key>bundleidentifier</key>
+  <string>${bundleId}</string>
+  <key>path</key>
+  <string>${selectedPath}</string>
+</dict>
+</plist>`;
+
+	                        // Convert to binary plist, then to hex
+	                        const escaped = plistXml.replaceAll(
+	                          "'",
+	                          String.raw`'\''`
+	                        );
+
+	                        // First convert to binary plist
+	                        const binCmd = `printf '%s' '${escaped}' | ` +
+	                          `plutil -convert binary1 -o /tmp/attr.bin -`;
+	                        const binResult = spawnSync$1('sh', ['-c', binCmd]);
+
+	                        if (binResult.status === 0) {
+	                          // Then convert binary to hex
+	                          const hexResult = spawnSync$1(
+	                            'xxd',
+	                            ['-p', '/tmp/attr.bin'],
+	                            {encoding: 'utf8'}
+	                          );
+
+	                          if (hexResult.status === 0 &&
+	                            hexResult.stdout) {
+	                            // Remove newlines from hex output
+	                            const hexData = hexResult.stdout.
+	                              replaceAll(/\s+/gv, '');
+
+	                            // Set xattr using hex format
+	                            const xattrResult = spawnSync$1('xattr', [
+	                              '-wx',
+	                              'com.apple.LaunchServices.OpenWith',
+	                              hexData,
+	                              pth
+	                            ]);
+
+	                            // Verify it was set
+	                            const verifyResult = spawnSync$1(
+	                              'xattr',
+	                              ['-l', pth],
+	                              {encoding: 'utf8'}
+	                            );
+
+	                            /* eslint-disable-next-line no-console -- Debug */
+	                            console.log('Set OpenWith for:', pth);
+	                            /* eslint-disable-next-line no-console -- Debug */
+	                            console.log('Bundle ID:', bundleId);
+	                            /* eslint-disable-next-line no-console -- Debug */
+	                            console.log('xattr result:', xattrResult.status);
+	                            /* eslint-disable-next-line no-console -- Debug */
+	                            console.log(
+	                              'Verification:',
+	                              verifyResult.stdout
+	                            );
+	                          }
+	                        }
+	                      }
+	                    }
+	                  }
+	                }
+	              }, [
+	                ['option', {value: defaultApp.path}, [
+	                  defaultApp.name + ' (default)'
+	                ]],
+	                ...apps.map((app) => {
+	                  return ['option', {value: app.path}, [app.name]];
+	                })
+	              ]],
+	              ['button', {
+	                style: {marginLeft: '10px'},
+	                $on: {
+	                  click () {
+	                    const select = this.previousElementSibling;
+	                    const selectedPath = select.value;
+	                    if (selectedPath) {
+	                      // Change default app system-wide
+	                      const ext = path$1.extname(pth);
+	                      if (ext) {
+	                        const appName = select.options[
+	                          select.selectedIndex
+	                        ].text.replace(/ \(default\)$/v, '');
+
+	                        // Get bundle ID
+	                        const bundleResult = spawnSync$1(
+	                          '/usr/libexec/PlistBuddy',
+	                          [
+	                            '-c',
+	                            'Print CFBundleIdentifier',
+	                            `${selectedPath}/Contents/Info.plist`
+	                          ],
+	                          {encoding: 'utf8'}
+	                        );
+
+	                        if (bundleResult.status === 0 &&
+	                          bundleResult.stdout) {
+	                          const bundleId = bundleResult.stdout.trim();
+
+	                          // Get UTI for the file
+	                          const utiResult = spawnSync$1(
+	                            'mdls',
+	                            ['-name', 'kMDItemContentType', '-raw', pth],
+	                            {encoding: 'utf8'}
+	                          );
+
+	                          if (utiResult.status === 0 && utiResult.stdout &&
+	                            utiResult.stdout !== '(null)') {
+	                            const uti = utiResult.stdout.trim();
+
+	                            // Use JXA to call LSSetDefaultHandler
+	                            const script = `
+ObjC.import('CoreServices');
+
+var bundleID = '${bundleId}';
+var uti = '${uti}';
+
+var result = $.LSSetDefaultRoleHandlerForContentType(
+  $(uti),
+  $.kLSRolesAll,
+  $(bundleID)
+);
+
+result;
+                            `.trim();
+
+	                            const result = spawnSync$1(
+	                              'osascript',
+	                              ['-l', 'JavaScript', '-e', script],
+	                              {encoding: 'utf8'}
+	                            );
+
+	                            if (result.status === 0) {
+	                              // eslint-disable-next-line no-alert -- Feedback
+	                              alert(
+	                                `Default app for ${ext} files ` +
+	                                `changed to ${appName}`
+	                              );
+	                            } else {
+	                              // eslint-disable-next-line no-alert -- Error
+	                              alert(
+	                                'Failed to change: ' +
+	                                `${result.stderr || 'Unknown error'}`
+	                              );
+	                            }
+	                          } else {
+	                            // eslint-disable-next-line no-alert -- Error
+	                            alert('Could not determine file type');
+	                          }
+	                        }
+	                      }
+	                    }
+	                  }
+	                }
+	              }, ['Change All...']]
+	            ]]
+	          ]
+	          : [])
+
 	        // Todo: Preview
 	        // Todo: Sharing & Permissions
 	      ]]
