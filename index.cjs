@@ -28767,6 +28767,8 @@
 	            const parentRect = parentLi.getBoundingClientRect();
 	            const wouldFitOnTop = parentRect.top - submenuRect.height >= 0;
 
+	            /* c8 ignore next 6 -- Depends on precise viewport
+	              dimensions and submenu size */
 	            if (wouldFitOnTop) {
 	              // Align to bottom of parent instead
 	              submenu.style.top = 'auto';
