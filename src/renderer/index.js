@@ -53,7 +53,7 @@ import {openNewTerminalWithCommand} from './terminal/terminal.js';
 // Get Node APIs from the preload script
 const {
   fs: {
-    mkdirSync, writeFileSync, existsSync, renameSync, lstatSync
+    mkdirSync, writeFileSync, existsSync, renameSync, lstatSync, readFileSync
   },
   path,
   // eslint-disable-next-line no-shadow -- Different process
@@ -854,13 +854,58 @@ function addItems (result, basePath, currentBasePath) {
         ? getMacAppCategory(pth)
         : null;
 
-      // Also has `metadata.ItemDateAdded` (date added) but doesn't
-      //   show on preview; shows on list view
+      // Get UTI for content preview
+      const utiResult = spawnSync(
+        'mdls',
+        ['-name', 'kMDItemContentType', '-raw', pth],
+        {encoding: 'utf8'}
+      );
+      const uti = utiResult.stdout?.trim() || '';
 
-      console.log('metadata2', metadata, category);
+      // Generate preview content based on file type
+      let previewContent = '';
+
+      if (lstat.isFile()) {
+        // Image types
+        if ((/image|png|jpeg|gif|svg|webp|bmp|tiff/v).test(uti)) {
+          previewContent = `
+<div class="miller-preview-content">
+  <img src="file://${pth}" style="max-width: 100%; max-height: 200px; object-fit: contain;" />
+</div>`;
+        } else if ((/pdf/v).test(uti)) {
+          // PDF
+          previewContent = `
+<div class="miller-preview-content">
+  <embed src="file://${pth}" type="application/pdf" style="width: 100%; height: 200px;" />
+</div>`;
+        } else if ((/text|json|xml|javascript|source/v).test(uti) ||
+          (/\.(?:txt|md|js|ts|html|css|json|xml|sh|py|rb)$/iv).test(pth)) {
+          // Text-based files
+          try {
+            const content = readFileSync(pth, 'utf8');
+            const preview = content.length > 1000
+              ? content.slice(0, 1000) + '\n\n[... truncated]'
+              : content;
+            const escaped = preview.
+              replaceAll('&', '&amp;').
+              replaceAll('<', '&lt;').
+              replaceAll('>', '&gt;');
+            const preStyle = 'margin: 0; white-space: pre-wrap; ' +
+              'word-break: break-word; font-size: 10px; ' +
+              'font-family: monospace; max-height: 200px; overflow: auto;';
+            previewContent = `
+<div class="miller-preview-content">
+  <pre style="${preStyle}">${escaped}</pre>
+</div>`;
+          } catch {
+            previewContent = '<div>Cannot preview file</div>';
+          }
+        }
+      }
 
       return `<div><b>${elem.textContent}</b></div>
 <div>${kind} - ${filesize(lstat.size)}</div>
+${previewContent}
 <div><b>Information</b></div>
 <table>
   <tr><td>Created</td><td>${getFormattedDate(lstat.birthtimeMs)}</td></tr>
