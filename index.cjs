@@ -28883,6 +28883,7 @@
 	}
 
 	/* eslint-disable n/no-sync -- Needed for performance */
+	/* eslint-disable sonarjs/publicly-writable-directories -- Safe */
 
 
 	// Get Node APIs from the preload script
@@ -29090,191 +29091,285 @@
 	            ['div', [
 	              'Open with:',
 	              ['br'],
-	              ['select', {
-	                $on: {
-	                  change () {
-	                    const selectedPath = this.value;
-	                    if (selectedPath) {
-	                      // Get bundle identifier from app path
-	                      const bundleResult = spawnSync$1(
-	                        '/usr/libexec/PlistBuddy',
-	                        [
-	                          '-c',
-	                          'Print CFBundleIdentifier',
-	                          `${selectedPath}/Contents/Info.plist`
-	                        ],
-	                        {encoding: 'utf8'}
-	                      );
+	              ['div', {
+	                class: 'custom-select-container'
+	              }, [
+	                // Selected item display (looks like a select)
+	                ['div', {
+	                  class: 'custom-select-trigger',
+	                  $on: {
+	                    click (e) {
+	                      const trigger = e.currentTarget;
+	                      const dropdown = trigger.nextElementSibling;
+	                      const isHidden = dropdown.style.display === 'none' ||
+	                        !dropdown.style.display;
 
-	                      if (bundleResult.status === 0 &&
-	                        bundleResult.stdout) {
-	                        const bundleId = bundleResult.stdout.trim();
+	                      if (isHidden) {
+	                        dropdown.style.display = 'flex';
 
-	                        // Create binary plist with required structure
-	                        const plistXml = String.raw`<?xml version="1.0" ` +
-	                          String.raw`encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
+	                        // Store handler reference
+	                        const closeDropdown = (evt) => {
+	                          // Don't close if clicking on dropdown or trigger
+	                          if (dropdown.contains(evt.target) ||
+	                              trigger.contains(evt.target)) {
+	                            return;
+	                          }
+	                          dropdown.style.display = 'none';
+	                          document.removeEventListener(
+	                            'click',
+	                            closeDropdown,
+	                            true
+	                          );
+	                        };
+
+	                        // Store reference on dropdown for item handlers
+	                        dropdown._closeHandler = closeDropdown;
+
+	                        // Attach immediately after this event finishes
+	                        requestAnimationFrame(() => {
+	                          document.addEventListener(
+	                            'click',
+	                            closeDropdown,
+	                            true
+	                          );
+	                        });
+	                      } else {
+	                        dropdown.style.display = 'none';
+	                      }
+	                    }
+	                  }
+	                }, [
+	                  ['img', {
+	                    src: defaultApp.image
+	                  }],
+	                  ['span', [defaultApp.name + ' (default)']],
+	                  ['span', ['▼']]
+	                ]],
+	                // Dropdown list (hidden by default)
+	                ['div', {
+	                  class: 'app-list'
+	                }, [
+	                  ['div', {
+	                    class: 'app-item default',
+	                    dataset: {appPath: defaultApp.path}
+	                  }, [
+	                    ['img', {
+	                      src: defaultApp.image
+	                    }],
+	                    ['span', [defaultApp.name + ' (default)']]
+	                  ]],
+	                  ...apps.map((app) => {
+	                    return ['div', {
+	                      class: 'app-item selectable',
+	                      dataset: {appPath: app.path},
+	                      $on: {
+	                        click (e) {
+	                          const {appPath} = e.currentTarget.dataset;
+	                          // Set per-file override using xattr
+	                          const bundleResult = spawnSync$1(
+	                            '/usr/libexec/PlistBuddy',
+	                            [
+	                              '-c',
+	                              'Print CFBundleIdentifier',
+	                              `${appPath}/Contents/Info.plist`
+	                            ],
+	                            {encoding: 'utf8'}
+	                          );
+
+	                          if (bundleResult.status === 0 &&
+	                            bundleResult.stdout) {
+	                            const bundleId = bundleResult.stdout.trim();
+
+	                            const plistXml = String.raw`<?xml version="1.0" ` +
+	                              String.raw`encoding="UTF-8"?>
+  <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+  <plist version="1.0">
+  <dict>
   <key>version</key>
   <integer>0</integer>
   <key>bundleidentifier</key>
   <string>${bundleId}</string>
   <key>path</key>
-  <string>${selectedPath}</string>
-</dict>
-</plist>`;
+  <string>${appPath}</string>
+  </dict>
+  </plist>`;
 
-	                        // Convert to binary plist, then to hex
-	                        const escaped = plistXml.replaceAll(
-	                          "'",
-	                          String.raw`'\''`
-	                        );
-
-	                        // First convert to binary plist
-	                        const binCmd = `printf '%s' '${escaped}' | ` +
-	                          `plutil -convert binary1 -o /tmp/attr.bin -`;
-	                        const binResult = spawnSync$1('sh', ['-c', binCmd]);
-
-	                        if (binResult.status === 0) {
-	                          // Then convert binary to hex
-	                          const hexResult = spawnSync$1(
-	                            'xxd',
-	                            ['-p', '/tmp/attr.bin'],
-	                            {encoding: 'utf8'}
-	                          );
-
-	                          if (hexResult.status === 0 &&
-	                            hexResult.stdout) {
-	                            // Remove newlines from hex output
-	                            const hexData = hexResult.stdout.
-	                              replaceAll(/\s+/gv, '');
-
-	                            // Set xattr using hex format
-	                            const xattrResult = spawnSync$1('xattr', [
-	                              '-wx',
-	                              'com.apple.LaunchServices.OpenWith',
-	                              hexData,
-	                              pth
-	                            ]);
-
-	                            // Verify it was set
-	                            const verifyResult = spawnSync$1(
-	                              'xattr',
-	                              ['-l', pth],
-	                              {encoding: 'utf8'}
+	                            const escaped = plistXml.replaceAll(
+	                              "'",
+	                              String.raw`'\''`
 	                            );
 
-	                            /* eslint-disable-next-line no-console -- Debug */
-	                            console.log('Set OpenWith for:', pth);
-	                            /* eslint-disable-next-line no-console -- Debug */
-	                            console.log('Bundle ID:', bundleId);
-	                            /* eslint-disable-next-line no-console -- Debug */
-	                            console.log('xattr result:', xattrResult.status);
-	                            /* eslint-disable-next-line no-console -- Debug */
-	                            console.log(
-	                              'Verification:',
-	                              verifyResult.stdout
+	                            const binCmd = `printf '%s' '${escaped}' | ` +
+	                              `plutil -convert binary1 -o /tmp/attr.bin -`;
+	                            const binResult = spawnSync$1('sh', ['-c', binCmd]);
+
+	                            if (binResult.status === 0) {
+	                              const hexResult = spawnSync$1(
+	                                'xxd',
+	                                ['-p', '/tmp/attr.bin'],
+	                                {encoding: 'utf8'}
+	                              );
+
+	                              if (hexResult.status === 0 &&
+	                                hexResult.stdout) {
+	                                const hexData = hexResult.stdout.
+	                                  replaceAll(/\s+/gv, '');
+
+	                                spawnSync$1('xattr', [
+	                                  '-wx',
+	                                  'com.apple.LaunchServices.OpenWith',
+	                                  hexData,
+	                                  pth
+	                                ]);
+	                              }
+	                            }
+	                          }
+
+	                          // Close the dropdown
+	                          const dropdown = e.currentTarget.parentElement;
+	                          dropdown.style.display = 'none';
+	                          if (dropdown._closeHandler) {
+	                            document.removeEventListener(
+	                              'click',
+	                              dropdown._closeHandler,
+	                              true
 	                            );
+	                          }
+
+	                          // Update the trigger to show selected app
+	                          const trigger = dropdown.previousElementSibling;
+	                          const triggerImg = trigger.querySelector('img');
+	                          const triggerSpan = trigger.querySelector('span');
+	                          const clickedImg = e.currentTarget.
+	                            querySelector('img');
+	                          const clickedSpan = e.currentTarget.
+	                            querySelector('span');
+
+	                          if (triggerImg && clickedImg) {
+	                            triggerImg.src = clickedImg.src;
+	                          }
+	                          if (triggerSpan && clickedSpan) {
+	                            triggerSpan.textContent = clickedSpan.textContent;
 	                          }
 	                        }
 	                      }
-	                    }
-	                  }
-	                }
-	              }, [
-	                ['option', {value: defaultApp.path}, [
-	                  defaultApp.name + ' (default)'
+	                    }, [
+	                      ['img', {
+	                        src: app.image
+	                      }],
+	                      ['span', [app.name]]
+	                    ]];
+	                  })
 	                ]],
-	                ...apps.map((app) => {
-	                  return ['option', {value: app.path}, [app.name]];
-	                })
-	              ]],
-	              ['button', {
-	                style: {marginLeft: '10px'},
-	                $on: {
-	                  click () {
-	                    const select = this.previousElementSibling;
-	                    const selectedPath = select.value;
-	                    if (selectedPath) {
-	                      // Change default app system-wide
-	                      const ext = path$1.extname(pth);
-	                      if (ext) {
-	                        const appName = select.options[
-	                          select.selectedIndex
-	                        ].text.replace(/ \(default\)$/v, '');
+	                ['button', {
+	                  class: 'change-all-button',
+	                  $on: {
+	                    click (e) {
+	                      // Get the currently selected app from the trigger
+	                      const container = e.currentTarget.parentElement;
+	                      const trigger = container.querySelector(
+	                        '.custom-select-trigger'
+	                      );
 
-	                        // Get bundle ID
-	                        const bundleResult = spawnSync$1(
-	                          '/usr/libexec/PlistBuddy',
-	                          [
-	                            '-c',
-	                            'Print CFBundleIdentifier',
-	                            `${selectedPath}/Contents/Info.plist`
-	                          ],
-	                          {encoding: 'utf8'}
-	                        );
+	                      // Find the selected app from the list
+	                      let selectedPath = defaultApp.path;
+	                      let selectedName = defaultApp.name;
 
-	                        if (bundleResult.status === 0 &&
-	                          bundleResult.stdout) {
-	                          const bundleId = bundleResult.stdout.trim();
+	                      // Check trigger text to find which app is selected
+	                      const triggerSpan = trigger?.querySelector('span');
+	                      if (triggerSpan) {
+	                        const displayedName = triggerSpan.textContent;
+	                        const allApps = [defaultApp, ...apps];
+	                        const selectedApp = allApps.find((app) => {
+	                          // Match exact name or name with " (default)"
+	                          return displayedName === app.name ||
+	                            displayedName === `${app.name} (default)`;
+	                        });
 
-	                          // Get UTI for the file
-	                          const utiResult = spawnSync$1(
-	                            'mdls',
-	                            ['-name', 'kMDItemContentType', '-raw', pth],
+	                        if (selectedApp) {
+	                          selectedPath = selectedApp.path;
+	                          selectedName = selectedApp.name;
+	                        }
+	                      }
+
+	                      if (selectedPath) {
+	                        // Change default app system-wide
+	                        const ext = path$1.extname(pth);
+	                        if (ext) {
+	                          const appName = selectedName;
+
+	                          // Get bundle ID
+	                          const bundleResult = spawnSync$1(
+	                            '/usr/libexec/PlistBuddy',
+	                            [
+	                              '-c',
+	                              'Print CFBundleIdentifier',
+	                              `${selectedPath}/Contents/Info.plist`
+	                            ],
 	                            {encoding: 'utf8'}
 	                          );
 
-	                          if (utiResult.status === 0 && utiResult.stdout &&
-	                            utiResult.stdout !== '(null)') {
-	                            const uti = utiResult.stdout.trim();
+	                          if (bundleResult.status === 0 &&
+	                            bundleResult.stdout) {
+	                            const bundleId = bundleResult.stdout.trim();
 
-	                            // Use JXA to call LSSetDefaultHandler
-	                            const script = `
-ObjC.import('CoreServices');
-
-var bundleID = '${bundleId}';
-var uti = '${uti}';
-
-var result = $.LSSetDefaultRoleHandlerForContentType(
-  $(uti),
-  $.kLSRolesAll,
-  $(bundleID)
-);
-
-result;
-                            `.trim();
-
-	                            const result = spawnSync$1(
-	                              'osascript',
-	                              ['-l', 'JavaScript', '-e', script],
+	                            // Get UTI for the file
+	                            const utiResult = spawnSync$1(
+	                              'mdls',
+	                              ['-name', 'kMDItemContentType', '-raw', pth],
 	                              {encoding: 'utf8'}
 	                            );
 
-	                            if (result.status === 0) {
-	                              // eslint-disable-next-line no-alert -- Feedback
-	                              alert(
-	                                `Default app for ${ext} files ` +
-	                                `changed to ${appName}`
+	                            if (utiResult.status === 0 && utiResult.stdout &&
+	                              utiResult.stdout !== '(null)') {
+	                              const uti = utiResult.stdout.trim();
+
+	                              // Use JXA to call LSSetDefaultHandler
+	                              const script = `
+  ObjC.import('CoreServices');
+
+  var bundleID = '${bundleId}';
+  var uti = '${uti}';
+
+  var result = $.LSSetDefaultRoleHandlerForContentType(
+    $(uti),
+    $.kLSRolesAll,
+    $(bundleID)
+  );
+
+  result;
+                              `.trim();
+
+	                              const result = spawnSync$1(
+	                                'osascript',
+	                                ['-l', 'JavaScript', '-e', script],
+	                                {encoding: 'utf8'}
 	                              );
+
+	                              if (result.status === 0) {
+	                                // eslint-disable-next-line no-alert -- Feedback
+	                                alert(
+	                                  `Default app for ${ext} files ` +
+	                                  `changed to ${appName}`
+	                                );
+	                              } else {
+	                                // eslint-disable-next-line no-alert -- Error
+	                                alert(
+	                                  'Failed to change: ' +
+	                                  `${result.stderr || 'Unknown error'}`
+	                                );
+	                              }
 	                            } else {
 	                              // eslint-disable-next-line no-alert -- Error
-	                              alert(
-	                                'Failed to change: ' +
-	                                `${result.stderr || 'Unknown error'}`
-	                              );
+	                              alert('Could not determine file type');
 	                            }
-	                          } else {
-	                            // eslint-disable-next-line no-alert -- Error
-	                            alert('Could not determine file type');
 	                          }
 	                        }
 	                      }
 	                    }
 	                  }
-	                }
-	              }, ['Change All...']]
+	                }, ['Change All...']]
+	              ]]
 	            ]]
 	          ]
 	          : []),
@@ -29286,15 +29381,7 @@ result;
 	              'Preview:',
 	              ['br'],
 	              ['div', {
-	                class: 'info-window-preview',
-	                style: {
-	                  maxWidth: '100%',
-	                  maxHeight: '300px',
-	                  overflow: 'auto',
-	                  border: '1px solid #ccc',
-	                  padding: '8px',
-	                  backgroundColor: '#f9f9f9'
-	                }
+	                class: 'info-window-preview'
 	              }, [
 	                (() => {
 	                  // Get UTI/MIME type
@@ -29309,12 +29396,7 @@ result;
 	                  if ((/image|png|jpeg|gif|svg|webp|bmp|tiff/v).
 	                    test(uti)) {
 	                    return ['img', {
-	                      src: `file://${pth}`,
-	                      style: {
-	                        maxWidth: '100%',
-	                        maxHeight: '280px',
-	                        objectFit: 'contain'
-	                      }
+	                      src: `file://${pth}`
 	                    }];
 	                  }
 
@@ -29322,11 +29404,7 @@ result;
 	                  if ((/pdf/v).test(uti)) {
 	                    return ['embed', {
 	                      src: `file://${pth}`,
-	                      type: 'application/pdf',
-	                      style: {
-	                        width: '100%',
-	                        height: '280px'
-	                      }
+	                      type: 'application/pdf'
 	                    }];
 	                  }
 
@@ -29339,15 +29417,7 @@ result;
 	                      const preview = content.length > 5000
 	                        ? content.slice(0, 5000) + '\n\n[... truncated]'
 	                        : content;
-	                      return ['pre', {
-	                        style: {
-	                          margin: 0,
-	                          whiteSpace: 'pre-wrap',
-	                          wordBreak: 'break-word',
-	                          fontSize: '11px',
-	                          fontFamily: 'monospace'
-	                        }
-	                      }, [preview]];
+	                      return ['pre', {}, [preview]];
 	                    } catch {
 	                      return ['div', ['Cannot preview file']];
 	                    }
