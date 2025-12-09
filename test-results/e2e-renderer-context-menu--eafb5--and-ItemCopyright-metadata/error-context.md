@@ -1,0 +1,102 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - heading "Filebrowser" [level=1] [ref=e2]
+  - generic [ref=e3]:
+    - button "Create sticky for current path" [ref=e4]:
+      - img [ref=e5]
+    - button "Create global sticky" [ref=e6]:
+      - img [ref=e7]
+  - navigation [ref=e8]:
+    - button [ref=e9]:
+      - img [ref=e10]
+    - button [ref=e11]:
+      - img [ref=e12]
+  - heading "Files and folders:" [level=3] [ref=e13]
+  - generic [ref=e14]:
+    - generic [ref=e15] [cursor=pointer]: / ›
+    - generic [ref=e16] [cursor=pointer]: System ›
+    - generic [ref=e17] [cursor=pointer]: Applications
+  - generic [active] [ref=e18]:
+    - list [ref=e19]:
+      - listitem [ref=e20]: .file
+      - listitem [ref=e21]: .nofollow
+      - listitem [ref=e22]: .resolve
+      - listitem [ref=e23]: .vol
+      - listitem [ref=e24]: .VolumeIcon.icns
+      - listitem [ref=e25]: Applications
+      - listitem [ref=e26]: bin
+      - listitem [ref=e27]: cores
+      - listitem [ref=e28]: dev
+      - listitem [ref=e29]: etc
+      - listitem [ref=e30]: home
+      - listitem [ref=e31]: Library
+      - listitem [ref=e32]: opt
+      - listitem [ref=e33]: private
+      - listitem [ref=e34]: sbin
+      - listitem [ref=e35]: System›
+      - listitem [ref=e36]: tmp
+      - listitem [ref=e37]: Users
+      - listitem [ref=e38]: usr
+      - listitem [ref=e39]: var
+      - listitem [ref=e40]: Volumes
+    - list [ref=e41]:
+      - listitem [ref=e42]: .localized
+      - listitem [ref=e43]: Applications›
+      - listitem [ref=e44]: Cryptexes
+      - listitem [ref=e45]: Developer
+      - listitem [ref=e46]: DriverKit
+      - listitem [ref=e47]: iOSSupport
+      - listitem [ref=e48]: Library
+      - listitem [ref=e49]: Volumes
+    - list [ref=e50]:
+      - listitem [ref=e51]: .localized
+      - listitem [ref=e52]: App Store.app
+      - listitem [ref=e53]: Apps.app
+      - listitem [ref=e54]: Automator.app
+      - listitem [ref=e55]: Books.app
+      - listitem [ref=e56]: Calculator.app
+      - listitem [ref=e57]: Calendar.app
+      - listitem [ref=e58]: Chess.app
+      - listitem [ref=e59]: Clock.app
+      - listitem [ref=e60]: Contacts.app
+      - listitem [ref=e61]: Dictionary.app
+      - listitem [ref=e62]: FaceTime.app
+      - listitem [ref=e63]: FindMy.app
+      - listitem [ref=e64]: Font Book.app
+      - listitem [ref=e65]: Freeform.app
+      - listitem [ref=e66]: Games.app
+      - listitem [ref=e67]: Home.app
+      - listitem [ref=e68]: Image Capture.app
+      - listitem [ref=e69]: Image Playground.app
+      - listitem [ref=e70]: iPhone Mirroring.app
+      - listitem [ref=e71]: Journal.app
+      - listitem [ref=e72]: Mail.app
+      - listitem [ref=e73]: Maps.app
+      - listitem [ref=e74]: Messages.app
+      - listitem [ref=e75]: Mission Control.app
+      - listitem [ref=e76]: Music.app
+      - listitem [ref=e77]: News.app
+      - listitem [ref=e78]: Notes.app
+      - listitem [ref=e79]: Passwords.app
+      - listitem [ref=e80]: Phone.app
+      - listitem [ref=e81]: Photo Booth.app
+      - listitem [ref=e82]: Photos.app
+      - listitem [ref=e83]: Podcasts.app
+      - listitem [ref=e84]: Preview.app
+      - listitem [ref=e85]: QuickTime Player.app
+      - listitem [ref=e86]: Reminders.app
+      - listitem [ref=e87]: Shortcuts.app
+      - listitem [ref=e88]: Siri.app
+      - listitem [ref=e89]: Stickies.app
+      - listitem [ref=e90]: Stocks.app
+      - listitem [ref=e91]: System Settings.app
+      - listitem [ref=e92]: TextEdit.app
+      - listitem [ref=e93]: Time Machine.app
+      - listitem [ref=e94]: Tips.app
+      - listitem [ref=e95]: TV.app
+      - listitem [ref=e96]: Utilities
+      - listitem [ref=e97]: VoiceMemos.app
+      - listitem [ref=e98]: Weather.app
+```
