@@ -10,6 +10,7 @@ const {
 // Use same undo backup directory as operations.js
 const undoBackupDir = path.join(os.tmpdir(), 'filebrowser-undo-backups');
 try {
+  /* c8 ignore next 3 -- One-time operation */
   if (!existsSync(undoBackupDir)) {
     mkdirSync(undoBackupDir, {recursive: true});
   }

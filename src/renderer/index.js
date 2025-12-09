@@ -261,13 +261,11 @@ function addDragAndDropSupport (element, itemPath, isFolder) {
         try {
           if (ext === '.sh') {
             // Execute bash script
-            /* c8 ignore next 3 -- Hard to test interactive execution */
             openNewTerminalWithCommand(
               'bash', targetScriptPath, sourcePathDecoded
             );
           } else {
             // Execute JavaScript file with node
-            /* c8 ignore next 3 -- Hard to test interactive execution */
             openNewTerminalWithCommand(
               'node', targetScriptPath, sourcePathDecoded
             );

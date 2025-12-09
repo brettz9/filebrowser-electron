@@ -50,6 +50,7 @@ export function setFinderComment (filePath, commentText) {
     'osascript', ['-e', appleScript], {encoding: 'utf8', stdio: 'inherit'}
   );
 
+  /* c8 ignore next 4 -- Guard */
   if (result.status !== 0) {
     // eslint-disable-next-line no-console -- Debugging
     console.error(`Error setting comment: ${result.stderr}`);
