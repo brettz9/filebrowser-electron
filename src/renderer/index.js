@@ -11,12 +11,13 @@ import {$, $$} from './utils/dom.js';
 import {localStorage} from './utils/storage.js';
 import {getBasePath, readDirectory} from './utils/path.js';
 import {getCurrentView} from './utils/view.js';
+import {getFormattedDate} from './utils/date.js';
 import {
   stickyNotes,
   addLocalStickyInputListeners,
   addGlobalStickyInputListeners
 } from './stickyNotes/manager.js';
-import {getMacAppCategory} from './macApp/macApp.js';
+import {getMacAppCategory, isMacApp} from './macApp/macApp.js';
 import {getClipboard, setClipboard} from './state/clipboard.js';
 import {
   $columns,
@@ -849,29 +850,15 @@ function addItems (result, basePath, currentBasePath) {
       const lstat = lstatSync(pth);
       const kind = getFileKind(pth);
       const metadata = getFileMetadata(pth);
-      const category = getMacAppCategory(pth);
+      const category = isMacApp(pth)
+        ? getMacAppCategory(pth)
+        : null;
 
       // Also has `metadata.ItemDateAdded` (date added) but doesn't
-      //   show on preview
-      // Also has `metadata.ItemFinderComment` (comment) but doesn't
-      //   show on preview
+      //   show on preview; shows on list view
 
       console.log('metadata2', metadata, category);
-      /**
-       * @param {number} timestamp
-       * @returns {string}
-       */
-      function getFormattedDate (timestamp) {
-        return new Date(timestamp).toLocaleString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: 'numeric',
-          hour12: true
-        });
-      }
+
       return `<div><b>${elem.textContent}</b></div>
 <div>${kind} - ${filesize(lstat.size)}</div>
 <div><b>Information</b></div>

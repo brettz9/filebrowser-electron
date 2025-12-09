@@ -71,7 +71,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getFileMetadata: (filePath) => {
     const metadata = mdls.mdlsSync(
       filePath,
-      '-name kMDItemLastUsedDate -name kMDItemDateAdded -name kMDItemVersion -name kMDItemFinderComment'
+      '-name kMDItemLastUsedDate -name kMDItemDateAdded ' +
+      '-name kMDItemVersion -name kMDItemFinderComment ' +
+      '-name kMDItemCopyright -name kMDItemWhereFroms'
     );
 
     console.log('metadata', metadata);
@@ -81,7 +83,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     //   ItemLastUsedDate: Date | null,
     //   ItemDateAdded: Date | null,
     //   ItemVersion: string | null,
-    //   ItemFinderComment: string | null
+    //   ItemFinderComment: string | null,
+    //   ItemCopyright: string | null
     // }
     return metadata;
   },

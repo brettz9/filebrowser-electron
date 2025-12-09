@@ -25480,8 +25480,8 @@
 
 	// Get Node APIs from the preload script
 	const {
-	  fs: {existsSync: existsSync$3, readFileSync, lstatSync: lstatSync$3},
-	  path: path$5,
+	  fs: {existsSync: existsSync$3, readFileSync, lstatSync: lstatSync$4},
+	  path: path$6,
 	  getLocalizedUTIDescription
 	} = globalThis.electronAPI;
 
@@ -25491,20 +25491,20 @@
 	 */
 	function isMacApp (folderPath) {
 	  try {
-	    const stats = lstatSync$3(folderPath);
+	    const stats = lstatSync$4(folderPath);
 
 	    if (!stats.isDirectory()) {
 	      return false; // Not a directory, so not an app bundle
 	    }
 
-	    const contentsPath = path$5.join(folderPath, 'Contents');
-	    const macOSPath = path$5.join(contentsPath, 'MacOS');
-	    const infoPlistPath = path$5.join(contentsPath, 'Info.plist');
+	    const contentsPath = path$6.join(folderPath, 'Contents');
+	    const macOSPath = path$6.join(contentsPath, 'MacOS');
+	    const infoPlistPath = path$6.join(contentsPath, 'Info.plist');
 
 	    // Check for the presence of key directories and files
-	    const contentsExists = lstatSync$3(contentsPath).isDirectory();
-	    const macOSExists = lstatSync$3(macOSPath).isDirectory();
-	    const infoPlistExists = lstatSync$3(infoPlistPath).isFile();
+	    const contentsExists = lstatSync$4(contentsPath).isDirectory();
+	    const macOSExists = lstatSync$4(macOSPath).isDirectory();
+	    const infoPlistExists = lstatSync$4(infoPlistPath).isFile();
 
 	    return contentsExists && macOSExists && infoPlistExists;
 	  } catch (error) {
@@ -25520,8 +25520,8 @@
 	 * @returns {string|null} The application category or null if not found.
 	 */
 	function getMacAppCategory (appPath) {
-	  const appName = path$5.dirname(appPath);
-	  const infoPlistPath = path$5.join(appPath, 'Contents', 'Info.plist');
+	  const appName = path$6.dirname(appPath);
+	  const infoPlistPath = path$6.join(appPath, 'Contents', 'Info.plist');
 
 	  if (!existsSync$3(infoPlistPath)) {
 	    // eslint-disable-next-line no-console -- Debugging
@@ -25559,8 +25559,8 @@
 
 	// Get Node APIs from the preload script
 	const {
-	  fs: {readdirSync, lstatSync: lstatSync$2},
-	  path: path$4,
+	  fs: {readdirSync, lstatSync: lstatSync$3},
+	  path: path$5,
 	  // eslint-disable-next-line no-shadow -- Different process
 	  process: process$1
 	} = globalThis.electronAPI;
@@ -25579,7 +25579,7 @@
 	  }
 
 	  const params = new URLSearchParams(location.hash.slice(1));
-	  return path$4.normalize(
+	  return path$5.normalize(
 	    params.has('path') ? params.get('path') + '/' : '/'
 	  );
 	}
@@ -25596,8 +25596,8 @@
 	function readDirectory (basePath) {
 	  return readdirSync(basePath).
 	    map((fileOrDir) => {
-	      const fileOrDirPath = path$4.join(basePath, fileOrDir);
-	      const stat = lstatSync$2(fileOrDirPath);
+	      const fileOrDirPath = path$5.join(basePath, fileOrDir);
+	      const stat = lstatSync$3(fileOrDirPath);
 	      const isDir = stat.isDirectory() && !isMacApp(fileOrDirPath);
 	      return /** @type {Result} */ (
 	        [isDir || stat.isSymbolicLink(), basePath, fileOrDir]
@@ -25616,6 +25616,23 @@
 	const getCurrentView = () => {
 	  return localStorage.getItem('view') ?? 'icon-view';
 	};
+
+	/**
+	 * Formats a (metadata) date.
+	 * @param {number} timestamp
+	 * @returns {string}
+	 */
+	function getFormattedDate (timestamp) {
+	  return new Date(timestamp).toLocaleString('en-US', {
+	    weekday: 'long',
+	    year: 'numeric',
+	    month: 'long',
+	    day: 'numeric',
+	    hour: 'numeric',
+	    minute: 'numeric',
+	    hour12: true
+	  });
+	}
 
 	/**
 	 * @typedef {{
@@ -26596,12 +26613,12 @@
 	const {
 	  fs: {existsSync: existsSync$2, rmSync: rmSync$1, mkdirSync: mkdirSync$2, writeFileSync: writeFileSync$1, renameSync: renameSync$2},
 	  spawnSync: spawnSync$3,
-	  path: path$3,
+	  path: path$4,
 	  os: os$1
 	} = globalThis.electronAPI;
 
 	// Use same undo backup directory as operations.js
-	const undoBackupDir$1 = path$3.join(os$1.tmpdir(), 'filebrowser-undo-backups');
+	const undoBackupDir$1 = path$4.join(os$1.tmpdir(), 'filebrowser-undo-backups');
 	try {
 	  if (!existsSync$2(undoBackupDir$1)) {
 	    mkdirSync$2(undoBackupDir$1, {recursive: true});
@@ -26750,10 +26767,10 @@
 	      if (existsSync$2(action.path)) {
 	        // Create backup for potential undo
 	        const timestamp = Date.now();
-	        const safeName = path$3.basename(action.path).
+	        const safeName = path$4.basename(action.path).
 	          replaceAll(/[^\w.]/gv, '_');
 	        const backupName = `${safeName}.undo-backup-${timestamp}`;
-	        const backupPath = path$3.join(undoBackupDir$1, backupName);
+	        const backupPath = path$4.join(undoBackupDir$1, backupName);
 	        const cpResult = spawnSync$3('cp', ['-R', action.path, backupPath]);
 	        if (cpResult.status === 0) {
 	          rmSync$1(action.path, {recursive: true, force: true});
@@ -26864,14 +26881,14 @@
 
 	// Get Node APIs from the preload script
 	const {
-	  fs: {existsSync: existsSync$1, lstatSync: lstatSync$1, rmSync, renameSync: renameSync$1, mkdirSync: mkdirSync$1},
-	  path: path$2,
+	  fs: {existsSync: existsSync$1, lstatSync: lstatSync$2, rmSync, renameSync: renameSync$1, mkdirSync: mkdirSync$1},
+	  path: path$3,
 	  spawnSync: spawnSync$2,
 	  os
 	} = globalThis.electronAPI;
 
 	// Create undo backup directory in system temp folder
-	const undoBackupDir = path$2.join(os.tmpdir(), 'filebrowser-undo-backups');
+	const undoBackupDir = path$3.join(os.tmpdir(), 'filebrowser-undo-backups');
 	try {
 	  if (!existsSync$1(undoBackupDir)) {
 	    mkdirSync$1(undoBackupDir, {recursive: true});
@@ -26899,7 +26916,7 @@
 	  setIsDeleting(true);
 
 	  const decodedPath = decodeURIComponent(itemPath);
-	  const itemName = path$2.basename(decodedPath);
+	  const itemName = path$3.basename(decodedPath);
 
 	  // eslint-disable-next-line no-alert -- User confirmation
 	  const confirmed = confirm(`Are you sure you want to delete "${itemName}"?`);
@@ -26912,10 +26929,10 @@
 	  try {
 	    // Create a backup before deleting for undo support
 	    const timestamp = Date.now();
-	    const safeName = path$2.basename(decodedPath).
+	    const safeName = path$3.basename(decodedPath).
 	      replaceAll(/[^\w.\-]/gv, '_');
 	    const backupName = `${safeName}.undo-backup-${timestamp}`;
-	    const backupPath = path$2.join(undoBackupDir, backupName);
+	    const backupPath = path$3.join(undoBackupDir, backupName);
 	    const cpResult = spawnSync$2('cp', ['-R', decodedPath, backupPath]);
 
 	    /* c8 ignore next 3 - Defensive: requires cp command to fail */
@@ -26924,7 +26941,7 @@
 	    }
 
 	    // Check if it's a directory
-	    const stats = lstatSync$1(decodedPath);
+	    const stats = lstatSync$2(decodedPath);
 	    const wasDirectory = stats.isDirectory();
 
 	    // rmSync with recursive and force options to handle both files
@@ -26999,8 +27016,8 @@
 
 	  const decodedSource = decodeURIComponent(sourcePath);
 	  const decodedTargetDir = decodeURIComponent(targetDir);
-	  const itemName = path$2.basename(decodedSource);
-	  const targetPath = path$2.join(decodedTargetDir, itemName);
+	  const itemName = path$3.basename(decodedSource);
+	  const targetPath = path$3.join(decodedTargetDir, itemName);
 
 	  // Silently ignore if dragging to the same location or onto itself
 	  if (decodedSource === targetPath || decodedSource === decodedTargetDir) {
@@ -27010,7 +27027,7 @@
 	  }
 
 	  // Prevent moving/copying a folder into its own descendant
-	  if (decodedTargetDir.startsWith(decodedSource + path$2.sep) ||
+	  if (decodedTargetDir.startsWith(decodedSource + path$3.sep) ||
 	      decodedTargetDir === decodedSource) {
 	    // eslint-disable-next-line no-alert -- User feedback
 	    alert('Cannot copy or move a folder into itself or its descendants.');
@@ -27023,8 +27040,8 @@
 	  if (existsSync$1(targetPath)) {
 	    // Check if source is inside the target that would be replaced
 	    // This would cause the source to be deleted before the operation
-	    if (decodedSource.startsWith(targetPath + path$2.sep) ||
-	        path$2.dirname(decodedSource) === targetPath) {
+	    if (decodedSource.startsWith(targetPath + path$3.sep) ||
+	        path$3.dirname(decodedSource) === targetPath) {
 	      // eslint-disable-next-line no-alert -- User feedback
 	      alert('Cannot replace a folder with one of its own contents.');
 	      operationCounter = 0;
@@ -27048,7 +27065,7 @@
 	    try {
 	      const timestamp = Date.now();
 	      const sanitizedPath = targetPath.replaceAll(/[^a-zA-Z\d]/gv, '_');
-	      const backupPath = path$2.join(
+	      const backupPath = path$3.join(
 	        undoBackupDir,
 	        `${sanitizedPath}_${timestamp}`
 	      );
@@ -27132,7 +27149,7 @@
 	// Get Node APIs from the preload script
 	const {
 	  fs: {realpathSync},
-	  path: path$1,
+	  path: path$2,
 	  parcelWatcher
 	} = globalThis.electronAPI;
 
@@ -27258,7 +27275,7 @@
 	        // Check each event against the watched folder
 	        for (const evt of relevantEvents) {
 	          const eventPath = evt.path;
-	          const eventDir = path$1.dirname(eventPath);
+	          const eventDir = path$2.dirname(eventPath);
 
 	          // Ignore macOS Trash events
 	          // – moving items there shouldn't refresh
@@ -27273,7 +27290,7 @@
 	          // Normalize paths for comparison
 	          // (currentBasePath has trailing slash)
 	          // Also resolve symlinks (macOS /tmp -> /private/tmp)
-	          const normalizedEventDir = path$1.normalize(eventDir + '/');
+	          const normalizedEventDir = path$2.normalize(eventDir + '/');
 	          try {
 	            const resolvedEventDir = realpathSync(normalizedEventDir);
 	            const resolvedCurrentBasePath = realpathSync(currentBasePath);
@@ -27297,7 +27314,7 @@
 	          // Check if change affects visible columns
 	          if (selectedPath) {
 	            const decodedSelectedPath = decodeURIComponent(selectedPath);
-	            const selectedDir = path$1.dirname(decodedSelectedPath);
+	            const selectedDir = path$2.dirname(decodedSelectedPath);
 
 	            // Resolve symlinks for path comparison
 	            let resolvedEventDir = eventDir;
@@ -27328,8 +27345,8 @@
 	            // Case 2b: Change in sibling folder
 	            // (different child, same parent)
 	            // Check if eventDir's parent matches selectedDir's parent
-	            const eventDirParent = path$1.dirname(resolvedEventDir);
-	            const selectedDirParent = path$1.dirname(resolvedSelectedDir);
+	            const eventDirParent = path$2.dirname(resolvedEventDir);
+	            const selectedDirParent = path$2.dirname(resolvedSelectedDir);
 	            if (eventDirParent === selectedDirParent &&
 	                resolvedEventDir !== resolvedSelectedDir) {
 	              changeInVisibleArea = true;
@@ -27355,7 +27372,7 @@
 	                columnsToRefresh.add(eventDir);
 	                break;
 	              }
-	              const nextAncestor = path$1.dirname(ancestorPath);
+	              const nextAncestor = path$2.dirname(ancestorPath);
 	              /* c8 ignore next 4 - Defensive break, unreachable because
 	                 while condition exits when ancestorPath === '/' */
 	              if (nextAncestor === ancestorPath) {
@@ -28780,6 +28797,19 @@
 	  }
 	}
 
+	/* eslint-disable n/no-sync -- Needed for performance */
+
+
+	// Get Node APIs from the preload script
+	const {
+	  fs: {
+	    lstatSync: lstatSync$1
+	  },
+	  path: path$1,
+	  getFileKind: getFileKind$1,
+	  getFileMetadata: getFileMetadata$1
+	} = globalThis.electronAPI;
+
 	/**
 	 * Create and show an info window for a file or folder.
 	 *
@@ -28789,6 +28819,12 @@
 	 * @returns {void}
 	 */
 	function showInfoWindow ({jml, itemPath}) {
+	  const pth = decodeURIComponent(itemPath);
+	  const baseName = path$1.basename(pth);
+	  const lstat = lstatSync$1(pth);
+	  const kind = getFileKind$1(pth);
+	  const metadata = getFileMetadata$1(pth);
+
 	  // Create a draggable info window
 	  const infoWindow = jml('div', {
 	    class: 'info-window'
@@ -28814,7 +28850,112 @@
 	        path: itemPath
 	      }
 	    }, [
-	      ['p', ['Loading metadata...']]
+	      ['p', [
+	        ['table', [
+	          ['tr', [
+	            ['td', [
+	              ['b', [baseName]]
+	            ]],
+	            ['td', [
+	              filesize(lstat.size)
+	            ]]
+	          ]],
+	          ['tr', [
+	            ['td', [
+	              'Modified'
+	            ]],
+	            ['td', [
+	              getFormattedDate(lstat.mtimeMs)
+	            ]]
+	          ]]
+	        ]],
+	        // Todo: Tags textbox
+	        ['div', [
+	          'General',
+	          ['table', [
+	            ['tr', [
+	              ['td', [
+	                'Kind'
+	              ]],
+	              ['td', [
+	                kind
+	              ]]
+	            ]],
+	            ['tr', [
+	              ['td', [
+	                'Created'
+	              ]],
+	              ['td', [
+	                getFormattedDate(lstat.birthtimeMs)
+	              ]]
+	            ]],
+	            ['tr', [
+	              ['td', [
+	                'Modified'
+	              ]],
+	              ['td', [
+	                getFormattedDate(lstat.mtimeMs)
+	              ]]
+	            ]],
+	            ...(metadata.ItemVersion
+	              ? [
+	                ['tr', [
+	                  ['td', [
+	                    'Version'
+	                  ]],
+	                  ['td', [
+	                    metadata.ItemVersion
+	                  ]]
+	                ]]
+	              ]
+	              : []),
+	            ...(metadata.ItemCopyright
+	              ? [
+	                ['tr', [
+	                  ['td', [
+	                    'Copyright'
+	                  ]],
+	                  ['td', [
+	                    metadata.ItemCopyright
+	                  ]]
+	                ]]
+	              ]
+	              : []
+	            )
+	          ]]
+	        ]],
+	        ['div', [
+	          'More Info:',
+	          ['table', [
+	            // Todo: "Where from"
+	            ['tr', [
+	              ['td', [
+	                'Last opened'
+	              ]],
+	              ['td', [
+	                getFormattedDate(metadata.ItemLastUsedDate)
+	              ]]
+	            ]]
+	          ]]
+	        ]],
+	        // Todo: `baseName` input box
+	        ['div', [
+	          'Comments:',
+	          ['br'],
+	          ['textarea', {
+	            $on: {
+	              input () {
+	                // Todo: Save comment
+	              }
+	            }
+	          }, [
+	            metadata.ItemFinderComment ?? ''
+	          ]]
+	        ]]
+	        // Todo: Open with: and Change All...
+	        // Todo: Preview
+	        // Todo: Sharing & Permissions
+	      ]]
 	    ]]
 	  ], document.body);
 
@@ -29731,29 +29872,15 @@
 	      const lstat = lstatSync(pth);
 	      const kind = getFileKind(pth);
 	      const metadata = getFileMetadata(pth);
-	      const category = getMacAppCategory(pth);
+	      const category = isMacApp(pth)
+	        ? getMacAppCategory(pth)
+	        : null;
 
 	      // Also has `metadata.ItemDateAdded` (date added) but doesn't
-	      //   show on preview
-	      // Also has `metadata.ItemFinderComment` (comment) but doesn't
-	      //   show on preview
+	      //   show on preview; shows on list view
 
 	      console.log('metadata2', metadata, category);
-	      /**
-	       * @param {number} timestamp
-	       * @returns {string}
-	       */
-	      function getFormattedDate (timestamp) {
-	        return new Date(timestamp).toLocaleString('en-US', {
-	          weekday: 'long',
-	          year: 'numeric',
-	          month: 'long',
-	          day: 'numeric',
-	          hour: 'numeric',
-	          minute: 'numeric',
-	          hour12: true
-	        });
-	      }
+
 	      return `<div><b>${elem.textContent}</b></div>
 <div>${kind} - ${filesize(lstat.size)}</div>
 <div><b>Information</b></div>

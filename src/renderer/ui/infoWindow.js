@@ -1,3 +1,18 @@
+/* eslint-disable n/no-sync -- Needed for performance */
+
+import {filesize} from 'filesize';
+import {getFormattedDate} from '../utils/date.js';
+
+// Get Node APIs from the preload script
+const {
+  fs: {
+    lstatSync
+  },
+  path,
+  getFileKind,
+  getFileMetadata
+} = globalThis.electronAPI;
+
 /**
  * Create and show an info window for a file or folder.
  *
@@ -7,6 +22,12 @@
  * @returns {void}
  */
 export function showInfoWindow ({jml, itemPath}) {
+  const pth = decodeURIComponent(itemPath);
+  const baseName = path.basename(pth);
+  const lstat = lstatSync(pth);
+  const kind = getFileKind(pth);
+  const metadata = getFileMetadata(pth);
+
   // Create a draggable info window
   const infoWindow = jml('div', {
     class: 'info-window'
@@ -32,7 +53,132 @@ export function showInfoWindow ({jml, itemPath}) {
         path: itemPath
       }
     }, [
-      ['p', ['Loading metadata...']]
+      ['p', [
+        ['table', [
+          ['tr', [
+            ['td', [
+              ['b', [baseName]]
+            ]],
+            ['td', [
+              filesize(lstat.size)
+            ]]
+          ]],
+          ['tr', [
+            ['td', [
+              'Modified'
+            ]],
+            ['td', [
+              getFormattedDate(lstat.mtimeMs)
+            ]]
+          ]]
+        ]],
+        // Todo: Tags textbox
+        ['div', [
+          'General',
+          ['table', [
+            ['tr', [
+              ['td', [
+                'Kind'
+              ]],
+              ['td', [
+                kind
+              ]]
+            ]],
+            ['tr', [
+              ['td', [
+                'Created'
+              ]],
+              ['td', [
+                getFormattedDate(lstat.birthtimeMs)
+              ]]
+            ]],
+            ['tr', [
+              ['td', [
+                'Modified'
+              ]],
+              ['td', [
+                getFormattedDate(lstat.mtimeMs)
+              ]]
+            ]],
+            ...(metadata.ItemVersion
+              ? [
+                ['tr', [
+                  ['td', [
+                    'Version'
+                  ]],
+                  ['td', [
+                    metadata.ItemVersion
+                  ]]
+                ]]
+              ]
+              : []),
+            ...(metadata.ItemCopyright
+              ? [
+                ['tr', [
+                  ['td', [
+                    'Copyright'
+                  ]],
+                  ['td', [
+                    metadata.ItemCopyright
+                  ]]
+                ]]
+              ]
+              : []
+            )
+          ]]
+        ]],
+        ['div', [
+          'More Info:',
+          ['table', [
+            metadata.ItemWhereFroms
+              ? ['tr', [
+                ['td', [
+                  'Where from'
+                ]],
+                ['td', [
+                  metadata.ItemWhereFroms
+                ]]
+              ]]
+              : '',
+            ['tr', [
+              ['td', [
+                'Last opened'
+              ]],
+              ['td', [
+                getFormattedDate(metadata.ItemLastUsedDate)
+              ]]
+            ]]
+            // Todo (e.g., PDFs): Version, Pages, Security, Encoding software
+          ]]
+        ]],
+        ['div', [
+          'Name and Extension:',
+          ['input', {
+            value: baseName,
+            $on: {
+              change () {
+                // Todo: Save new `baseName`
+              }
+            }
+          }]
+        ]],
+        ['div', [
+          'Comments:',
+          ['br'],
+          ['textarea', {
+            $on: {
+              input () {
+                // Todo: Save comment
+              }
+            }
+          }, [
+            metadata.ItemFinderComment ?? ''
+          ]]
+        ]]
+        // Todo: Open with: and Change All...
+        // Todo: Preview
+        // Todo: Sharing & Permissions
+      ]]
     ]]
   ], document.body);
 
