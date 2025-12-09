@@ -30292,73 +30292,86 @@
 	    // Options:
 	    breadcrumbRoot: '/',
 	    preview ($item) {
-	      const elem = $item.find('[data-path]')[0];
-	      const pth = decodeURIComponent(elem.dataset.path);
-	      const lstat = lstatSync(pth);
-	      const kind = getFileKind(pth);
-	      const metadata = getFileMetadata(pth);
-	      const category = isMacApp(pth)
-	        ? getMacAppCategory(pth)
-	        : null;
+	      try {
+	        const elem = $item.find('[data-path]')[0];
+	        if (!elem || !elem.dataset || !elem.dataset.path) {
+	          return '<div>No preview available</div>';
+	        }
 
-	      // Get UTI for content preview
-	      const utiResult = spawnSync(
-	        'mdls',
-	        ['-name', 'kMDItemContentType', '-raw', pth],
-	        {encoding: 'utf8'}
-	      );
-	      const uti = utiResult.stdout?.trim() || '';
+	        const pth = decodeURIComponent(elem.dataset.path);
 
-	      // Generate preview content based on file type
-	      let previewContent = '';
+	        // Check if path exists before calling lstatSync
+	        let lstat;
+	        try {
+	          lstat = lstatSync(pth);
+	        } catch {
+	          return '<div>File not found</div>';
+	        }
 
-	      if (lstat.isFile()) {
-	        // Image types
-	        if ((/image|png|jpeg|gif|svg|webp|bmp|tiff/v).test(uti)) {
-	          previewContent = `
+	        const kind = getFileKind(pth);
+	        const metadata = getFileMetadata(pth);
+	        const category = isMacApp(pth)
+	          ? getMacAppCategory(pth)
+	          : null;
+
+	        // Generate preview content based on file type (only for files)
+	        let previewContent = '';
+
+	        if (lstat.isFile()) {
+	          // Get UTI for content preview
+	          const utiResult = spawnSync(
+	            'mdls',
+	            ['-name', 'kMDItemContentType', '-raw', pth],
+	            {encoding: 'utf8'}
+	          );
+	          const uti = utiResult.stdout?.trim() || '';
+
+	          // Image types
+	          if ((/image|png|jpeg|gif|svg|webp|bmp|tiff/v).test(uti)) {
+	            previewContent = `
 <div class="miller-preview-content">
   <img src="file://${pth}" style="max-width: 100%; max-height: 200px; object-fit: contain;" />
 </div>`;
-	        } else if ((/pdf/v).test(uti)) {
-	          // PDF
-	          previewContent = `
+	          } else if ((/pdf/v).test(uti)) {
+	            // PDF
+	            previewContent = `
 <div class="miller-preview-content">
   <embed src="file://${pth}" type="application/pdf" style="width: 100%; height: 200px;" />
 </div>`;
-	        } else if ((/text|json|xml|javascript|source/v).test(uti) ||
-	          (/\.(?:txt|md|js|ts|html|css|json|xml|sh|py|rb)$/iv).test(pth)) {
-	          // Text-based files
-	          try {
-	            const content = readFileSync(pth, 'utf8');
-	            const preview = content.length > 1000
-	              ? content.slice(0, 1000) + '\n\n[... truncated]'
-	              : content;
-	            const escaped = preview.
-	              replaceAll('&', '&amp;').
-	              replaceAll('<', '&lt;').
-	              replaceAll('>', '&gt;');
-	            const preStyle = 'margin: 0; white-space: pre-wrap; ' +
-	              'word-break: break-word; font-size: 10px; ' +
-	              'font-family: monospace; max-height: 200px; overflow: auto;';
-	            previewContent = `
+	          } else if ((/text|json|xml|javascript|source/v).test(uti) ||
+	            (/\.(?:txt|md|js|ts|html|css|json|xml|sh|py|rb)$/iv).test(pth)) {
+	            // Text-based files
+	            try {
+	              const content = readFileSync(pth, 'utf8');
+	              const preview = content.length > 1000
+	                ? content.slice(0, 1000) + '\n\n[... truncated]'
+	                : content;
+	              const escaped = preview.
+	                replaceAll('&', '&amp;').
+	                replaceAll('<', '&lt;').
+	                replaceAll('>', '&gt;');
+	              const preStyle = 'margin: 0; white-space: pre-wrap; ' +
+	                'word-break: break-word; font-size: 10px; ' +
+	                'font-family: monospace; max-height: 200px; overflow: auto;';
+	              previewContent = `
 <div class="miller-preview-content">
   <pre style="${preStyle}">${escaped}</pre>
 </div>`;
-	          } catch (err) {
-	            const errMsg = err && typeof err === 'object' && 'message' in err
-	              ? String(err.message)
-	              : 'Unknown error';
-	            previewContent = `<div>Cannot preview file: ${errMsg}</div>`;
+	            } catch (err) {
+	              const errMsg = err && typeof err === 'object' && 'message' in err
+	                ? String(err.message)
+	                : 'Unknown error';
+	              previewContent = `<div>Cannot preview file: ${errMsg}</div>`;
+	            }
 	          }
 	        }
-	      }
 
-	      const escapedName = elem.textContent.
-	        replaceAll('&', '&amp;').
-	        replaceAll('<', '&lt;').
-	        replaceAll('>', '&gt;');
+	        const escapedName = elem.textContent.
+	          replaceAll('&', '&amp;').
+	          replaceAll('<', '&lt;').
+	          replaceAll('>', '&gt;');
 
-	      return `<div><b>${escapedName}</b></div>
+	        return `<div><b>${escapedName}</b></div>
 <div>${kind} - ${filesize(lstat.size)}</div>
 ${previewContent}
 <div><b>Information</b></div>
@@ -30377,6 +30390,13 @@ ${previewContent}
       : ''
   }</table>
 `;
+	      } catch (err) {
+	        // If preview fails, return a basic error message
+	        const errMsg = err && typeof err === 'object' && 'message' in err
+	          ? String(err.message)
+	          : 'Unknown error';
+	        return `<div>Preview error: ${errMsg}</div>`;
+	      }
 	      // <div><b>Tags</b></div>
 	    },
 	    animation () {

@@ -917,15 +917,18 @@ describe('renderer', () => {
           return links.length > 0;
         }, {timeout: 10000});
       } catch (error) {
-        // Log page state for debugging
-        const isVisible = await page.isVisible('body');
-        // eslint-disable-next-line no-console -- Debug
-        console.log('Page visible:', isVisible);
+        // Log page state for debugging - catch if page is already closed
         try {
+          const isVisible = await page.isVisible('body');
+          // eslint-disable-next-line no-console -- Debug
+          console.log('Page visible:', isVisible);
           const html = await page.content();
           // eslint-disable-next-line no-console -- Debug
           console.log('Page HTML length:', html.length);
-        } catch {}
+        } catch (logError) {
+          // eslint-disable-next-line no-console -- Debug
+          console.log('Page already closed, cannot get state');
+        }
         throw error;
       }
 
@@ -1049,12 +1052,27 @@ describe('renderer', () => {
       await page.waitForTimeout(1000);
 
       // Wait for source-folder to appear
-      await page.waitForFunction(() => {
-        const links = document.querySelectorAll(
-          'a[data-path*="source-folder"]'
-        );
-        return links.length > 0;
-      }, {timeout: 10000});
+      try {
+        await page.waitForFunction(() => {
+          const links = document.querySelectorAll(
+            'a[data-path*="source-folder"]'
+          );
+          return links.length > 0;
+        }, {timeout: 10000});
+      } catch (error) {
+        // Log page state for debugging
+        try {
+          const isVisible = await page.isVisible('body');
+          // eslint-disable-next-line no-console -- Debug
+          console.log('Page visible:', isVisible);
+        } catch {}
+        try {
+          const html = await page.content();
+          // eslint-disable-next-line no-console -- Debug
+          console.log('Page HTML length:', html.length);
+        } catch {}
+        throw error;
+      }
 
       // Click source-folder to select it
       const sourceFolderLink = await page.locator(
@@ -2104,11 +2122,11 @@ describe('renderer', () => {
       await iconViewBtn.click();
       await page.waitForTimeout(300);
 
-      // Set up dialog handler to capture the alert
+      // Set up dialog handler to capture the confirm and dismiss it
       let alertMessage = '';
       page.on('dialog', async (dialog) => {
         alertMessage = dialog.message();
-        await dialog.accept();
+        await dialog.dismiss(); // Click Cancel to prevent overwrite
       });
 
       // Copy the source file
@@ -2169,7 +2187,7 @@ describe('renderer', () => {
       }, {timeout: 5000});
       await page.waitForTimeout(500);
 
-      // Paste - should trigger alert about duplicate
+      // Paste - should trigger confirm dialog about duplicate
       await page.evaluate(() => {
         const tbl = document.querySelector('table[data-base-path]');
         if (tbl) {
@@ -2183,7 +2201,7 @@ describe('renderer', () => {
       });
       await page.waitForTimeout(500);
 
-      // Verify alert was shown
+      // Verify confirm dialog was shown
       expect(alertMessage).toContain('already exists');
 
       // Verify file was NOT overwritten (still has original content)
@@ -2699,7 +2717,7 @@ describe('renderer', () => {
       // Filter out backup files which might still exist
       const deletedFolder = await page.locator(
         '.miller-column:not(.miller-collapse) ' +
-        'a[data-path*="test-folder-to-delete"]:'
+        'a[data-path*="test-folder-to-delete"]'
       );
       await expect(deletedFolder).toBeHidden();
 
