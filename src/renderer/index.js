@@ -876,8 +876,8 @@ function addItems (result, basePath, currentBasePath) {
       ? `<tr><td>Category</td><td>${category}</td></tr>`
       : ''
   }</table>
-<div><b>Tags</b></div>
 `;
+      // <div><b>Tags</b></div>
     },
     animation () {
       // No-op to avoid need for timeouts and jarring redraws

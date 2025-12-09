@@ -69,6 +69,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   spawnSync: (...args) => spawnSync(...args),
   getFileMetadata: (filePath) => {
+    // Get Finder comment from extended attributes (more reliable than Spotlight)
+    let finderComment = null;
+    try {
+      // Use xxd to convert hex to binary, then plutil to parse
+      // Note: Using -px for hex output, xxd -r -p to convert back to binary
+      const commentResult = spawnSync('sh', [
+        '-c',
+        `xattr -px com.apple.metadata:kMDItemFinderComment "$1" 2>/dev/null | xxd -r -p | plutil -convert xml1 -o - - 2>/dev/null | sed -n 's/.*<string>\\(.*\\)<\\/string>.*/\\1/p'`,
+        '--',
+        filePath
+      ], {
+        encoding: 'utf8'
+      });
+
+      if (commentResult.status === 0 && commentResult.stdout.trim()) {
+        finderComment = commentResult.stdout.trim()
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&apos;/g, "'");
+      }
+    } catch (err) {
+      // Ignore errors, will fall back to Spotlight
+      console.log('err getting finder comment', err);
+    }
+
     const metadata = mdls.mdlsSync(
       filePath,
       '-name kMDItemLastUsedDate -name kMDItemDateAdded ' +
@@ -76,7 +103,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       '-name kMDItemCopyright -name kMDItemWhereFroms'
     );
 
-    console.log('metadata', metadata);
+    // Override with the more accurate xattr-based comment if available
+    if (finderComment !== null) {
+      metadata.ItemFinderComment = finderComment;
+    }
+
+    // console.log('metadata', metadata);
 
     // This returns an object like:
     // {

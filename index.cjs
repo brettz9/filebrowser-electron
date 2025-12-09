@@ -28797,6 +28797,92 @@
 	  }
 	}
 
+	/* eslint-disable n/no-sync -- For performance */
+
+	// Get Node APIs from the preload script
+	const {
+	  spawnSync: spawnSync$1
+	  // @ts-expect-error Ok
+	} = globalThis.electronAPI;
+
+	/**
+	 * Escape a string for safe use in AppleScript string literals.
+	 * @param {string} str - The string to escape
+	 * @returns {string} The escaped string
+	 */
+	function escapeAppleScript (str) {
+	  // Escape backslashes first, then quotes
+	  return str.replaceAll('\\', '\\\\').
+	    replaceAll('"', String.raw`\"`);
+	}
+
+	/**
+	 * Escape a string for safe use in shell commands.
+	 * @param {string} str - The string to escape
+	 * @returns {string} The escaped string safe for shell
+	 */
+	function escapeShell (str) {
+	  // Use single quotes and escape any single quotes in the string
+	  return `'${str.replaceAll("'", String.raw`'\''`)}'`;
+	}
+
+	/**
+	 * Sets the Finder comment for a specific file on macOS synchronously.
+	 * @param {string} filePath - The absolute path to the file.
+	 * @param {string} commentText - The comment to set.
+	 */
+	function setFinderComment (filePath, commentText) {
+	  // Escape the file path and comment text for the shell and AppleScript
+	  const escapedPath = JSON.stringify(filePath);
+	  const escapedComment = JSON.stringify(commentText);
+
+	  const appleScript = `
+    set filepath to POSIX file ${escapedPath}
+    set the_File to filepath as alias
+    tell application "Finder" to set the comment of the_File to ${
+      escapedComment
+    }
+  `;
+
+	  // We pass the script as arguments to osascript
+	  const result = spawnSync$1(
+	    'osascript', ['-e', appleScript], {encoding: 'utf8', stdio: 'inherit'}
+	  );
+
+	  if (result.status !== 0) {
+	    console.error(`Error setting comment: ${result.stderr}`);
+	  } else {
+	    console.log(`Comment set successfully for: ${filePath}`);
+	  }
+	}
+
+	/**
+	 * @param {string} executable
+	 * @param {string} scriptPath - Path to the script
+	 * @param {string} arg - Argument to pass to the script
+	 * @returns {void}
+	 */
+	function openNewTerminalWithCommand (executable, scriptPath, arg) {
+	  // Properly escape both arguments for shell
+	  const shellCommand = `${executable} ${
+    escapeShell(scriptPath)
+  } ${
+    escapeShell(arg)
+  }`;
+	  // Then escape the whole command for AppleScript
+	  const escapedCommand = escapeAppleScript(shellCommand);
+	  const appleScript = `
+    tell application "Terminal"
+        do script "${escapedCommand}"
+        activate
+    end tell
+  `;
+
+	  spawnSync$1('osascript', ['-e', appleScript], {
+	    stdio: 'inherit'
+	  });
+	}
+
 	/* eslint-disable n/no-sync -- Needed for performance */
 
 
@@ -28927,7 +29013,16 @@
 	        ['div', [
 	          'More Info:',
 	          ['table', [
-	            // Todo: "Where from"
+	            metadata.ItemWhereFroms
+	              ? ['tr', [
+	                ['td', [
+	                  'Where from'
+	                ]],
+	                ['td', [
+	                  metadata.ItemWhereFroms
+	                ]]
+	              ]]
+	              : '',
 	            ['tr', [
 	              ['td', [
 	                'Last opened'
@@ -28936,16 +29031,27 @@
 	                getFormattedDate(metadata.ItemLastUsedDate)
 	              ]]
 	            ]]
+	            // Todo (e.g., PDFs): Version, Pages, Security, Encoding software
 	          ]]
 	        ]],
-	        // Todo: `baseName` input box
+	        // ['div', [
+	        //   'Name and Extension:',
+	        //   ['input', {
+	        //     value: baseName,
+	        //     $on: {
+	        //       change () {
+	        //         // Todo: Save new `baseName`
+	        //       }
+	        //     }
+	        //   }]
+	        // ]],
 	        ['div', [
 	          'Comments:',
 	          ['br'],
 	          ['textarea', {
 	            $on: {
 	              input () {
-	                // Todo: Save comment
+	                setFinderComment(pth, this.value);
 	              }
 	            }
 	          }, [
@@ -29010,62 +29116,6 @@
 	    infoWindow.style.left = (100 + offset) + 'px';
 	    infoWindow.style.top = (100 + offset) + 'px';
 	  }
-	}
-
-	/* eslint-disable n/no-sync -- For performance */
-
-	// Get Node APIs from the preload script
-	const {
-	  spawnSync: spawnSync$1
-	  // @ts-expect-error Ok
-	} = globalThis.electronAPI;
-
-	/**
-	 * Escape a string for safe use in AppleScript string literals.
-	 * @param {string} str - The string to escape
-	 * @returns {string} The escaped string
-	 */
-	function escapeAppleScript (str) {
-	  // Escape backslashes first, then quotes
-	  return str.replaceAll('\\', '\\\\').
-	    replaceAll('"', String.raw`\"`);
-	}
-
-	/**
-	 * Escape a string for safe use in shell commands.
-	 * @param {string} str - The string to escape
-	 * @returns {string} The escaped string safe for shell
-	 */
-	function escapeShell (str) {
-	  // Use single quotes and escape any single quotes in the string
-	  return `'${str.replaceAll("'", String.raw`'\''`)}'`;
-	}
-
-	/**
-	 * @param {string} executable
-	 * @param {string} scriptPath - Path to the script
-	 * @param {string} arg - Argument to pass to the script
-	 * @returns {void}
-	 */
-	function openNewTerminalWithCommand (executable, scriptPath, arg) {
-	  // Properly escape both arguments for shell
-	  const shellCommand = `${executable} ${
-    escapeShell(scriptPath)
-  } ${
-    escapeShell(arg)
-  }`;
-	  // Then escape the whole command for AppleScript
-	  const escapedCommand = escapeAppleScript(shellCommand);
-	  const appleScript = `
-    tell application "Terminal"
-        do script "${escapedCommand}"
-        activate
-    end tell
-  `;
-
-	  spawnSync$1('osascript', ['-e', appleScript], {
-	    stdio: 'inherit'
-	  });
 	}
 
 	/* eslint-disable promise/prefer-await-to-then,
@@ -29898,8 +29948,8 @@
       ? `<tr><td>Category</td><td>${category}</td></tr>`
       : ''
   }</table>
-<div><b>Tags</b></div>
 `;
+	      // <div><b>Tags</b></div>
 	    },
 	    animation () {
 	      // No-op to avoid need for timeouts and jarring redraws

@@ -2,6 +2,7 @@
 
 import {filesize} from 'filesize';
 import {getFormattedDate} from '../utils/date.js';
+import {setFinderComment} from '../terminal/terminal.js';
 
 // Get Node APIs from the preload script
 const {
@@ -151,24 +152,24 @@ export function showInfoWindow ({jml, itemPath}) {
             // Todo (e.g., PDFs): Version, Pages, Security, Encoding software
           ]]
         ]],
-        ['div', [
-          'Name and Extension:',
-          ['input', {
-            value: baseName,
-            $on: {
-              change () {
-                // Todo: Save new `baseName`
-              }
-            }
-          }]
-        ]],
+        // ['div', [
+        //   'Name and Extension:',
+        //   ['input', {
+        //     value: baseName,
+        //     $on: {
+        //       change () {
+        //         // Todo: Save new `baseName`
+        //       }
+        //     }
+        //   }]
+        // ]],
         ['div', [
           'Comments:',
           ['br'],
           ['textarea', {
             $on: {
               input () {
-                // Todo: Save comment
+                setFinderComment(pth, this.value);
               }
             }
           }, [

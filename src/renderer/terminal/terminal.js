@@ -28,6 +28,35 @@ function escapeShell (str) {
 }
 
 /**
+ * Sets the Finder comment for a specific file on macOS synchronously.
+ * @param {string} filePath - The absolute path to the file.
+ * @param {string} commentText - The comment to set.
+ */
+export function setFinderComment (filePath, commentText) {
+  // Escape the file path and comment text for the shell and AppleScript
+  const escapedPath = JSON.stringify(filePath);
+  const escapedComment = JSON.stringify(commentText);
+
+  const appleScript = `
+    set filepath to POSIX file ${escapedPath}
+    set the_File to filepath as alias
+    tell application "Finder" to set the comment of the_File to ${
+      escapedComment
+    }
+  `;
+
+  // We pass the script as arguments to osascript
+  const result = spawnSync(
+    'osascript', ['-e', appleScript], {encoding: 'utf8', stdio: 'inherit'}
+  );
+
+  if (result.status !== 0) {
+    // eslint-disable-next-line no-console -- Debugging
+    console.error(`Error setting comment: ${result.stderr}`);
+  }
+}
+
+/**
  * @param {string} executable
  * @param {string} scriptPath - Path to the script
  * @param {string} arg - Argument to pass to the script
