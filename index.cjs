@@ -29619,6 +29619,9 @@
 	  n/no-sync,
 	  promise/catch-or-return -- Needed for performance */
 
+	// Expose stickyNotes globally for testing
+	globalThis.stickyNotes = stickyNotes;
+
 	// Get Node APIs from the preload script
 	const {
 	  fs: {
@@ -30477,6 +30480,7 @@
 <div class="miller-preview-content">
   <pre style="${preStyle}">${escaped}</pre>
 </div>`;
+	            /* c8 ignore next 6 -- Defensive error for text processing */
 	            } catch (err) {
 	              const errMsg = err && typeof err === 'object' && 'message' in err
 	                ? String(err.message)

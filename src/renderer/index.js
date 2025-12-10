@@ -50,6 +50,9 @@ import {
 import {showInfoWindow} from './ui/infoWindow.js';
 import {openNewTerminalWithCommand} from './terminal/terminal.js';
 
+// Expose stickyNotes globally for testing
+globalThis.stickyNotes = stickyNotes;
+
 // Get Node APIs from the preload script
 const {
   fs: {
@@ -908,6 +911,7 @@ function addItems (result, basePath, currentBasePath) {
 <div class="miller-preview-content">
   <pre style="${preStyle}">${escaped}</pre>
 </div>`;
+            /* c8 ignore next 6 -- Defensive error for text processing */
             } catch (err) {
               const errMsg = err && typeof err === 'object' && 'message' in err
                 ? String(err.message)
