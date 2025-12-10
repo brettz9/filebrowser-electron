@@ -1370,6 +1370,72 @@ describe('renderer', () => {
       });
     });
 
+    test(
+      'dragover on miller-columns background with altKey ' +
+      'sets dropEffect to copy (line 1493)',
+      async () => {
+        // Switch to three-columns view
+        await page.locator('#three-columns').click();
+        await page.waitForTimeout(500);
+
+        // Navigate to /tmp to ensure miller-columns is rendered
+        await page.evaluate(() => {
+          globalThis.location.hash = '#path=/tmp';
+        });
+        await page.waitForTimeout(500);
+
+        const result = await page.evaluate(() => {
+          const millerColumnsDiv = document.querySelector('div.miller-columns');
+          if (!millerColumnsDiv) {
+            return {success: false, reason: 'no miller-columns div'};
+          }
+
+          let dropEffectSetTo = null;
+
+          // Create a mock dataTransfer that tracks when dropEffect is set
+          const mockDataTransfer = {
+            _dropEffect: 'none',
+            get dropEffect () {
+              return this._dropEffect;
+            },
+            set dropEffect (value) {
+              this._dropEffect = value;
+              dropEffectSetTo = value;
+            },
+            effectAllowed: 'all',
+            files: [],
+            items: [],
+            types: []
+          };
+
+          // Create a dragover event WITH altKey
+          const event = new DragEvent('dragover', {
+            bubbles: true,
+            cancelable: true,
+            altKey: true
+          });
+
+          // Override dataTransfer with our mock
+          Object.defineProperty(event, 'dataTransfer', {
+            value: mockDataTransfer,
+            writable: false
+          });
+
+          // Dispatch on millerColumnsDiv itself (background)
+          millerColumnsDiv.dispatchEvent(event);
+
+          return {
+            success: true,
+            dropEffectSetTo
+          };
+        });
+
+        expect(result.success).toBe(true);
+        // altKey true should set 'copy'
+        expect(result.dropEffectSetTo).toBe('copy');
+      }
+    );
+
     test('undo and redo folder creation', async () => {
       // Clean up any leftover test artifacts from previous runs
       await page.evaluate(() => {
@@ -5183,11 +5249,6 @@ describe('renderer', () => {
       'startRename exits early if textElement has no dataset.path',
       async () => {
         const result = await page.evaluate(() => {
-          let callbackCalled = false;
-          const onComplete = () => {
-            callbackCalled = true;
-          };
-
           // @ts-expect-error Testing internal API
           const startRename = globalThis.startRenameForTesting;
           if (!startRename) {
@@ -5197,6 +5258,11 @@ describe('renderer', () => {
           // Create element without dataset.path
           const div = document.createElement('div');
           div.textContent = 'test';
+
+          let callbackCalled = false;
+          const onComplete = () => {
+            callbackCalled = true;
+          };
 
           startRename(div, onComplete);
 
