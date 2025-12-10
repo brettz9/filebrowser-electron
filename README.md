@@ -14,27 +14,6 @@ npm i filebrowser-electron
 cd filebrowser-electron && npm install && npm start
 ```
 
-## Create your own Mac Quick Action
-
-1. Open Automator
-1. Create a new Quick Action
-1. Set "Workflow receives current" to "files or folders"
-1. Find the action "Run Shell Script" and drag it into the Quick Action
-1. Change "Pass input" to "as arguments"
-1. Paste the following, adapting the filebrowser-electron path to your own
-```shell
-for f in "$@"
-do
-	open -a "/Users/brett/filebrowser/out/filebrowser-electron-darwin-arm64/filebrowser-electron.app" --args --path "$f"
-done
-```
-1. Save (e.g., as "Open in Filebrowser")
-1. Go to the Finder, choose a folder or file, and right-click it and select "Quick Actions" and your name created in the previous step.
-
-## Invoking with arguments during development
-
-1. Invoke like such: `npm run start -- --path /Users/brett`
-
 ## Features
 
 ### File Operations
@@ -67,6 +46,27 @@ done
 - Edit, collapse/expand, and delete notes
 - Notes persist across sessions
 
+## Create your own Mac Quick Action
+
+1. Open Automator
+1. Create a new Quick Action
+1. Set "Workflow receives current" to "files or folders"
+1. Find the action "Run Shell Script" and drag it into the Quick Action
+1. Change "Pass input" to "as arguments"
+1. Paste the following, adapting the filebrowser-electron path to your own
+```shell
+for f in "$@"
+do
+	open -a "/Users/brett/filebrowser/out/filebrowser-electron-darwin-arm64/filebrowser-electron.app" --args --path "$f"
+done
+```
+1. Save (e.g., as "Open in Filebrowser")
+1. Go to the Finder, choose a folder or file, and right-click it and select "Quick Actions" and your name created in the previous step.
+
+## Invoking with arguments during development
+
+1. Invoke like such: `npm run start -- --path /Users/brett`
+
 ## To-dos
 
 1. List view/Gallery view
@@ -86,5 +86,6 @@ done
 
 ## Misc. to-dos
 
+1. Folders like Utilities not showing children?
+1. Why are icons being lost when using shortcuts?
 1. Allow "Show package contents" context menu for apps
-1. Key commands: shift-cmd-H for Home, shift-cmd-D for Desktop, shift-cmd-A for Applications

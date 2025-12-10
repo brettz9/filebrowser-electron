@@ -59,7 +59,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     sep: path.sep
   },
   os: {
-    tmpdir: () => os.tmpdir()
+    tmpdir: () => os.tmpdir(),
+    homedir: () => os.homedir()
   },
   process: {
     platform: process.platform,

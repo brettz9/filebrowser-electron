@@ -8,6 +8,7 @@
 - feat: option to drag-and-drop files onto bash or JavaScript files
 - feat: preview pane
 - feat: Get Info dialog
+- feat: Key commands: Shift+Cmd+H for Home, Shift+Cmd+D for Desktop, Shift+Cmd+A for Applications, Shift+Cmd+U for Utilities
 - fix: properly restore position after external file/folder creation/deletions
 - fix: sticky notes at root
 - fix: misc. fixes

@@ -30370,6 +30370,31 @@
 	        const clip = getClipboard();
 	        copyOrMoveItem$1(clip.path, targetDir, clip.isCopy);
 	        setClipboard(null);
+
+	      // Shift+Cmd+H to navigate to Home directory
+	      } else if (e.metaKey && e.shiftKey && e.key === 'h') {
+	        e.preventDefault();
+	        globalThis.location.hash = '#path=' +
+	          encodeURIComponent(globalThis.electronAPI.os.homedir());
+
+	      // Shift+Cmd+D to navigate to Desktop
+	      } else if (e.metaKey && e.shiftKey && e.key === 'd') {
+	        e.preventDefault();
+	        const desktopDir = path.join(
+	          globalThis.electronAPI.os.homedir(),
+	          'Desktop'
+	        );
+	        globalThis.location.hash = `#path=${encodeURIComponent(desktopDir)}`;
+
+	      // Shift+Cmd+A to navigate to Applications
+	      } else if (e.metaKey && e.shiftKey && e.key === 'a') {
+	        e.preventDefault();
+	        globalThis.location.hash = '#path=/Applications';
+
+	      // Shift+Cmd+U to navigate to Utilities
+	      } else if (e.metaKey && e.shiftKey && e.key === 'u') {
+	        e.preventDefault();
+	        globalThis.location.hash = '#path=/Applications/Utilities';
 	      }
 	    };
 
@@ -30894,6 +30919,31 @@ ${previewContent}
 	      if (textElement) {
 	        startRename$1(textElement);
 	      }
+
+	    // Shift+Cmd+H to navigate to Home directory
+	    } else if (e.metaKey && e.shiftKey && e.key === 'h') {
+	      e.preventDefault();
+	      globalThis.location.hash = '#path=' +
+	        encodeURIComponent(globalThis.electronAPI.os.homedir());
+
+	    // Shift+Cmd+D to navigate to Desktop
+	    } else if (e.metaKey && e.shiftKey && e.key === 'd') {
+	      e.preventDefault();
+	      const desktopDir = path.join(
+	        globalThis.electronAPI.os.homedir(),
+	        'Desktop'
+	      );
+	      globalThis.location.hash = `#path=${encodeURIComponent(desktopDir)}`;
+
+	    // Shift+Cmd+A to navigate to Applications
+	    } else if (e.metaKey && e.shiftKey && e.key === 'a') {
+	      e.preventDefault();
+	      globalThis.location.hash = '#path=/Applications';
+
+	    // Shift+Cmd+U to navigate to Utilities
+	    } else if (e.metaKey && e.shiftKey && e.key === 'u') {
+	      e.preventDefault();
+	      globalThis.location.hash = '#path=/Applications/Utilities';
 	    }
 	  });
 
