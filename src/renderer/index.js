@@ -299,6 +299,7 @@ function addDragAndDropSupport (element, itemPath, isFolder) {
  */
 function updateBreadcrumbs (currentPath) {
   const breadcrumbsDiv = $('.miller-breadcrumbs');
+  /* c8 ignore next 2 -- Defensive: breadcrumbs div always exists */
   if (!breadcrumbsDiv) {
     return;
   }
@@ -712,130 +713,133 @@ function addItems (result, basePath, currentBasePath) {
 
     // Add keyboard support for icon-view
     const iconViewTable = $('table[data-base-path]');
-    if (iconViewTable) {
-      // Make table focusable
-      iconViewTable.setAttribute('tabindex', '0');
-
-      // Remove any existing keydown listeners to avoid duplicates
-      const oldListener = iconViewTable._keydownListener;
-      if (oldListener) {
-        iconViewTable.removeEventListener('keydown', oldListener);
-      }
-
-      // Add drag-and-drop support to all cells
-      const cells = iconViewTable.querySelectorAll('td.list-item');
-      cells.forEach((cell) => {
-        const cellEl = /** @type {HTMLElement} */ (cell);
-        const link = cellEl.querySelector('a, span');
-        if (link) {
-          const linkEl = /** @type {HTMLElement} */ (link);
-          const itemPath = linkEl.dataset.path;
-          if (itemPath) {
-            const isFolder = linkEl.tagName === 'A';
-            addDragAndDropSupport(cellEl, itemPath, isFolder);
-          }
-        }
-      });
-
-      // Add new keydown listener
-      const keydownListener = (e) => {
-        // Cmd+Shift+N to create new folder
-        if (e.metaKey && e.shiftKey && e.key === 'n') {
-          e.preventDefault();
-          /* c8 ignore next -- TS */
-          const folderPath = iconViewTable.dataset.basePath || '/';
-          createNewFolder(folderPath);
-
-        // Cmd+I to show info window
-        } else if (e.metaKey && e.key === 'i') {
-          const selectedRow = iconViewTable.querySelector('tr.selected');
-          if (selectedRow) {
-            e.preventDefault();
-            const selectedEl = /** @type {HTMLElement} */ (selectedRow);
-            const itemPath = selectedEl.dataset.path;
-            if (itemPath) {
-              showInfoWindow({jml, itemPath});
-            }
-          }
-
-        // Cmd+C to copy selected item
-        } else if (e.metaKey && e.key === 'c') {
-          const selectedRow = iconViewTable.querySelector('tr.selected');
-          if (selectedRow) {
-            e.preventDefault();
-            const selectedEl = /** @type {HTMLElement} */ (selectedRow);
-            const itemPath = selectedEl.dataset.path;
-            if (itemPath) {
-              setClipboard({path: itemPath, isCopy: true});
-            }
-          }
-
-        // Cmd+X to cut selected item
-        } else if (e.metaKey && e.key === 'x') {
-          const selectedRow = iconViewTable.querySelector('tr.selected');
-          if (selectedRow) {
-            e.preventDefault();
-            const selectedEl = /** @type {HTMLElement} */ (selectedRow);
-            const itemPath = selectedEl.dataset.path;
-            if (itemPath) {
-              setClipboard({path: itemPath, isCopy: false});
-            }
-          }
-
-        // Cmd+V to paste (copy) to current directory
-        } else if (e.metaKey && e.key === 'v' && getClipboard()) {
-          e.preventDefault();
-          /* c8 ignore next -- TS */
-          const targetDir = iconViewTable.dataset.basePath || '/';
-          const clip = getClipboard();
-          copyOrMoveItem(clip.path, targetDir, clip.isCopy);
-          setClipboard(null);
-        }
-      };
-
-      iconViewTable.addEventListener('keydown', keydownListener);
-      // Store reference for cleanup
-      // @ts-expect-error Custom property
-      iconViewTable._keydownListener = keydownListener;
-
-      // Add drop support for table background (empty space)
-      iconViewTable.addEventListener('dragover', (e) => {
-        // Only handle drops on the table itself or empty cells, not on items
-        const {target} = e;
-        const targetEl = /** @type {HTMLElement} */ (target);
-        if (targetEl === iconViewTable || targetEl.tagName === 'TR' ||
-            (targetEl.tagName === 'TD' &&
-             !targetEl.classList.contains('list-item'))) {
-          e.preventDefault();
-          if (e.dataTransfer) {
-            e.dataTransfer.dropEffect = e.altKey ? 'copy' : 'move';
-          }
-        }
-      });
-
-      iconViewTable.addEventListener('drop', (e) => {
-        const {target} = e;
-        const targetEl = /** @type {HTMLElement} */ (target);
-        // Only handle drops on the table itself or empty cells, not on items
-        if (targetEl === iconViewTable || targetEl.tagName === 'TR' ||
-            (targetEl.tagName === 'TD' &&
-             !targetEl.classList.contains('list-item'))) {
-          e.preventDefault();
-          e.stopPropagation();
-          const sourcePath = e.dataTransfer?.getData('text/plain');
-          /* c8 ignore next -- TS */
-          const targetDir = iconViewTable.dataset.basePath || '/';
-          if (sourcePath && targetDir && !getIsCopyingOrMoving()) {
-            copyOrMoveItem(sourcePath, targetDir, e.altKey);
-          }
-        }
-      });
-
-      // Focus the table for keyboard navigation
-      requestAnimationFrame(() => {
-        iconViewTable.focus();
-      });
+    /* c8 ignore next 3 -- Unreachable: always returns above */
+    if (!iconViewTable) {
+      return;
     }
+
+    // Make table focusable
+    iconViewTable.setAttribute('tabindex', '0');
+
+    // Remove any existing keydown listeners to avoid duplicates
+    const oldListener = iconViewTable._keydownListener;
+    if (oldListener) {
+      iconViewTable.removeEventListener('keydown', oldListener);
+    }
+
+    // Add drag-and-drop support to all cells
+    const cells = iconViewTable.querySelectorAll('td.list-item');
+    cells.forEach((cell) => {
+      const cellEl = /** @type {HTMLElement} */ (cell);
+      const link = cellEl.querySelector('a, span');
+      if (link) {
+        const linkEl = /** @type {HTMLElement} */ (link);
+        const itemPath = linkEl.dataset.path;
+        if (itemPath) {
+          const isFolder = linkEl.tagName === 'A';
+          addDragAndDropSupport(cellEl, itemPath, isFolder);
+        }
+      }
+    });
+
+    // Add new keydown listener
+    const keydownListener = (e) => {
+      // Cmd+Shift+N to create new folder
+      if (e.metaKey && e.shiftKey && e.key === 'n') {
+        e.preventDefault();
+        /* c8 ignore next -- TS */
+        const folderPath = iconViewTable.dataset.basePath || '/';
+        createNewFolder(folderPath);
+
+      // Cmd+I to show info window
+      } else if (e.metaKey && e.key === 'i') {
+        const selectedRow = iconViewTable.querySelector('tr.selected');
+        if (selectedRow) {
+          e.preventDefault();
+          const selectedEl = /** @type {HTMLElement} */ (selectedRow);
+          const itemPath = selectedEl.dataset.path;
+          if (itemPath) {
+            showInfoWindow({jml, itemPath});
+          }
+        }
+
+      // Cmd+C to copy selected item
+      } else if (e.metaKey && e.key === 'c') {
+        const selectedRow = iconViewTable.querySelector('tr.selected');
+        if (selectedRow) {
+          e.preventDefault();
+          const selectedEl = /** @type {HTMLElement} */ (selectedRow);
+          const itemPath = selectedEl.dataset.path;
+          if (itemPath) {
+            setClipboard({path: itemPath, isCopy: true});
+          }
+        }
+
+      // Cmd+X to cut selected item
+      } else if (e.metaKey && e.key === 'x') {
+        const selectedRow = iconViewTable.querySelector('tr.selected');
+        if (selectedRow) {
+          e.preventDefault();
+          const selectedEl = /** @type {HTMLElement} */ (selectedRow);
+          const itemPath = selectedEl.dataset.path;
+          if (itemPath) {
+            setClipboard({path: itemPath, isCopy: false});
+          }
+        }
+
+      // Cmd+V to paste (copy) to current directory
+      } else if (e.metaKey && e.key === 'v' && getClipboard()) {
+        e.preventDefault();
+        /* c8 ignore next -- TS */
+        const targetDir = iconViewTable.dataset.basePath || '/';
+        const clip = getClipboard();
+        copyOrMoveItem(clip.path, targetDir, clip.isCopy);
+        setClipboard(null);
+      }
+    };
+
+    iconViewTable.addEventListener('keydown', keydownListener);
+    // Store reference for cleanup
+    // @ts-expect-error Custom property
+    iconViewTable._keydownListener = keydownListener;
+
+    // Add drop support for table background (empty space)
+    iconViewTable.addEventListener('dragover', (e) => {
+      // Only handle drops on the table itself or empty cells, not on items
+      const {target} = e;
+      const targetEl = /** @type {HTMLElement} */ (target);
+      if (targetEl === iconViewTable || targetEl.tagName === 'TR' ||
+          (targetEl.tagName === 'TD' &&
+            !targetEl.classList.contains('list-item'))) {
+        e.preventDefault();
+        if (e.dataTransfer) {
+          e.dataTransfer.dropEffect = e.altKey ? 'copy' : 'move';
+        }
+      }
+    });
+
+    iconViewTable.addEventListener('drop', (e) => {
+      const {target} = e;
+      const targetEl = /** @type {HTMLElement} */ (target);
+      // Only handle drops on the table itself or empty cells, not on items
+      if (targetEl === iconViewTable || targetEl.tagName === 'TR' ||
+          (targetEl.tagName === 'TD' &&
+            !targetEl.classList.contains('list-item'))) {
+        e.preventDefault();
+        e.stopPropagation();
+        const sourcePath = e.dataTransfer?.getData('text/plain');
+        /* c8 ignore next -- TS */
+        const targetDir = iconViewTable.dataset.basePath || '/';
+        if (sourcePath && targetDir && !getIsCopyingOrMoving()) {
+          copyOrMoveItem(sourcePath, targetDir, e.altKey);
+        }
+      }
+    });
+
+    // Focus the table for keyboard navigation
+    requestAnimationFrame(() => {
+      iconViewTable.focus();
+    });
     return;
   }
 
