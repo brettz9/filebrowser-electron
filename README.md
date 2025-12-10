@@ -69,11 +69,10 @@ done
 
 ## To-dos
 
-1. Preview/Editing Metadata/File
-1. Views
-    1. List view/Gallery view
+1. List view/Gallery view
 1. Ideally would allow separate windows and tabs, with menu bar
 
+1. More Editing Metadata/File
 1. Demo with file handler web apps (may need to restore webappfind if
     Chrome apps are now deprecated)
 1. Build/set icon:
