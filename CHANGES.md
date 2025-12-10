@@ -6,6 +6,8 @@
 - feat: undo/redo
 - feat: add breadcrumbs for icon view
 - feat: option to drag-and-drop files onto bash or JavaScript files
+- feat: preview pane
+- feat: Get Info dialog
 - fix: properly restore position after external file/folder creation/deletions
 - fix: sticky notes at root
 - fix: misc. fixes
