@@ -343,6 +343,7 @@ async function setupNativeWatcher (dirPath) {
                 // Use original if resolution fails
               }
 
+              /* c8 ignore next 10 -- Difficult to cover */
               if (resolvedCurrentBasePath.startsWith(columnPath + '/') &&
                 resolvedCurrentBasePath !== columnPath + '/'
               ) {

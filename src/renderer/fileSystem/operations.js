@@ -207,12 +207,28 @@ export function copyOrMoveItem (sourcePath, targetDir, isCopy) {
       // Remove the existing item
       rmSync(targetPath, {recursive: true, force: true});
 
+      // Copy the new item to replace the old one
+      if (isCopy) {
+        const cpResult = spawnSync('cp', ['-R', decodedSource, targetPath]);
+        /* c8 ignore next 3 - Defensive: requires cp command to fail */
+        if (cpResult.error || cpResult.status !== 0) {
+          throw new Error(cpResult.stderr?.toString() || 'Copy failed');
+        }
+      } else {
+        // Move operation
+        renameSync(decodedSource, targetPath);
+      }
+
       // Store backup info for potential undo
       emit('pushUndo', {
         type: 'replace',
         path: targetPath,
         backupPath
       });
+
+      operationCounter = 0;
+      setIsCopyingOrMoving(false);
+      return;
     /* c8 ignore next 6 - Defensive: backup failures are rare */
     } catch (err) {
       // eslint-disable-next-line no-alert -- User feedback

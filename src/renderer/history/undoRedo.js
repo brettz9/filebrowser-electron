@@ -102,17 +102,38 @@ export const performUndo = (changePath) => {
     case 'replace': {
       // Undo replace: restore the replaced item from backup
       if (action.backupPath && existsSync(action.backupPath)) {
-        // Remove the new item
+        // Before removing the new item, back it up for potential redo
+        let newItemBackupPath;
         if (existsSync(action.path)) {
-          rmSync(action.path, {recursive: true, force: true});
+          const timestamp = Date.now();
+          const sanitizedPath = action.path.replaceAll(/[^a-zA-Z\d]/gv, '_');
+          newItemBackupPath = path.join(
+            undoBackupDir,
+            `${sanitizedPath}_new_${timestamp}`
+          );
+          const backupNewResult = spawnSync(
+            'cp',
+            ['-R', action.path, newItemBackupPath]
+          );
+          if (backupNewResult.status === 0) {
+            // Remove the new item
+            rmSync(action.path, {recursive: true, force: true});
+          }
         }
-        // Restore the backed-up item
+
+        // Restore the original from backup
         const cpResult = spawnSync(
           'cp',
           ['-R', action.backupPath, action.path]
         );
         if (cpResult.status === 0) {
-          redoStack.push(action);
+          // Clean up old backup after successful restore
+          rmSync(action.backupPath, {recursive: true, force: true});
+          // Push to redo stack with the new backup path
+          redoStack.push({
+            ...action,
+            backupPath: newItemBackupPath
+          });
         }
       }
       break;
@@ -190,11 +211,42 @@ export const performRedo = (changePath) => {
       break;
     }
     case 'replace': {
-      // Redo replace: remove backup and keep the new item
+      // Redo replace: restore the "new" item from its backup
       if (action.backupPath && existsSync(action.backupPath)) {
-        // Just remove the backup - the replaced item should already be there
-        rmSync(action.backupPath, {recursive: true, force: true});
-        undoStack.push({...action, backupPath: undefined});
+        // The current file has the old content (from undo)
+        // Back it up again for potential undo
+        const timestamp = Date.now();
+        const sanitizedPath = action.path.replaceAll(/[^a-zA-Z\d]/gv, '_');
+        const oldItemBackupPath = path.join(
+          undoBackupDir,
+          `${sanitizedPath}_${timestamp}`
+        );
+
+        const backupOldResult = spawnSync(
+          'cp',
+          ['-R', action.path, oldItemBackupPath]
+        );
+
+        if (backupOldResult.status === 0) {
+          // Remove the old item
+          rmSync(action.path, {recursive: true, force: true});
+
+          // Restore the new item from backup
+          const cpResult = spawnSync(
+            'cp',
+            ['-R', action.backupPath, action.path]
+          );
+
+          if (cpResult.status === 0) {
+            // Clean up the new item backup
+            rmSync(action.backupPath, {recursive: true, force: true});
+            // Push back to undo stack with the old item backup
+            undoStack.push({
+              ...action,
+              backupPath: oldItemBackupPath
+            });
+          }
+        }
       }
       break;
     }

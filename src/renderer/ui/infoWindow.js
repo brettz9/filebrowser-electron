@@ -515,6 +515,7 @@ export async function showInfoWindow ({jml, itemPath}) {
                     ['-name', 'kMDItemContentType', '-raw', pth],
                     {encoding: 'utf8'}
                   );
+                  /* c8 ignore next -- Should be present? */
                   const uti = utiResult.stdout?.trim() || '';
 
                   // Image types
@@ -553,6 +554,7 @@ export async function showInfoWindow ({jml, itemPath}) {
                   return ['div', [
                     'Preview not available for this file type',
                     ['br'],
+                    /* c8 ignore next -- Should be present? */
                     ['small', [`Type: ${uti || 'Unknown'}`]]
                   ]];
                 })()

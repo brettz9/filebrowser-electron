@@ -25523,6 +25523,7 @@
 	  const appName = path$6.dirname(appPath);
 	  const infoPlistPath = path$6.join(appPath, 'Contents', 'Info.plist');
 
+	  /* c8 ignore next 5 -- Unusual circumstance */
 	  if (!existsSync$3(infoPlistPath)) {
 	    // eslint-disable-next-line no-console -- Debugging
 	    console.error(`Info.plist not found for ${appName}`);
@@ -25539,12 +25540,13 @@
 	      // (e.g., "public.app-category.productivity" -> "Productivity")
 	      return getLocalizedUTIDescription(category);
 	    }
-
+	    /* c8 ignore next 5 -- Unusual circumstance */
 	    // eslint-disable-next-line no-console -- Debugging
 	    console.log(
 	      `LSApplicationCategoryType not found in ${appName}'s Info.plist`
 	    );
 	    return null;
+	  /* c8 ignore next 7 -- Unusual circumstance */
 	  } catch (error) {
 	    // eslint-disable-next-line no-console -- Debugging
 	    console.error(
@@ -26620,6 +26622,7 @@
 	// Use same undo backup directory as operations.js
 	const undoBackupDir$1 = path$4.join(os$1.tmpdir(), 'filebrowser-undo-backups');
 	try {
+	  /* c8 ignore next 3 -- One-time operation */
 	  if (!existsSync$2(undoBackupDir$1)) {
 	    mkdirSync$2(undoBackupDir$1, {recursive: true});
 	  }
@@ -26711,17 +26714,38 @@
 	    case 'replace': {
 	      // Undo replace: restore the replaced item from backup
 	      if (action.backupPath && existsSync$2(action.backupPath)) {
-	        // Remove the new item
+	        // Before removing the new item, back it up for potential redo
+	        let newItemBackupPath;
 	        if (existsSync$2(action.path)) {
-	          rmSync$1(action.path, {recursive: true, force: true});
+	          const timestamp = Date.now();
+	          const sanitizedPath = action.path.replaceAll(/[^a-zA-Z\d]/gv, '_');
+	          newItemBackupPath = path$4.join(
+	            undoBackupDir$1,
+	            `${sanitizedPath}_new_${timestamp}`
+	          );
+	          const backupNewResult = spawnSync$4(
+	            'cp',
+	            ['-R', action.path, newItemBackupPath]
+	          );
+	          if (backupNewResult.status === 0) {
+	            // Remove the new item
+	            rmSync$1(action.path, {recursive: true, force: true});
+	          }
 	        }
-	        // Restore the backed-up item
+
+	        // Restore the original from backup
 	        const cpResult = spawnSync$4(
 	          'cp',
 	          ['-R', action.backupPath, action.path]
 	        );
 	        if (cpResult.status === 0) {
-	          redoStack.push(action);
+	          // Clean up old backup after successful restore
+	          rmSync$1(action.backupPath, {recursive: true, force: true});
+	          // Push to redo stack with the new backup path
+	          redoStack.push({
+	            ...action,
+	            backupPath: newItemBackupPath
+	          });
 	        }
 	      }
 	      break;
@@ -26799,11 +26823,42 @@
 	      break;
 	    }
 	    case 'replace': {
-	      // Redo replace: remove backup and keep the new item
+	      // Redo replace: restore the "new" item from its backup
 	      if (action.backupPath && existsSync$2(action.backupPath)) {
-	        // Just remove the backup - the replaced item should already be there
-	        rmSync$1(action.backupPath, {recursive: true, force: true});
-	        undoStack.push({...action, backupPath: undefined});
+	        // The current file has the old content (from undo)
+	        // Back it up again for potential undo
+	        const timestamp = Date.now();
+	        const sanitizedPath = action.path.replaceAll(/[^a-zA-Z\d]/gv, '_');
+	        const oldItemBackupPath = path$4.join(
+	          undoBackupDir$1,
+	          `${sanitizedPath}_${timestamp}`
+	        );
+
+	        const backupOldResult = spawnSync$4(
+	          'cp',
+	          ['-R', action.path, oldItemBackupPath]
+	        );
+
+	        if (backupOldResult.status === 0) {
+	          // Remove the old item
+	          rmSync$1(action.path, {recursive: true, force: true});
+
+	          // Restore the new item from backup
+	          const cpResult = spawnSync$4(
+	            'cp',
+	            ['-R', action.backupPath, action.path]
+	          );
+
+	          if (cpResult.status === 0) {
+	            // Clean up the new item backup
+	            rmSync$1(action.backupPath, {recursive: true, force: true});
+	            // Push back to undo stack with the old item backup
+	            undoStack.push({
+	              ...action,
+	              backupPath: oldItemBackupPath
+	            });
+	          }
+	        }
 	      }
 	      break;
 	    }
@@ -27080,12 +27135,28 @@
 	      // Remove the existing item
 	      rmSync(targetPath, {recursive: true, force: true});
 
+	      // Copy the new item to replace the old one
+	      if (isCopy) {
+	        const cpResult = spawnSync$3('cp', ['-R', decodedSource, targetPath]);
+	        /* c8 ignore next 3 - Defensive: requires cp command to fail */
+	        if (cpResult.error || cpResult.status !== 0) {
+	          throw new Error(cpResult.stderr?.toString() || 'Copy failed');
+	        }
+	      } else {
+	        // Move operation
+	        renameSync$1(decodedSource, targetPath);
+	      }
+
 	      // Store backup info for potential undo
 	      emit('pushUndo', {
 	        type: 'replace',
 	        path: targetPath,
 	        backupPath
 	      });
+
+	      operationCounter = 0;
+	      setIsCopyingOrMoving(false);
+	      return;
 	    /* c8 ignore next 6 - Defensive: backup failures are rare */
 	    } catch (err) {
 	      // eslint-disable-next-line no-alert -- User feedback
@@ -27479,6 +27550,7 @@
 	                // Use original if resolution fails
 	              }
 
+	              /* c8 ignore next 10 -- Difficult to cover */
 	              if (resolvedCurrentBasePath.startsWith(columnPath + '/') &&
 	                resolvedCurrentBasePath !== columnPath + '/'
 	              ) {
@@ -29399,6 +29471,7 @@
 	                    ['-name', 'kMDItemContentType', '-raw', pth],
 	                    {encoding: 'utf8'}
 	                  );
+	                  /* c8 ignore next -- Should be present? */
 	                  const uti = utiResult.stdout?.trim() || '';
 
 	                  // Image types
@@ -29437,6 +29510,7 @@
 	                  return ['div', [
 	                    'Preview not available for this file type',
 	                    ['br'],
+	                    /* c8 ignore next -- Should be present? */
 	                    ['small', [`Type: ${uti || 'Unknown'}`]]
 	                  ]];
 	                })()

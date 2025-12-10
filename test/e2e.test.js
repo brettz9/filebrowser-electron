@@ -2226,6 +2226,245 @@ describe('renderer', () => {
       });
     });
 
+    test('undo and redo replace operation', async () => {
+      // Clean up any leftover files
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        try {
+          fs.rmSync(
+            path.join('/tmp', 'test-replace-source.txt'), {force: true}
+          );
+          fs.rmSync(
+            path.join('/tmp', 'test-replace-target.txt'), {force: true}
+          );
+          fs.rmSync(path.join('/tmp', 'test-replace-dest'), {
+            recursive: true, force: true
+          });
+        } catch {
+          // Ignore cleanup errors
+        }
+      });
+
+      // Create source file and destination folder with existing file
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+
+        // Create source file
+        const sourceFile = path.join('/tmp', 'test-replace-source.txt');
+        fs.writeFileSync(sourceFile, 'new content');
+
+        // Create destination folder
+        const destFolder = path.join('/tmp', 'test-replace-dest');
+        if (!fs.existsSync(destFolder)) {
+          fs.mkdirSync(destFolder);
+        }
+
+        // Create existing target file that will be replaced
+        const targetFile = path.join(destFolder, 'test-replace-source.txt');
+        fs.writeFileSync(targetFile, 'old content');
+      });
+
+      // Navigate to /tmp
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1500);
+
+      // Switch to three-columns view
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      // Find and copy the source file
+      const sourceFile = await page.locator(
+        'span[data-path="/tmp/test-replace-source.txt"]'
+      ).first();
+      await sourceFile.click();
+      await page.waitForTimeout(100);
+
+      // Copy the file (Cmd+C)
+      await page.keyboard.press('Meta+c');
+      await page.waitForTimeout(300);
+
+      // Navigate into the destination folder
+      const destFolder = await page.locator(
+        'a[data-path="/tmp/test-replace-dest"]'
+      ).first();
+      await destFolder.click();
+      await page.waitForTimeout(1000);
+
+      // Set up dialog handler to confirm replace
+      let replaceConfirmed = false;
+      // @ts-expect-error - Dialog type from Playwright
+      const dialogHandler = async (dialog) => {
+        replaceConfirmed = true;
+        await dialog.accept(); // Confirm replace
+      };
+      page.on('dialog', dialogHandler);
+
+      // Paste the file (Cmd+V) - should trigger replace dialog
+      await page.keyboard.press('Meta+v');
+      await page.waitForTimeout(1000);
+
+      page.off('dialog', dialogHandler);
+
+      // Verify replace was confirmed
+      expect(replaceConfirmed).toBe(true);
+
+      // Wait a bit for operation to complete
+      await page.waitForTimeout(500);
+
+      // Verify the file was replaced (has new content)
+      const afterReplace = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path, os} = globalThis.electronAPI;
+        const targetFile = path.join(
+          '/tmp',
+          'test-replace-dest',
+          'test-replace-source.txt'
+        );
+
+        // Check backup directory
+        const backupDir = path.join(os.tmpdir(), 'filebrowser-undo-backups');
+        const backupFiles = fs.existsSync(backupDir)
+          ? fs.readdirSync(backupDir)
+          : [];
+
+        return {
+          exists: fs.existsSync(targetFile),
+          content: fs.existsSync(targetFile)
+            ? fs.readFileSync(targetFile, 'utf8')
+            : null,
+          backupFiles
+        };
+      });
+
+      expect(afterReplace.exists).toBe(true);
+      expect(afterReplace.content).toBe('new content');
+
+      // Undo the replace (Cmd+Z)
+      await page.keyboard.press('Meta+z');
+      await page.waitForTimeout(2000); // Give more time for undo operation
+
+      // Verify old content is restored
+      const afterUndo = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path, os} = globalThis.electronAPI;
+        const targetFile = path.join(
+          '/tmp',
+          'test-replace-dest',
+          'test-replace-source.txt'
+        );
+
+        // Check what files exist in the folder
+        const files = fs.readdirSync('/tmp/test-replace-dest');
+
+        // Check backup files still exist
+        const backupDir = path.join(os.tmpdir(), 'filebrowser-undo-backups');
+        const backupFiles = fs.existsSync(backupDir)
+          ? fs.readdirSync(backupDir).filter(
+            // @ts-expect-error - filter function
+            (f) => f.includes('test_replace')
+          )
+          : [];
+
+        // Check current location
+        const currentPath = globalThis.location.hash;
+
+        // Check if the most recent backup exists and get its full path
+        const latestBackup = backupFiles.length > 0
+          ? backupFiles.toSorted().pop()
+          : null;
+        const latestBackupPath = latestBackup
+          ? path.join(backupDir, latestBackup)
+          : null;
+        const backupExists = latestBackupPath
+          ? fs.existsSync(latestBackupPath)
+          : false;
+
+        // Try to read the backup file to see what's in it
+        let backupContent = null;
+        if (backupExists && latestBackupPath) {
+          try {
+            // Check if it's a file or directory
+            const backupStats = fs.lstatSync(latestBackupPath);
+            backupContent = backupStats.isFile()
+              ? fs.readFileSync(latestBackupPath, 'utf8')
+              : 'is directory';
+          } catch (err) {
+            backupContent = `error: ${
+              (/** @type {Error} */ (err)).message
+            }`;
+          }
+        }
+
+        return {
+          exists: fs.existsSync(targetFile),
+          content: fs.existsSync(targetFile)
+            ? fs.readFileSync(targetFile, 'utf8')
+            : null,
+          filesInDir: files,
+          backupFiles,
+          currentPath,
+          latestBackup,
+          latestBackupPath,
+          backupExists,
+          backupContent
+        };
+      });
+
+      // Verify file was restored from backup
+      expect(afterUndo.exists).toBe(true);
+      expect(afterUndo.content).toBe('old content');
+      expect(afterUndo.filesInDir).toEqual(['test-replace-source.txt']);
+
+      // Verify a backup of the new content was created for redo
+      expect(afterUndo.backupExists).toBe(true);
+      expect(afterUndo.backupContent).toBe('new content');
+
+      // Redo the replace (Cmd+Shift+Z)
+      await page.keyboard.press('Meta+Shift+z');
+      await page.waitForTimeout(500);
+
+      // Verify new content is back after redo
+      const afterRedo = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const targetFile = path.join(
+          '/tmp',
+          'test-replace-dest',
+          'test-replace-source.txt'
+        );
+        return {
+          exists: fs.existsSync(targetFile),
+          content: fs.existsSync(targetFile)
+            ? fs.readFileSync(targetFile, 'utf8')
+            : null
+        };
+      });
+
+      // Verify file exists again with new content
+      expect(afterRedo.exists).toBe(true);
+      expect(afterRedo.content).toBe('new content');
+
+      // Clean up
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        try {
+          fs.rmSync(
+            path.join('/tmp', 'test-replace-source.txt'), {force: true}
+          );
+          fs.rmSync(path.join('/tmp', 'test-replace-dest'), {
+            recursive: true, force: true
+          });
+        } catch {
+          // Ignore cleanup errors
+        }
+      });
+    });
+
     test('undo and redo text file creation', async () => {
       // Clean up any existing untitled files from previous runs
       await page.evaluate(() => {
@@ -8552,7 +8791,7 @@ describe('renderer', () => {
       }
     );
 
-    test('info window displays Mac app category', async () => {
+    test.only('info window displays Mac app category', async () => {
       // Navigate to Applications folder
       await page.evaluate(() => {
         globalThis.location.hash = '#path=/Applications';
@@ -8565,7 +8804,7 @@ describe('renderer', () => {
 
       // Find a .app file
       const appExists = await page.evaluate(() => {
-        const apps = document.querySelectorAll('a[data-path*=".app"]');
+        const apps = document.querySelectorAll('span[data-path*=".app"]');
         return apps.length > 0;
       });
 
@@ -8576,9 +8815,18 @@ describe('renderer', () => {
 
       // Get first app - click to select it and trigger preview
       // (this calls getMacAppCategory on line 865 of index.js)
-      const firstApp = await page.locator('a[data-path*=".app"]').first();
+      const firstApp = await page.locator('span[data-path*=".app"]').first();
       await firstApp.click();
       await page.waitForTimeout(1000);
+
+      // Check if the preview panel shows the category
+      const previewHtml = await page.evaluate(() => {
+        const preview = document.querySelector('.miller-preview');
+        return preview ? preview.innerHTML : null;
+      });
+
+      // Verify getMacAppCategory was called by checking for category in preview
+      expect(previewHtml).toContain('Category');
 
       // Navigate back to /tmp
       await page.evaluate(() => {

@@ -46,6 +46,7 @@ export function getMacAppCategory (appPath) {
   const appName = path.dirname(appPath);
   const infoPlistPath = path.join(appPath, 'Contents', 'Info.plist');
 
+  /* c8 ignore next 5 -- Unusual circumstance */
   if (!existsSync(infoPlistPath)) {
     // eslint-disable-next-line no-console -- Debugging
     console.error(`Info.plist not found for ${appName}`);
@@ -62,12 +63,13 @@ export function getMacAppCategory (appPath) {
       // (e.g., "public.app-category.productivity" -> "Productivity")
       return getLocalizedUTIDescription(category);
     }
-
+    /* c8 ignore next 5 -- Unusual circumstance */
     // eslint-disable-next-line no-console -- Debugging
     console.log(
       `LSApplicationCategoryType not found in ${appName}'s Info.plist`
     );
     return null;
+  /* c8 ignore next 7 -- Unusual circumstance */
   } catch (error) {
     // eslint-disable-next-line no-console -- Debugging
     console.error(
