@@ -1339,7 +1339,16 @@ describe('renderer', () => {
 
       // Perform drag and drop using Playwright's dragAndDrop
       await sourceFile.dragTo(destFolder);
-      await page.waitForTimeout(1000);
+
+      // Wait for the file operation to complete by polling for the file
+      // in the destination (more reliable than fixed timeout)
+      await page.waitForFunction(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        return fs.existsSync(
+          path.join('/tmp', 'test-drag-dest', 'test-drag-source.txt')
+        );
+      }, {timeout: 5000});
 
       // Verify file was moved (default is move without Alt key)
       const results = await page.evaluate(() => {
