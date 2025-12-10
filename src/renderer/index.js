@@ -1315,7 +1315,8 @@ ${previewContent}
 
     // Find which column was clicked and get its path
     const columnElement = /** @type {HTMLElement} */ (e.target);
-    const prevColumn = jQuery(columnElement).prevAll(
+    const clickedColumn = jQuery(columnElement).closest('ul.miller-column');
+    const prevColumn = clickedColumn.prevAll(
       'ul.miller-column:not(.miller-collapse)'
     ).first();
     const selectedInPrev = prevColumn.find('li.miller-selected');

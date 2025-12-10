@@ -10857,5 +10857,338 @@ describe('renderer', () => {
         } catch {}
       });
     });
+
+    test('Cmd+I shows info window in Miller Columns', async () => {
+      // Create a test file
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs} = globalThis.electronAPI;
+        fs.writeFileSync('/tmp/test-cmd-i.txt', 'info test');
+      });
+
+      // Switch to three-columns view
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      // Navigate to /tmp
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1000);
+
+      // Wait for file to appear
+      await page.waitForFunction(() => {
+        const items = document.querySelectorAll(
+          'span[data-path*="test-cmd-i.txt"]'
+        );
+        return items.length > 0;
+      }, {timeout: 10000});
+
+      // Click to select the file
+      const fileItem = await page.locator(
+        'span[data-path="/tmp/test-cmd-i.txt"]'
+      ).first();
+      await fileItem.click();
+      await page.waitForTimeout(300);
+
+      // Press Cmd+I to show info window
+      await page.keyboard.press('Meta+i');
+      await page.waitForTimeout(500);
+
+      // Verify info window appeared
+      const infoWindowVisible = await page.evaluate(() => {
+        return document.querySelector('.info-window') !== null;
+      });
+      expect(infoWindowVisible).toBe(true);
+
+      // Close info window
+      await page.evaluate(() => {
+        const infoWindow = document.querySelector('.info-window');
+        if (infoWindow) {
+          infoWindow.remove();
+        }
+      });
+
+      // Cleanup
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs} = globalThis.electronAPI;
+        try {
+          fs.unlinkSync('/tmp/test-cmd-i.txt');
+        } catch {}
+      });
+    });
+
+    test(
+      'context menu Paste in empty column area',
+      async () => {
+        // This test covers lines 1354-1359 in index.js
+        // (Paste menu item in context menu for empty column areas)
+
+        // Clean up any leftover files from previous runs
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available
+          const {fs} = globalThis.electronAPI;
+          try {
+            fs.unlinkSync('/tmp/test-empty-paste.txt');
+            fs.rmSync('/tmp/test-empty-dest', {recursive: true, force: true});
+          } catch {}
+        });
+
+        // Create source file
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available
+          const {fs} = globalThis.electronAPI;
+          fs.writeFileSync('/tmp/test-empty-paste.txt', 'empty paste test');
+        });
+
+        // Switch to three-columns view
+        await page.locator('#three-columns').click();
+        await page.waitForTimeout(500);
+
+        // Navigate to /tmp
+        await page.evaluate(() => {
+          globalThis.location.hash = '#path=/tmp';
+        });
+        await page.waitForTimeout(1000);
+
+        // Wait for file to appear
+        await page.waitForFunction(() => {
+          const items = document.querySelectorAll(
+            'span[data-path*="test-empty-paste.txt"]'
+          );
+          return items.length > 0;
+        }, {timeout: 10000});
+
+        // Right-click on file to copy (Cmd+C doesn't work in tests)
+        const fileItem = await page.locator(
+          'span[data-path="/tmp/test-empty-paste.txt"]'
+        ).first();
+        await fileItem.click({button: 'right'});
+        await page.waitForTimeout(300);
+
+        // Click "Copy" in context menu
+        const copyItem = await page.locator(
+          '.context-menu-item:has-text("Copy")'
+        ).first();
+        await copyItem.click();
+        await page.waitForTimeout(300);
+
+        // Create destination folder
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available
+          const {fs} = globalThis.electronAPI;
+          if (!fs.existsSync('/tmp/test-empty-dest')) {
+            fs.mkdirSync('/tmp/test-empty-dest');
+          }
+        });
+
+        // Wait a bit for folder to be created
+        await page.waitForTimeout(500);
+
+        // Wait for folder to appear
+        await page.waitForFunction(() => {
+          const items = document.querySelectorAll(
+            'a[data-path="/tmp/test-empty-dest"]'
+          );
+          return items.length > 0;
+        }, {timeout: 10000});
+
+        // Navigate into destination folder
+        const destFolder = await page.locator(
+          'a[data-path="/tmp/test-empty-dest"]'
+        ).first();
+        await destFolder.click();
+        await page.waitForTimeout(1000);
+
+        // Right-click on empty column space to open context menu
+        const millerColumn = await page.locator('.miller-column').last();
+        const box = await millerColumn.boundingBox();
+
+        if (box) {
+          // Listen for dialog/alert
+          page.once('dialog', async (dialog) => {
+            await dialog.accept();
+          });
+
+          await page.mouse.click(
+            box.x + (box.width / 2),
+            box.y + (box.height / 2),
+            {button: 'right'}
+          );
+          await page.waitForTimeout(500);
+
+          // Verify context menu appeared with Paste option
+          const pasteItem = await page.locator(
+            '.context-menu-item:has-text("Paste")'
+          );
+          const pasteCount = await pasteItem.count();
+
+          if (pasteCount === 0) {
+            throw new Error('Paste menu item not found in context menu');
+          }
+
+          // Click "Paste" in context menu
+          await pasteItem.first().click();
+          await page.waitForTimeout(1500);
+
+          // Verify file was pasted
+          const fileExists = await page.evaluate(() => {
+            // @ts-expect-error - electronAPI available
+            const {fs} = globalThis.electronAPI;
+            return fs.existsSync(
+              '/tmp/test-empty-dest/test-empty-paste.txt'
+            );
+          });
+
+          expect(fileExists).toBe(true);
+        }
+
+        // Cleanup
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available
+          const {fs} = globalThis.electronAPI;
+          try {
+            fs.unlinkSync('/tmp/test-empty-paste.txt');
+            fs.rmSync('/tmp/test-empty-dest', {recursive: true, force: true});
+          } catch {}
+        });
+      }
+    );
+
+    test('drag and drop on empty Miller Columns space', async () => {
+      // This test covers lines 1463-1467 and 1471-1509 in index.js
+      // (dragover and drop events on empty Miller Columns space)
+
+      // Create source file and destination folder
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs} = globalThis.electronAPI;
+        fs.writeFileSync('/tmp/test-drag-source.txt', 'drag test');
+        if (!fs.existsSync('/tmp/test-drag-dest')) {
+          fs.mkdirSync('/tmp/test-drag-dest');
+        }
+      });
+
+      // Switch to three-columns view
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      // Navigate to /tmp
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1000);
+
+      // Wait for destination folder to appear
+      await page.waitForFunction(() => {
+        const items = document.querySelectorAll(
+          'a[data-path*="test-drag-dest"]'
+        );
+        return items.length > 0;
+      }, {timeout: 10000});
+
+      // Click into destination folder to navigate
+      const destFolder = await page.locator(
+        'a[data-path="/tmp/test-drag-dest"]'
+      ).first();
+      await destFolder.click();
+      await page.waitForTimeout(1000);
+
+      // Now dispatch drag events on the empty column space
+      const result = await page.evaluate(() => {
+        const millerColumnsDiv = document.querySelector('div.miller-columns');
+        const lastColumn = [
+          ...document.querySelectorAll('ul.miller-column')
+        ].pop();
+
+        if (!millerColumnsDiv || !lastColumn) {
+          return {success: false, error: 'Elements not found'};
+        }
+
+        // Dispatch dragover event
+        const dragoverEvent = new DragEvent('dragover', {
+          bubbles: true,
+          cancelable: true,
+          altKey: false,
+          dataTransfer: new DataTransfer()
+        });
+
+        Object.defineProperty(dragoverEvent, 'target', {
+          value: lastColumn,
+          enumerable: true
+        });
+
+        lastColumn.dispatchEvent(dragoverEvent);
+
+        // Dispatch drop event with source file path
+        const dropEvent = new DragEvent('drop', {
+          bubbles: true,
+          cancelable: true,
+          altKey: false,
+          dataTransfer: new DataTransfer()
+        });
+
+        dropEvent.dataTransfer?.setData(
+          'text/plain',
+          '/tmp/test-drag-source.txt'
+        );
+
+        Object.defineProperty(dropEvent, 'target', {
+          value: lastColumn,
+          enumerable: true
+        });
+
+        lastColumn.dispatchEvent(dropEvent);
+
+        return {success: true};
+      });
+
+      if (!result.success) {
+        throw new Error(`Event dispatch failed: ${result.error}`);
+      }
+
+      await page.waitForTimeout(2000);
+
+      // Verify file was moved to destination
+      const fileExists = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs} = globalThis.electronAPI;
+        const inDest = fs.existsSync(
+          '/tmp/test-drag-dest/test-drag-source.txt'
+        );
+
+        let destContent = '';
+        try {
+          if (inDest) {
+            destContent = fs.readFileSync(
+              '/tmp/test-drag-dest/test-drag-source.txt',
+              'utf8'
+            );
+          }
+        } catch (e) {
+          destContent = 'ERROR: ' + (/** @type {Error} */ (e)).message;
+        }
+
+        return {
+          inDest,
+          destContent
+        };
+      });
+
+      // File should be in destination (operation completed successfully)
+      expect(fileExists.inDest).toBe(true);
+      expect(fileExists.destContent).toBe('drag test');
+
+      // Cleanup
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs} = globalThis.electronAPI;
+        try {
+          fs.unlinkSync('/tmp/test-drag-source.txt');
+          fs.rmSync('/tmp/test-drag-dest', {recursive: true, force: true});
+        } catch {}
+      });
+    });
   });
 });

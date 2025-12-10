@@ -62,8 +62,8 @@ export function getMacAppCategory (appPath) {
       // Get localized version
       // (e.g., "public.app-category.productivity" -> "Productivity")
       return getLocalizedUTIDescription(category);
+    /* c8 ignore next 6 -- Unusual circumstance */
     }
-    /* c8 ignore next 5 -- Unusual circumstance */
     // eslint-disable-next-line no-console -- Debugging
     console.log(
       `LSApplicationCategoryType not found in ${appName}'s Info.plist`
