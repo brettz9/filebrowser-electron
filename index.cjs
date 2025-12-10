@@ -26741,6 +26741,27 @@
 	        if (cpResult.status === 0) {
 	          // Clean up old backup after successful restore
 	          rmSync$1(action.backupPath, {recursive: true, force: true});
+
+	          // If this was a move operation, also restore the source file
+	          if (!action.isCopy && action.sourcePath) {
+	            // The new item backup contains what was moved to target
+	            // We need to restore it to the source location
+	            if (newItemBackupPath && existsSync$2(newItemBackupPath)) {
+	              const restoreSourceResult = spawnSync$4(
+	                'cp',
+	                ['-R', newItemBackupPath, action.sourcePath]
+	              );
+	              /* c8 ignore next 7 -- Hard to simulate error */
+	              // Keep the backup for redo (it will need to move it back)
+	              if (restoreSourceResult.status !== 0) {
+	                // eslint-disable-next-line no-console -- Debugging
+	                console.error(
+	                  'Failed to restore source file for move operation'
+	                );
+	              }
+	            }
+	          }
+
 	          // Push to redo stack with the new backup path
 	          redoStack.push({
 	            ...action,
@@ -26842,6 +26863,16 @@
 	        if (backupOldResult.status === 0) {
 	          // Remove the old item
 	          rmSync$1(action.path, {recursive: true, force: true});
+
+	          // If this was a move operation, remove the source file too
+	          // (undo restored it, redo needs to "move" it back)
+	          if (
+	            !action.isCopy &&
+	            action.sourcePath &&
+	            existsSync$2(action.sourcePath)
+	          ) {
+	            rmSync$1(action.sourcePath, {recursive: true, force: true});
+	          }
 
 	          // Restore the new item from backup
 	          const cpResult = spawnSync$4(
@@ -27151,13 +27182,15 @@
 	      emit('pushUndo', {
 	        type: 'replace',
 	        path: targetPath,
-	        backupPath
+	        backupPath,
+	        isCopy,
+	        sourcePath: isCopy ? null : decodedSource
 	      });
 
 	      operationCounter = 0;
 	      setIsCopyingOrMoving(false);
 	      return;
-	    /* c8 ignore next 6 - Defensive: backup failures are rare */
+	    /* c8 ignore next 7 - Defensive: backup failures are rare */
 	    } catch (err) {
 	      // eslint-disable-next-line no-alert -- User feedback
 	      alert(`Failed to replace: ${(/** @type {Error} */ (err)).message}`);
@@ -27203,7 +27236,7 @@
 	      operationCounter = 0;
 	      setIsCopyingOrMoving(false);
 	    }, 100);
-	  /* c8 ignore next 7 - Defensive: difficult to trigger errors in cp/rename */
+	  /* c8 ignore next 9 - Defensive: difficult to trigger errors in cp/rename */
 	  } catch (err) {
 	    // eslint-disable-next-line no-alert -- User feedback
 	    alert(

@@ -129,6 +129,27 @@ export const performUndo = (changePath) => {
         if (cpResult.status === 0) {
           // Clean up old backup after successful restore
           rmSync(action.backupPath, {recursive: true, force: true});
+
+          // If this was a move operation, also restore the source file
+          if (!action.isCopy && action.sourcePath) {
+            // The new item backup contains what was moved to target
+            // We need to restore it to the source location
+            if (newItemBackupPath && existsSync(newItemBackupPath)) {
+              const restoreSourceResult = spawnSync(
+                'cp',
+                ['-R', newItemBackupPath, action.sourcePath]
+              );
+              /* c8 ignore next 7 -- Hard to simulate error */
+              // Keep the backup for redo (it will need to move it back)
+              if (restoreSourceResult.status !== 0) {
+                // eslint-disable-next-line no-console -- Debugging
+                console.error(
+                  'Failed to restore source file for move operation'
+                );
+              }
+            }
+          }
+
           // Push to redo stack with the new backup path
           redoStack.push({
             ...action,
@@ -230,6 +251,16 @@ export const performRedo = (changePath) => {
         if (backupOldResult.status === 0) {
           // Remove the old item
           rmSync(action.path, {recursive: true, force: true});
+
+          // If this was a move operation, remove the source file too
+          // (undo restored it, redo needs to "move" it back)
+          if (
+            !action.isCopy &&
+            action.sourcePath &&
+            existsSync(action.sourcePath)
+          ) {
+            rmSync(action.sourcePath, {recursive: true, force: true});
+          }
 
           // Restore the new item from backup
           const cpResult = spawnSync(

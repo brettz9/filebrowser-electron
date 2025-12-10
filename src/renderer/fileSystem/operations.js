@@ -223,13 +223,15 @@ export function copyOrMoveItem (sourcePath, targetDir, isCopy) {
       emit('pushUndo', {
         type: 'replace',
         path: targetPath,
-        backupPath
+        backupPath,
+        isCopy,
+        sourcePath: isCopy ? null : decodedSource
       });
 
       operationCounter = 0;
       setIsCopyingOrMoving(false);
       return;
-    /* c8 ignore next 6 - Defensive: backup failures are rare */
+    /* c8 ignore next 7 - Defensive: backup failures are rare */
     } catch (err) {
       // eslint-disable-next-line no-alert -- User feedback
       alert(`Failed to replace: ${(/** @type {Error} */ (err)).message}`);
@@ -275,7 +277,7 @@ export function copyOrMoveItem (sourcePath, targetDir, isCopy) {
       operationCounter = 0;
       setIsCopyingOrMoving(false);
     }, 100);
-  /* c8 ignore next 7 - Defensive: difficult to trigger errors in cp/rename */
+  /* c8 ignore next 9 - Defensive: difficult to trigger errors in cp/rename */
   } catch (err) {
     // eslint-disable-next-line no-alert -- User feedback
     alert(

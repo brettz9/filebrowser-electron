@@ -2465,6 +2465,345 @@ describe('renderer', () => {
       });
     });
 
+    test('cannot replace folder with its own contents', async () => {
+      // Create nested folder structure: /tmp/parent/child/file.txt
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const parentDir = path.join('/tmp', 'test-nested-parent');
+        const itemDir = path.join(parentDir, 'item');
+        const nestedItemDir = path.join(itemDir, 'item'); // Same name nested
+
+        // Clean up if exists
+        try {
+          fs.rmSync(parentDir, {recursive: true, force: true});
+        } catch {
+          // Ignore
+        }
+
+        fs.mkdirSync(nestedItemDir, {recursive: true});
+        fs.writeFileSync(
+          path.join(nestedItemDir, 'file.txt'), 'nested content'
+        );
+      });
+
+      // Navigate to /tmp in Miller Columns
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1500);
+
+      // Switch to three-columns view
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      // Navigate to /tmp/test-nested-parent
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp/test-nested-parent';
+      });
+      await page.waitForTimeout(500);
+
+      // Click into item folder to see nested item
+      const itemFolder = await page.locator(
+        'a[data-path="/tmp/test-nested-parent/item"]'
+      ).first();
+      await itemFolder.click();
+      await page.waitForTimeout(500);
+
+      // Copy the nested item folder (same name as parent)
+      const nestedItemFolder = await page.locator(
+        'a[data-path="/tmp/test-nested-parent/item/item"]'
+      ).first();
+      await nestedItemFolder.click();
+      await page.keyboard.press('Meta+c');
+      await page.waitForTimeout(300);
+
+      // Navigate back to parent level
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp/test-nested-parent';
+      });
+      await page.waitForTimeout(500);
+
+      // Try to paste - this will try to create /tmp/test-nested-parent/item
+      // but /tmp/test-nested-parent/item already exists
+      //   (it's the parent of what we copied)
+      // Source: /tmp/test-nested-parent/item/item (in clipboard)
+      // Target would be: /tmp/test-nested-parent/item (basename
+      //   of source in current dir)
+      // Target exists and source is inside it:
+      //   /tmp/test-nested-parent/item/item starts with
+      //   /tmp/test-nested-parent/item/
+      // This should trigger "Cannot replace a folder with
+      //   one of its own contents"
+
+      // Listen for alert
+      let alertMessage = '';
+      page.once('dialog', async (dialog) => {
+        alertMessage = dialog.message();
+        await dialog.accept();
+      });
+
+      // Try to paste
+      await page.keyboard.press('Meta+v');
+      await page.waitForTimeout(500);
+
+      // Verify alert was shown
+      expect(alertMessage).toContain(
+        'Cannot replace a folder with one of its own contents'
+      );
+
+      // Cleanup
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        try {
+          fs.rmSync(path.join('/tmp', 'test-nested-parent'), {
+            recursive: true,
+            force: true
+          });
+        } catch {}
+      });
+    });
+
+    test(
+      'cannot copy folder into its own descendant',
+      async () => {
+        // Create nested folder structure
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available
+          const {fs, path} = globalThis.electronAPI;
+          const parentPath = path.join('/tmp', 'test-descendant-parent');
+          const childPath = path.join(parentPath, 'child');
+          fs.mkdirSync(childPath, {recursive: true});
+          fs.writeFileSync(path.join(childPath, 'file.txt'), 'test content');
+        });
+
+        // Navigate to /tmp
+        await page.evaluate(() => {
+          globalThis.location.hash = '#path=/tmp';
+        });
+        await page.waitForTimeout(1500);
+
+        // Switch to three-columns view
+        await page.locator('#three-columns').click();
+        await page.waitForTimeout(500);
+
+        // Copy the parent folder
+        const parentFolder = await page.locator(
+          'a[data-path="/tmp/test-descendant-parent"]'
+        ).first();
+        await parentFolder.click();
+        await page.keyboard.press('Meta+c');
+        await page.waitForTimeout(300);
+
+        // Navigate into parent to see child
+        await parentFolder.click();
+        await page.waitForTimeout(500);
+
+        // Try to paste parent into child (copying into own descendant)
+        // Source: /tmp/test-descendant-parent (in clipboard)
+        // Target directory: /tmp/test-descendant-parent/child
+        // This should trigger "Cannot copy or move a folder
+        //   into itself or its descendants"
+        const childFolder = await page.locator(
+          'a[data-path="/tmp/test-descendant-parent/child"]'
+        ).first();
+
+        // Listen for alert
+        let alertMessage = '';
+        page.once('dialog', async (dialog) => {
+          alertMessage = dialog.message();
+          await dialog.accept();
+        });
+
+        // Try to paste into child folder
+        await childFolder.click();
+        await page.keyboard.press('Meta+v');
+        await page.waitForTimeout(500);
+
+        // Verify alert was shown
+        expect(alertMessage).toContain(
+          'Cannot copy or move a folder into itself or its descendants'
+        );
+
+        // Cleanup
+        await page.evaluate(() => {
+          // @ts-expect-error - electronAPI available
+          const {fs, path} = globalThis.electronAPI;
+          try {
+            fs.rmSync(path.join('/tmp', 'test-descendant-parent'), {
+              recursive: true,
+              force: true
+            });
+          } catch {}
+        });
+      }
+    );
+
+    test('undo and redo move replace operation', async () => {
+      // Create source file and destination file
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+
+        // Create source file
+        const sourceFile = path.join('/tmp', 'test-move-replace-source.txt');
+        fs.writeFileSync(sourceFile, 'new content from source');
+
+        // Create destination folder with existing file
+        const destFolder = path.join('/tmp', 'test-move-replace-dest');
+        if (!fs.existsSync(destFolder)) {
+          fs.mkdirSync(destFolder);
+        }
+
+        // Create existing target file that will be replaced
+        const targetFile = path.join(
+          destFolder,
+          'test-move-replace-source.txt'
+        );
+        fs.writeFileSync(targetFile, 'old content in dest');
+      });
+
+      // Navigate to /tmp
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1500);
+
+      // Switch to three-columns view
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      // Find and cut the source file (for move operation)
+      const sourceFile = await page.locator(
+        'span[data-path="/tmp/test-move-replace-source.txt"]'
+      ).first();
+      await sourceFile.click();
+      await page.waitForTimeout(100);
+
+      // Cut the file (Cmd+X for move)
+      await page.keyboard.press('Meta+x');
+      await page.waitForTimeout(300);
+
+      // Navigate into the destination folder
+      const destFolder = await page.locator(
+        'a[data-path="/tmp/test-move-replace-dest"]'
+      ).first();
+      await destFolder.click();
+      await page.waitForTimeout(1000);
+
+      // Set up dialog handler to confirm replace
+      page.once('dialog', async (dialog) => {
+        await dialog.accept();
+      });
+
+      // Paste to trigger move+replace (Cmd+V)
+      await page.keyboard.press('Meta+v');
+      await page.waitForTimeout(500);
+
+      // Verify file was moved and replaced
+      const afterReplace = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const targetFile = path.join(
+          '/tmp',
+          'test-move-replace-dest',
+          'test-move-replace-source.txt'
+        );
+        const sourceFile = path.join('/tmp', 'test-move-replace-source.txt');
+
+        return {
+          targetExists: fs.existsSync(targetFile),
+          targetContent: fs.existsSync(targetFile)
+            ? fs.readFileSync(targetFile, 'utf8')
+            : null,
+          sourceExists: fs.existsSync(sourceFile)
+        };
+      });
+
+      expect(afterReplace.targetExists).toBe(true);
+      expect(afterReplace.targetContent).toBe('new content from source');
+      // Source should be gone (moved)
+      expect(afterReplace.sourceExists).toBe(false);
+
+      // Undo the move+replace
+      await page.keyboard.press('Meta+z');
+      await page.waitForTimeout(500);
+
+      // Verify old content restored and source file back
+      const afterUndo = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const targetFile = path.join(
+          '/tmp',
+          'test-move-replace-dest',
+          'test-move-replace-source.txt'
+        );
+        const sourceFile = path.join('/tmp', 'test-move-replace-source.txt');
+
+        return {
+          targetExists: fs.existsSync(targetFile),
+          targetContent: fs.existsSync(targetFile)
+            ? fs.readFileSync(targetFile, 'utf8')
+            : null,
+          sourceExists: fs.existsSync(sourceFile),
+          sourceContent: fs.existsSync(sourceFile)
+            ? fs.readFileSync(sourceFile, 'utf8')
+            : null
+        };
+      });
+
+      expect(afterUndo.targetExists).toBe(true);
+      expect(afterUndo.targetContent).toBe('old content in dest');
+      expect(afterUndo.sourceExists).toBe(true); // Source should be back
+      expect(afterUndo.sourceContent).toBe('new content from source');
+
+      // Redo the move+replace
+      await page.keyboard.press('Meta+Shift+z');
+      await page.waitForTimeout(500);
+
+      // Verify new content is back and source is gone again
+      const afterRedo = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const targetFile = path.join(
+          '/tmp',
+          'test-move-replace-dest',
+          'test-move-replace-source.txt'
+        );
+        const sourceFile = path.join('/tmp', 'test-move-replace-source.txt');
+
+        return {
+          targetExists: fs.existsSync(targetFile),
+          targetContent: fs.existsSync(targetFile)
+            ? fs.readFileSync(targetFile, 'utf8')
+            : null,
+          sourceExists: fs.existsSync(sourceFile)
+        };
+      });
+
+      expect(afterRedo.targetExists).toBe(true);
+      expect(afterRedo.targetContent).toBe('new content from source');
+      expect(afterRedo.sourceExists).toBe(false); // Source should be gone again
+
+      // Cleanup
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        try {
+          fs.rmSync(path.join('/tmp', 'test-move-replace-source.txt'), {
+            force: true
+          });
+          fs.rmSync(path.join('/tmp', 'test-move-replace-dest'), {
+            recursive: true,
+            force: true
+          });
+        } catch {
+          // Ignore cleanup errors
+        }
+      });
+    });
+
     test('undo and redo text file creation', async () => {
       // Clean up any existing untitled files from previous runs
       await page.evaluate(() => {
@@ -8791,7 +9130,7 @@ describe('renderer', () => {
       }
     );
 
-    test.only('info window displays Mac app category', async () => {
+    test('info window displays Mac app category', async () => {
       // Navigate to Applications folder
       await page.evaluate(() => {
         globalThis.location.hash = '#path=/Applications';
