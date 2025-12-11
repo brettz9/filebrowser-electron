@@ -47,11 +47,13 @@ export function readDirectory (basePath) {
     try {
       // Check if system path exists and has content
       const systemContents = readdirSync(systemPath);
+      /* c8 ignore next 2 -- macOS system-specific path handling */
       if (systemContents.length > 1 ||
           (systemContents.length === 1 &&
            systemContents[0] !== '.localized')) {
         actualPath = systemPath;
       }
+    /* c8 ignore next 3 -- Should not normally err */
     } catch {
       // If system path doesn't exist, use original path
     }
