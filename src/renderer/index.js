@@ -650,18 +650,33 @@ function addItems (result, basePath, currentBasePath) {
       ]
     );
 
+    // Store the path for later icon loading (after plugin init)
+    const dataPath = basePath + encodeURIComponent(title);
+    li.dataset.iconPath = dataPath;
+
     getIconDataURLForFile(
       path.join(basePath, title)
     ).then((url) => {
-      li.setAttribute(
-        'style',
-        url
-          ? `background-image: url(${
-            url
-          })`
-          /* c8 ignore next -- url should be present */
-          : ''
-      );
+      // Find the actual element in the DOM (plugin may have cloned it)
+      const actualElement = view === 'three-columns'
+        ? document.querySelector(
+          `a[data-path="${CSS.escape(dataPath)}"], span[data-path="${
+            CSS.escape(dataPath)
+          }"]`
+        )?.parentElement
+        : li;
+
+      if (actualElement) {
+        actualElement.setAttribute(
+          'style',
+          url
+            ? `background-image: url(${
+              url
+            })`
+            /* c8 ignore next -- url should be present */
+            : ''
+        );
+      }
       return undefined;
     });
 
@@ -1483,10 +1498,14 @@ ${previewContent}
         anchors.trigger('click');
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            anchors[0]?.scrollIntoView({
-              block: 'start',
-              inline: 'start'
-            });
+            // Not sure why timeout is now needed, but using with shortcuts like
+            //    shift-cmd-A, it has become necessary
+            setTimeout(() => {
+              anchors[0]?.scrollIntoView({
+                block: 'start',
+                inline: 'start'
+              });
+            }, 200);
           });
         });
       }

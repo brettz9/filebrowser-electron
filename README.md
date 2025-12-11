@@ -87,5 +87,4 @@ done
 ## Misc. to-dos
 
 1. Folders like Utilities not showing children?
-1. Why are icons being lost when using shortcuts?
 1. Allow "Show package contents" context menu for apps
