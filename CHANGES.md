@@ -9,6 +9,8 @@
 - feat: preview pane
 - feat: Get Info dialog
 - feat: Key commands: Shift+Cmd+H for Home, Shift+Cmd+D for Desktop, Shift+Cmd+A for Applications, Shift+Cmd+U for Utilities
+- feat: cmd-1 and cmd-3 for icon/column view selection
+- fix: navigate icon view by arrow or key command
 - fix: properly restore position after external file/folder creation/deletions
 - fix: sticky notes at root
 - fix: misc. fixes

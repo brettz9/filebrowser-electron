@@ -69,8 +69,6 @@ done
 
 ## To-dos
 
-1. cmd-1 for icon view, cmd-3 for column view
-1. Let arrow keys work in icon view
 1. List view/Gallery view
 1. Ideally would allow separate windows and tabs, with menu bar
 

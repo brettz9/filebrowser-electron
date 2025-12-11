@@ -31354,8 +31354,16 @@ ${previewContent}
 	    return;
 	  }
 
-	  // Cmd+Z for undo
-	  if (e.metaKey && e.key === 'z' && !e.shiftKey) {
+	  // Cmd+1 to switch to icon view
+	  if (e.metaKey && e.key === '1') {
+	    e.preventDefault();
+	    $('#icon-view').click();
+	  } else if (e.metaKey && e.key === '3') {
+	    // Cmd+3 to switch to three-columns view
+	    e.preventDefault();
+	    $('#three-columns').click();
+	  } else if (e.metaKey && e.key === 'z' && !e.shiftKey) {
+	    // Cmd+Z for undo
 	    e.preventDefault();
 	    performUndo();
 	  } else if (e.metaKey && e.shiftKey && e.key === 'z') {
