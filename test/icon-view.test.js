@@ -146,14 +146,17 @@ describe('Icon View', () => {
       globalThis.infoPath = null;
     });
 
-    // Manually select a row and dispatch keyboard event on table
+    // Manually select a cell and dispatch keyboard event on table
     await page.evaluate((filePath) => {
-      // Try without tbody selector since jamilih might not create tbody
-      const row = document.querySelector('table[data-base-path] tr');
-      if (row) {
-        row.classList.add('selected');
-        // @ts-expect-error - dataset.path
-        row.dataset.path = filePath;
+      // Select a td.list-item cell in icon view
+      const cell = document.querySelector('td.list-item');
+      if (cell) {
+        cell.classList.add('selected');
+        const link = cell.querySelector('a, span');
+        if (link) {
+          // @ts-expect-error - dataset.path
+          link.dataset.path = filePath;
+        }
       }
 
       // Get the icon-view table and dispatch Cmd+I keydown event

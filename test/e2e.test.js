@@ -1188,18 +1188,13 @@ describe('renderer', () => {
         return cells.length >= 2;
       }, {timeout: 10000});
 
-      // Select source-folder by clicking it and marking row as selected
+      // Select source-folder by clicking it and marking cell as selected
       await page.evaluate(() => {
         const sourceCell = document.querySelector(
           'td.list-item:has(a[data-path*="source-folder"])'
         );
         if (sourceCell) {
-          const row = sourceCell.closest('tr');
-          if (row) {
-            row.classList.add('selected');
-            /** @type {HTMLElement} */ (row).dataset.path =
-              sourceCell.querySelector('a')?.dataset.path || '';
-          }
+          sourceCell.classList.add('selected');
         }
       });
       await page.waitForTimeout(300);
@@ -1994,23 +1989,17 @@ describe('renderer', () => {
           return {success: false, error: 'Path not found'};
         }
 
-        // Add selected class and path to the row
-        const row = cell.closest('tr');
-        if (!row) {
-          return {success: false, error: 'Row not found'};
-        }
-
-        // Clear other selections
-        document.querySelectorAll('tbody tr.selected').forEach(
-          (r) => r.classList.remove('selected')
+        // Add selected class to the cell (not the row) for icon view
+        document.querySelectorAll('td.list-item.selected').forEach(
+          (c) => c.classList.remove('selected')
         );
-        row.classList.add('selected');
-        /** @type {HTMLElement} */ (row).dataset.path = path;
+        cell.classList.add('selected');
 
-        // Verify the row actually has the selected class
-        const hasSelectedClass = row.classList.contains('selected');
-        const selectedRowQuery = document.querySelector('tbody tr.selected');
-        const selectedRowAny = document.querySelector('tr.selected');
+        // Verify the cell actually has the selected class
+        const hasSelectedClass = cell.classList.contains('selected');
+        const selectedCellQuery = document.querySelector(
+          'td.list-item.selected'
+        );
 
         // Immediately dispatch Cmd+C event
         const table = document.querySelector('table[data-base-path]');
@@ -2031,9 +2020,8 @@ describe('renderer', () => {
           success: true,
           path,
           hasSelectedClass,
-          hasSelectedRow: Boolean(selectedRowQuery),
-          hasSelectedAny: Boolean(selectedRowAny),
-          rowIsQuery: row === selectedRowQuery,
+          hasSelectedCell: Boolean(selectedCellQuery),
+          cellIsQuery: cell === selectedCellQuery,
           tableHTML
         };
       });
@@ -2041,13 +2029,12 @@ describe('renderer', () => {
 
       expect(copyResult.success).toBe(true);
       // Debug: check all values
-      if (!copyResult.hasSelectedAny) {
+      if (!copyResult.hasSelectedCell) {
         throw new Error(
           `Selection failed: ` +
           `hasSelectedClass=${copyResult.hasSelectedClass}, ` +
-          `hasSelectedRow=${copyResult.hasSelectedRow}, ` +
-          `hasSelectedAny=${copyResult.hasSelectedAny}, ` +
-          `rowIsQuery=${copyResult.rowIsQuery}, ` +
+          `hasSelectedCell=${copyResult.hasSelectedCell}, ` +
+          `cellIsQuery=${copyResult.cellIsQuery}, ` +
           `table=${copyResult.tableHTML}`
         );
       }
@@ -2190,13 +2177,6 @@ describe('renderer', () => {
       await iconViewBtn.click();
       await page.waitForTimeout(300);
 
-      // Set up dialog handler to capture the confirm and dismiss it
-      let alertMessage = '';
-      page.on('dialog', async (dialog) => {
-        alertMessage = dialog.message();
-        await dialog.dismiss(); // Click Cancel to prevent overwrite
-      });
-
       // Copy the source file
       const copyResult = await page.evaluate(() => {
         const cell = document.querySelector(
@@ -2215,16 +2195,11 @@ describe('renderer', () => {
           return {success: false, error: 'Path not found'};
         }
 
-        const row = cell.closest('tr');
-        if (!row) {
-          return {success: false, error: 'Row not found'};
-        }
-
-        document.querySelectorAll('tbody tr.selected').forEach(
-          (r) => r.classList.remove('selected')
+        // Add selected class to the cell (not the row) for icon view
+        document.querySelectorAll('td.list-item.selected').forEach(
+          (c) => c.classList.remove('selected')
         );
-        row.classList.add('selected');
-        /** @type {HTMLElement} */ (row).dataset.path = path;
+        cell.classList.add('selected');
 
         const table = document.querySelector('table[data-base-path]');
         if (!table) {
@@ -2244,7 +2219,15 @@ describe('renderer', () => {
       expect(copyResult.success).toBe(true);
       await page.waitForTimeout(200);
 
+      // Verify clipboard has the file
+      const clipboardCheck = await page.evaluate(() => {
+        // @ts-expect-error - clipboard available
+        return globalThis.clipboard || null;
+      });
+
+      expect(clipboardCheck).toBeTruthy();
       // Navigate to destination folder
+      expect(clipboardCheck.isCopy).toBe(true);
       const destFolderCell = await page.locator(
         'td.list-item:has(a[data-path*="test-dup-dest"])'
       );
@@ -2254,6 +2237,20 @@ describe('renderer', () => {
         return globalThis.location.hash.includes('test-dup-dest');
       }, {timeout: 5000});
       await page.waitForTimeout(500);
+
+      // Set up dialog handler before pasting
+      let dialogShown = false;
+      let alertMessage = '';
+
+      const dialogHandler = async (
+        /** @type {import('@playwright/test').Dialog} */ dialog
+      ) => {
+        dialogShown = true;
+        alertMessage = dialog.message();
+        await dialog.dismiss(); // Click Cancel to prevent overwrite
+      };
+
+      page.once('dialog', dialogHandler);
 
       // Paste - should trigger confirm dialog about duplicate
       await page.evaluate(() => {
@@ -2267,9 +2264,12 @@ describe('renderer', () => {
           tbl.dispatchEvent(evt);
         }
       });
-      await page.waitForTimeout(500);
+
+      // Wait a bit for the dialog to be handled
+      await page.waitForTimeout(1000);
 
       // Verify confirm dialog was shown
+      expect(dialogShown).toBe(true);
       expect(alertMessage).toContain('already exists');
 
       // Verify file was NOT overwritten (still has original content)
