@@ -1771,6 +1771,12 @@ describe('renderer', () => {
     );
 
     test('startRename exits early if textElement is null', async () => {
+      // Wait for startRenameForTesting to be available
+      await page.waitForFunction(() => {
+        // @ts-expect-error Testing internal API
+        return typeof globalThis.startRenameForTesting === 'function';
+      }, {timeout: 5000});
+
       // Test that startRename handles null textElement gracefully
       const result = await page.evaluate(() => {
         let callbackCalled = false;
@@ -1782,14 +1788,18 @@ describe('renderer', () => {
         // @ts-expect-error Testing internal API
         const startRename = globalThis.startRenameForTesting;
         if (!startRename) {
-          return {error: 'startRename not found'};
+          return {error: 'startRename not found', callbackCalled: false};
         }
 
         // Call with null textElement
         startRename(null, onComplete);
 
-        return {callbackCalled};
+        return {callbackCalled, error: null};
       });
+
+      if (result.error) {
+        throw new Error(`Test failed: ${result.error}`);
+      }
 
       expect(result.callbackCalled).toBe(true);
     });
