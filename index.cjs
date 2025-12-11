@@ -30355,6 +30355,24 @@
 	        // Add selection to clicked cell
 	        cellEl.classList.add('selected');
 	      });
+
+	      // Add double-click handler to open folders/files
+	      cellEl.addEventListener('dblclick', (e) => {
+	        e.preventDefault();
+	        const anchor = cellEl.querySelector('a');
+	        const span = cellEl.querySelector('span');
+
+	        if (anchor) {
+	          // It's a folder - navigate into it
+	          anchor.click();
+	        } else if (span) {
+	          // It's a file - open with default application
+	          const itemPath = span.dataset?.path;
+	          if (itemPath) {
+	            shell.openPath(decodeURIComponent(itemPath));
+	          }
+	        }
+	      });
 	    });
 
 	    // Add new keydown listener
