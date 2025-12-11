@@ -3,7 +3,7 @@ nav img {
   height: 25px;
 }
 
-nav button.selected {
+nav button.selected, .list-item.selected {
   background-color: aqua;
   color: white;
 }

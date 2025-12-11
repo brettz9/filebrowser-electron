@@ -7,7 +7,7 @@ const {
   afterEach, beforeEach, describe
 } = test;
 
-describe.only('renderer', () => {
+describe('renderer', () => {
   /** @type {import('@playwright/test').ElectronApplication} */
   let electron;
   /** @type {import('@playwright/test').Page} */

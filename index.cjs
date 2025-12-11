@@ -30336,10 +30336,126 @@
 	          addDragAndDropSupport(cellEl, itemPath, isFolder);
 	        }
 	      }
+
+	      // Add click handler for selection
+	      cellEl.addEventListener('click', (e) => {
+	        // Don't interfere with link navigation
+	        if (e.target !== cellEl &&
+	            !cellEl.contains(/** @type {Node} */ (e.target))) {
+	          return;
+	        }
+
+	        // Remove previous selection
+	        const prevSelected = iconViewTable.querySelector(
+	          'td.list-item.selected'
+	        );
+	        if (prevSelected) {
+	          prevSelected.classList.remove('selected');
+	        }
+
+	        // Add selection to clicked cell
+	        cellEl.classList.add('selected');
+	      });
 	    });
 
 	    // Add new keydown listener
+	    let typeaheadBuffer = '';
+	    let typeaheadTimeout = null;
+
 	    const keydownListener = (e) => {
+	      // Handle arrow key navigation
+	      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(
+	        e.key
+	      )) {
+	        e.preventDefault();
+	        const selectedCell = iconViewTable.querySelector(
+	          'td.list-item.selected'
+	        );
+	        const allCells = [...iconViewTable.querySelectorAll('td.list-item')];
+
+	        if (allCells.length === 0) {
+	          return;
+	        }
+
+	        const currentIndex = selectedCell
+	          ? allCells.indexOf(selectedCell)
+	          : -1;
+	        let newIndex = currentIndex;
+
+	        // Calculate number of columns
+	        const firstRow = iconViewTable.querySelector('tr');
+	        const numColumns = firstRow
+	          ? firstRow.querySelectorAll('td.list-item').length
+	          : numIconColumns;
+
+	        switch (e.key) {
+	        case 'ArrowRight':
+	          newIndex = currentIndex + 1;
+	          break;
+	        case 'ArrowLeft':
+	          newIndex = currentIndex - 1;
+	          break;
+	        case 'ArrowDown':
+	          newIndex = currentIndex + numColumns;
+	          break;
+	        case 'ArrowUp':
+	          newIndex = currentIndex - numColumns;
+	          break;
+	        }
+
+	        // Clamp to valid range
+	        if (newIndex >= 0 && newIndex < allCells.length) {
+	          if (selectedCell) {
+	            selectedCell.classList.remove('selected');
+	          }
+	          const newCell = allCells[newIndex];
+	          newCell.classList.add('selected');
+	          newCell.scrollIntoView({block: 'nearest', inline: 'nearest'});
+	        }
+	        return;
+	      }
+
+	      // Handle typeahead search
+	      if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+	        e.preventDefault();
+
+	        // Clear existing timeout
+	        if (typeaheadTimeout) {
+	          clearTimeout(typeaheadTimeout);
+	        }
+
+	        // Add character to buffer
+	        typeaheadBuffer += e.key.toLowerCase();
+
+	        // Find matching item
+	        const allCells = [...iconViewTable.querySelectorAll('td.list-item')];
+	        const matchingCell = allCells.find((cell) => {
+	          const link = cell.querySelector('a, span');
+	          const text = link?.textContent?.toLowerCase() || '';
+	          return text.startsWith(typeaheadBuffer);
+	        });
+
+	        if (matchingCell) {
+	          // Remove previous selection
+	          const selectedCell = iconViewTable.querySelector(
+	            'td.list-item.selected'
+	          );
+	          if (selectedCell) {
+	            selectedCell.classList.remove('selected');
+	          }
+
+	          // Select matching cell
+	          matchingCell.classList.add('selected');
+	          matchingCell.scrollIntoView({block: 'nearest', inline: 'nearest'});
+	        }
+
+	        // Clear buffer after 1 second of inactivity
+	        typeaheadTimeout = setTimeout(() => {
+	          typeaheadBuffer = '';
+	        }, 1000);
+	        return;
+	      }
+
 	      // Cmd+Shift+N to create new folder
 	      if (e.metaKey && e.shiftKey && e.key === 'n') {
 	        e.preventDefault();
@@ -30349,11 +30465,13 @@
 
 	      // Cmd+I to show info window
 	      } else if (e.metaKey && e.key === 'i') {
-	        const selectedRow = iconViewTable.querySelector('tr.selected');
-	        if (selectedRow) {
+	        const selectedCell = iconViewTable.querySelector(
+	          'td.list-item.selected'
+	        );
+	        if (selectedCell) {
 	          e.preventDefault();
-	          const selectedEl = /** @type {HTMLElement} */ (selectedRow);
-	          const itemPath = selectedEl.dataset.path;
+	          const link = selectedCell.querySelector('a, span');
+	          const itemPath = link?.dataset?.path;
 	          if (itemPath) {
 	            showInfoWindow({jml: jmlExports.jml, itemPath});
 	          }
@@ -30361,11 +30479,13 @@
 
 	      // Cmd+C to copy selected item
 	      } else if (e.metaKey && e.key === 'c') {
-	        const selectedRow = iconViewTable.querySelector('tr.selected');
-	        if (selectedRow) {
+	        const selectedCell = iconViewTable.querySelector(
+	          'td.list-item.selected'
+	        );
+	        if (selectedCell) {
 	          e.preventDefault();
-	          const selectedEl = /** @type {HTMLElement} */ (selectedRow);
-	          const itemPath = selectedEl.dataset.path;
+	          const link = selectedCell.querySelector('a, span');
+	          const itemPath = link?.dataset?.path;
 	          if (itemPath) {
 	            setClipboard({path: itemPath, isCopy: true});
 	          }
@@ -30373,11 +30493,13 @@
 
 	      // Cmd+X to cut selected item
 	      } else if (e.metaKey && e.key === 'x') {
-	        const selectedRow = iconViewTable.querySelector('tr.selected');
-	        if (selectedRow) {
+	        const selectedCell = iconViewTable.querySelector(
+	          'td.list-item.selected'
+	        );
+	        if (selectedCell) {
 	          e.preventDefault();
-	          const selectedEl = /** @type {HTMLElement} */ (selectedRow);
-	          const itemPath = selectedEl.dataset.path;
+	          const link = selectedCell.querySelector('a, span');
+	          const itemPath = link?.dataset?.path;
 	          if (itemPath) {
 	            setClipboard({path: itemPath, isCopy: false});
 	          }
