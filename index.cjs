@@ -30198,8 +30198,7 @@
 
 	  const listItems = result.map(([
 	    isDir,
-	    // eslint-disable-next-line no-unused-vars -- Not in use
-	    _childDir,
+	    childDir,
 	    title
 	  ]) => {
 	    const li = jmlExports.jml(
@@ -30242,7 +30241,7 @@
 	    li.dataset.iconPath = dataPath;
 
 	    getIconDataURLForFile(
-	      path.join(basePath, title)
+	      path.join(childDir, title)
 	    ).then((url) => {
 	      // Find the actual element in the DOM (plugin may have cloned it)
 	      const actualElement = view === 'three-columns'
