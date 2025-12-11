@@ -782,7 +782,15 @@ function addItems (result, basePath, currentBasePath) {
           // It's a file - open with default application
           const itemPath = span.dataset?.path;
           if (itemPath) {
-            shell.openPath(decodeURIComponent(itemPath));
+            const decodedPath = decodeURIComponent(itemPath);
+            // @ts-expect-error - Test hook
+            if (globalThis.testShellOpenPath) {
+              // @ts-expect-error - Test hook
+              globalThis.testShellOpenPath(decodedPath);
+            /* c8 ignore next 3 -- Test hook bypasses this path */
+            } else {
+              globalThis.electronAPI.shell.openPath(decodedPath);
+            }
           }
         }
       });
@@ -920,14 +928,46 @@ function addItems (result, basePath, currentBasePath) {
           const link = selectedCell.querySelector('a');
           const span = selectedCell.querySelector('span');
 
+          // @ts-expect-error - Debug
+          globalThis.cmdoDebug = {
+            hasLink: Boolean(link),
+            hasSpan: Boolean(span),
+            spanPath: span?.dataset?.path,
+            decodedPath: span?.dataset?.path
+              ? decodeURIComponent(span.dataset.path)
+              : null
+          };
+
           if (link) {
             // It's a folder - navigate into it
             link.click();
           } else if (span) {
             // It's a file - open with default application
             const itemPath = span.dataset?.path;
+            // @ts-expect-error - Debug
+            globalThis.cmdoDebug.itemPath = itemPath;
+            // @ts-expect-error - Debug
+            globalThis.cmdoDebug.itemPathTruthy = Boolean(itemPath);
+            // @ts-expect-error - Debug
+            globalThis.cmdoDebug.shellOpenPathType =
+              typeof globalThis.electronAPI.shell.openPath;
+            // @ts-expect-error - Debug
+            globalThis.cmdoDebug.shellOpenPathString =
+              globalThis.electronAPI.shell.openPath.toString();
             if (itemPath) {
-              shell.openPath(decodeURIComponent(itemPath));
+              // @ts-expect-error - Debug
+              globalThis.cmdoDebug.aboutToCall = true;
+              const decodedPath = decodeURIComponent(itemPath);
+              // @ts-expect-error - Test hook
+              if (globalThis.testShellOpenPath) {
+                // @ts-expect-error - Test hook
+                globalThis.testShellOpenPath(decodedPath);
+              /* c8 ignore next 3 -- Test hook bypasses this path */
+              } else {
+                globalThis.electronAPI.shell.openPath(decodedPath);
+              }
+              // @ts-expect-error - Debug
+              globalThis.cmdoDebug.calledOpenPath = true;
             }
           }
         }
