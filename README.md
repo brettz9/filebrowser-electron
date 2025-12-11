@@ -71,6 +71,9 @@ done
 
 1. List view/Gallery view
 1. Ideally would allow separate windows and tabs, with menu bar
+    1. At such point, ensure key commands (e.g., copy/cut/paste attached to
+        icon table) work globally instead of only when the element (table)
+        is focused
 
 1. More Editing Metadata/File
 1. Demo with file handler web apps (may need to restore webappfind if

@@ -30552,7 +30552,6 @@
 	        const clip = getClipboard();
 	        copyOrMoveItem$1(clip.path, targetDir, clip.isCopy);
 	        setClipboard(null);
-
 	      // Shift+Cmd+H to navigate to Home directory
 	      } else if (e.metaKey && e.shiftKey && e.key === 'h') {
 	        e.preventDefault();

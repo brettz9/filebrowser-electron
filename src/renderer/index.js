@@ -968,7 +968,6 @@ function addItems (result, basePath, currentBasePath) {
         const clip = getClipboard();
         copyOrMoveItem(clip.path, targetDir, clip.isCopy);
         setClipboard(null);
-
       // Shift+Cmd+H to navigate to Home directory
       } else if (e.metaKey && e.shiftKey && e.key === 'h') {
         e.preventDefault();
