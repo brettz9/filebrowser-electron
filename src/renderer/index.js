@@ -968,6 +968,34 @@ function addItems (result, basePath, currentBasePath) {
         const clip = getClipboard();
         copyOrMoveItem(clip.path, targetDir, clip.isCopy);
         setClipboard(null);
+
+      // Cmd+Backspace to delete selected item
+      } else if (e.metaKey && e.key === 'Backspace') {
+        const selectedCell = iconViewTable.querySelector(
+          'td.list-item.selected'
+        );
+        if (selectedCell) {
+          e.preventDefault();
+          const link = selectedCell.querySelector('a, span');
+          const itemPath = link?.dataset?.path;
+          if (itemPath) {
+            deleteItem(itemPath);
+          }
+        }
+
+      // Enter key to rename selected item
+      } else if (e.key === 'Enter') {
+        const selectedCell = iconViewTable.querySelector(
+          'td.list-item.selected'
+        );
+        if (selectedCell) {
+          e.preventDefault();
+          const textElement = selectedCell.querySelector('a, span');
+          if (textElement) {
+            startRename(textElement);
+          }
+        }
+
       // Shift+Cmd+H to navigate to Home directory
       } else if (e.metaKey && e.shiftKey && e.key === 'h') {
         e.preventDefault();

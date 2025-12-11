@@ -28004,6 +28004,7 @@
 	          changePath();
 
 	          // Re-select the renamed item after view refresh
+	          // Use longer delay to ensure all refresh operations complete
 	          setTimeout(() => {
 	            const encodedNewPath = parentPath + '/' +
 	              encodeURIComponent(newName);
@@ -28011,6 +28012,26 @@
 	              `[data-path="${CSS.escape(encodedNewPath)}"]`
 	            );
 	            if (renamedElement) {
+	              // Find the parent cell (td.list-item)
+	              const cell = renamedElement.closest('td.list-item');
+	              if (cell) {
+	                // Remove previous selection
+	                const iconViewTable = document.querySelector(
+	                  'table[data-base-path]'
+	                );
+	                if (iconViewTable) {
+	                  const prevSelected = iconViewTable.querySelector(
+	                    'td.list-item.selected'
+	                  );
+	                  if (prevSelected) {
+	                    prevSelected.classList.remove('selected');
+	                  }
+	                }
+
+	                // Select the renamed cell
+	                cell.classList.add('selected');
+	              }
+
 	              // Scroll into view
 	              requestAnimationFrame(() => {
 	                renamedElement.scrollIntoView({
@@ -28020,16 +28041,14 @@
 	              });
 	            }
 
+	            // Clear the flag after selection is complete
+	            setIsCreating(false);
+
 	            // Call completion callback after everything is done
 	            if (onComplete) {
-	              setTimeout(onComplete, 250);
-	            } else {
-	              // If no callback, just clear the flag after a delay
-	              setTimeout(() => {
-	                setIsCreating(false);
-	              }, 250);
+	              setTimeout(onComplete, 100);
 	            }
-	          }, 100);
+	          }, 1000);
 	        }
 	      } catch (err) {
 	        // eslint-disable-next-line no-alert -- User feedback
@@ -30552,6 +30571,34 @@
 	        const clip = getClipboard();
 	        copyOrMoveItem$1(clip.path, targetDir, clip.isCopy);
 	        setClipboard(null);
+
+	      // Cmd+Backspace to delete selected item
+	      } else if (e.metaKey && e.key === 'Backspace') {
+	        const selectedCell = iconViewTable.querySelector(
+	          'td.list-item.selected'
+	        );
+	        if (selectedCell) {
+	          e.preventDefault();
+	          const link = selectedCell.querySelector('a, span');
+	          const itemPath = link?.dataset?.path;
+	          if (itemPath) {
+	            deleteItem$1(itemPath);
+	          }
+	        }
+
+	      // Enter key to rename selected item
+	      } else if (e.key === 'Enter') {
+	        const selectedCell = iconViewTable.querySelector(
+	          'td.list-item.selected'
+	        );
+	        if (selectedCell) {
+	          e.preventDefault();
+	          const textElement = selectedCell.querySelector('a, span');
+	          if (textElement) {
+	            startRename$1(textElement);
+	          }
+	        }
+
 	      // Shift+Cmd+H to navigate to Home directory
 	      } else if (e.metaKey && e.shiftKey && e.key === 'h') {
 	        e.preventDefault();
