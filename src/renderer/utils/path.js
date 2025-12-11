@@ -39,13 +39,31 @@ export function getBasePath () {
  * @returns {Result[]}
  */
 export function readDirectory (basePath) {
-  return readdirSync(basePath).
+  // macOS redirects /Applications/Utilities to /System/Applications/Utilities
+  let actualPath = basePath;
+  if (basePath === '/Applications/Utilities' ||
+      basePath === '/Applications/Utilities/') {
+    const systemPath = '/System/Applications/Utilities';
+    try {
+      // Check if system path exists and has content
+      const systemContents = readdirSync(systemPath);
+      if (systemContents.length > 1 ||
+          (systemContents.length === 1 &&
+           systemContents[0] !== '.localized')) {
+        actualPath = systemPath;
+      }
+    } catch {
+      // If system path doesn't exist, use original path
+    }
+  }
+
+  return readdirSync(actualPath).
     map((fileOrDir) => {
-      const fileOrDirPath = path.join(basePath, fileOrDir);
+      const fileOrDirPath = path.join(actualPath, fileOrDir);
       const stat = lstatSync(fileOrDirPath);
       const isDir = stat.isDirectory() && !isMacApp(fileOrDirPath);
       return /** @type {Result} */ (
-        [isDir || stat.isSymbolicLink(), basePath, fileOrDir]
+        [isDir || stat.isSymbolicLink(), actualPath, fileOrDir]
       );
     }).toSorted(([, , a], [, , b]) => {
       return a.localeCompare(b, undefined, {sensitivity: 'base'});
