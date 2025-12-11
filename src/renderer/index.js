@@ -892,6 +892,28 @@ function addItems (result, basePath, currentBasePath) {
           }
         }
 
+      // Cmd+O to open/navigate into selected folder or open file
+      } else if (e.metaKey && e.key === 'o') {
+        const selectedCell = iconViewTable.querySelector(
+          'td.list-item.selected'
+        );
+        if (selectedCell) {
+          e.preventDefault();
+          const link = selectedCell.querySelector('a');
+          const span = selectedCell.querySelector('span');
+
+          if (link) {
+            // It's a folder - navigate into it
+            link.click();
+          } else if (span) {
+            // It's a file - open with default application
+            const itemPath = span.dataset?.path;
+            if (itemPath) {
+              shell.openPath(decodeURIComponent(itemPath));
+            }
+          }
+        }
+
       // Cmd+C to copy selected item
       } else if (e.metaKey && e.key === 'c') {
         const selectedCell = iconViewTable.querySelector(
