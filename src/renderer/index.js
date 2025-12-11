@@ -653,24 +653,12 @@ function addItems (result, basePath, currentBasePath) {
     getIconDataURLForFile(
       path.join(basePath, title)
     ).then((url) => {
-      const width = '25px';
-      const paddingTopBottom = '5px';
-      const paddingRightLeft = '30px';
-      const marginTopBottom = '18px';
       li.setAttribute(
         'style',
         url
-          ? `margin-top: ${
-            marginTopBottom
-          }; margin-bottom: ${
-            marginTopBottom
-          }; padding: ${paddingTopBottom} ${
-            paddingRightLeft
-          } ${paddingTopBottom} ${
-            paddingRightLeft
-          }; background-image: url(${
+          ? `background-image: url(${
             url
-          }); background-size: ${width};`
+          })`
           /* c8 ignore next -- url should be present */
           : ''
       );
@@ -1148,9 +1136,6 @@ ${previewContent}
       const childItems = childResult.map(([
         isDir, childDirectory, title
       ]) => {
-        const width = '25px';
-        const paddingRightLeft = '30px';
-        const marginTopBottom = '18px';
         const li = jml('li', {class: 'list-item'}, [
           isDir
             ? ['a', {
@@ -1191,18 +1176,9 @@ ${previewContent}
           li.setAttribute(
             'style',
             url
-              ? `margin-top: ${
-                marginTopBottom
-              }; margin-bottom: ${
-                marginTopBottom
-              }; padding: 0 ${
-                paddingRightLeft
-              } 0 ${
-                paddingRightLeft
-              }; list-style: none; background-image: url(${
+              ? `background-image: url(${
                 url
-              }); background-repeat: no-repeat; ` +
-              `background-position: left center; background-size: ${width};`
+              });`
               /* c8 ignore next -- Should be found */
               : ''
           );
