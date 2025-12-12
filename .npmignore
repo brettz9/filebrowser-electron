@@ -6,3 +6,6 @@ coverage
 eslint.config.js
 rollup.config.js
 test
+test-results
+tsconfig.json
+.c8rc.json
