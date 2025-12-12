@@ -1,6 +1,6 @@
 # CHANGES to filebrowser-electron
 
-## 0.9.0 (unreleased)
+## 0.9.0
 
 - feat: move/copy/cut
 - feat: undo/redo
