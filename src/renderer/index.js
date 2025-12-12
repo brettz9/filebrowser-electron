@@ -653,9 +653,25 @@ function addItems (result, basePath, currentBasePath) {
     const dataPath = basePath + encodeURIComponent(title);
     li.dataset.iconPath = dataPath;
 
-    getIconDataURLForFile(
-      path.join(childDir, title)
-    ).then((url) => {
+    const method = view === 'icon-view'
+      ? async () => {
+        if (isDir) {
+          return await getIconDataURLForFile(
+            path.join(childDir, title)
+          );
+        }
+
+        return await globalThis.electronAPI.getFileThumbnail(
+          path.join(childDir, title), 256
+        );
+      }
+      : async () => {
+        return await getIconDataURLForFile(
+          path.join(childDir, title)
+        );
+      };
+
+    method().then((url) => {
       // Find the actual element in the DOM (plugin may have cloned it)
       const actualElement = view === 'three-columns'
         ? document.querySelector(

@@ -3,7 +3,7 @@
 // @ts-nocheck Too many APIs and not much else
 'use strict';
 
-const {contextBridge, ipcRenderer, shell} = require('electron');
+const {contextBridge, nativeImage, ipcRenderer, shell} = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -26,6 +26,24 @@ try {
 // in the preload and expose them synchronously via contextBridge
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  getFileThumbnail: async (filePath, size = 256) => {
+    try {
+      const thumbnail = await nativeImage.createThumbnailFromPath(filePath, {
+        width: size,
+        height: size
+      });
+
+      if (thumbnail.isEmpty()) {
+        return null;
+      }
+
+      // Return as data URL for easy use in <img> tags
+      return thumbnail.toDataURL();
+    } catch (error) {
+      console.error('Thumbnail error:', error);
+      return null;
+    }
+  },
   fs: {
     mkdirSync: (...args) => fs.mkdirSync(...args),
     readdirSync: (...args) => fs.readdirSync(...args),
