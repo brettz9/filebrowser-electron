@@ -1102,6 +1102,17 @@ function addItems (result, basePath, currentBasePath) {
       } else if (e.metaKey && e.shiftKey && e.key === 'u') {
         e.preventDefault();
         globalThis.location.hash = '#path=/Applications/Utilities';
+
+      // Cmd+[ to go back in history
+      } else if (e.metaKey && e.key === '[') {
+        e.preventDefault();
+        console.log('going back 2');
+        history.back();
+
+      // Cmd+] to go forward in history
+      } else if (e.metaKey && e.key === ']') {
+        e.preventDefault();
+        history.forward();
       }
     };
 
@@ -1309,7 +1320,10 @@ ${previewContent}
        * @param {string} pth
        */
       const updateHistoryAndStickies = (pth) => {
-        history.replaceState(
+        console.log('pushing state', location.pathname + '#path=' + encodeURIComponent(
+          pth
+        ));
+        history.pushState(
           null,
           '',
           location.pathname + '#path=' + encodeURIComponent(
@@ -1639,6 +1653,17 @@ ${previewContent}
     } else if (e.metaKey && e.shiftKey && e.key === 'u') {
       e.preventDefault();
       globalThis.location.hash = '#path=/Applications/Utilities';
+
+    // Cmd+[ to go back in history
+    } else if (e.metaKey && e.key === '[') {
+      e.preventDefault();
+      console.log('going back');
+      history.back();
+
+    // Cmd+] to go forward in history
+    } else if (e.metaKey && e.key === ']') {
+      e.preventDefault();
+      history.forward();
     }
   });
 
@@ -1908,6 +1933,16 @@ ${previewContent}
 }
 
 globalThis.addEventListener('hashchange', changePath);
+
+globalThis.addEventListener('popstatechange', (e) => {
+  if (!e.state) { // As for hashchange which we handle above
+    console.log('hash change?');
+    return;
+  }
+  console.log('popstatechange');
+  changePath();
+});
+
 
 // Add global keyboard handler for undo/redo
 document.addEventListener('keydown', (e) => {

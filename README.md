@@ -89,6 +89,7 @@ done
 
 ## Misc. to-dos
 
-1. `cmd-[` and `cmd-]` for back/forward navigation
+1. ensure back/forward commands (`cmd-[` and `cmd-]`) work for column view
+    as it is not currently pushing state for each selection apparently
 
 1. Allow "Show package contents" context menu for apps
