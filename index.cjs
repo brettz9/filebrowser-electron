@@ -30499,8 +30499,14 @@
 	        }
 	      }
 
+	      // Remove old click handler if it exists
+	      const oldClickHandler = cellEl._clickHandler;
+	      if (oldClickHandler) {
+	        cellEl.removeEventListener('click', oldClickHandler);
+	      }
+
 	      // Add click handler for selection
-	      cellEl.addEventListener('click', (e) => {
+	      const clickHandler = (e) => {
 	        // Don't interfere with link navigation
 	        /* c8 ignore next 4 -- Defensive guard, event on cell */
 	        if (e.target !== cellEl &&
@@ -30518,10 +30524,19 @@
 
 	        // Add selection to clicked cell
 	        cellEl.classList.add('selected');
-	      });
+	      };
+	      cellEl.addEventListener('click', clickHandler);
+	      // @ts-expect-error Custom property
+	      cellEl._clickHandler = clickHandler;
+
+	      // Remove old dblclick handler if it exists
+	      const oldDblclickHandler = cellEl._dblclickHandler;
+	      if (oldDblclickHandler) {
+	        cellEl.removeEventListener('dblclick', oldDblclickHandler);
+	      }
 
 	      // Add double-click handler to open folders/files
-	      cellEl.addEventListener('dblclick', (e) => {
+	      const dblclickHandler = (e) => {
 	        e.preventDefault();
 	        const anchor = cellEl.querySelector('a');
 	        const span = cellEl.querySelector('p,span');
@@ -30544,7 +30559,10 @@
 	            }
 	          }
 	        }
-	      });
+	      };
+	      cellEl.addEventListener('dblclick', dblclickHandler);
+	      // @ts-expect-error Custom property
+	      cellEl._dblclickHandler = dblclickHandler;
 	    });
 
 	    // Add new keydown listener
@@ -30811,8 +30829,18 @@
 	    // @ts-expect-error Custom property
 	    iconViewTable._keydownListener = keydownListener;
 
+	    // Remove old drag handlers if they exist
+	    const oldDragoverHandler = iconViewTable._dragoverHandler;
+	    if (oldDragoverHandler) {
+	      iconViewTable.removeEventListener('dragover', oldDragoverHandler);
+	    }
+	    const oldDropHandler = iconViewTable._dropHandler;
+	    if (oldDropHandler) {
+	      iconViewTable.removeEventListener('drop', oldDropHandler);
+	    }
+
 	    // Add drop support for table background (empty space)
-	    iconViewTable.addEventListener('dragover', (e) => {
+	    const dragoverHandler = (e) => {
 	      // Only handle drops on the table itself or empty cells, not on items
 	      const {target} = e;
 	      const targetEl = /** @type {HTMLElement} */ (target);
@@ -30824,9 +30852,12 @@
 	          e.dataTransfer.dropEffect = e.altKey ? 'copy' : 'move';
 	        }
 	      }
-	    });
+	    };
+	    iconViewTable.addEventListener('dragover', dragoverHandler);
+	    // @ts-expect-error Custom property
+	    iconViewTable._dragoverHandler = dragoverHandler;
 
-	    iconViewTable.addEventListener('drop', (e) => {
+	    const dropHandler = (e) => {
 	      const {target} = e;
 	      const targetEl = /** @type {HTMLElement} */ (target);
 	      // Only handle drops on the table itself or empty cells, not on items
@@ -30842,7 +30873,10 @@
 	          copyOrMoveItem$1(sourcePath, targetDir, e.altKey);
 	        }
 	      }
-	    });
+	    };
+	    iconViewTable.addEventListener('drop', dropHandler);
+	    // @ts-expect-error Custom property
+	    iconViewTable._dropHandler = dropHandler;
 
 	    // Focus the table for keyboard navigation
 	    requestAnimationFrame(() => {
@@ -31251,6 +31285,11 @@ ${previewContent}
 	  });
 
 	  set$columns(columnsInstance);
+
+	  // Remove old event handlers before adding new ones
+	  $columns.off('dblclick');
+	  $columns.off('keydown');
+	  $columns.off('contextmenu');
 
 	  $columns.on('dblclick', (e) => {
 	    if (e.target.dataset.path) {
