@@ -69,8 +69,6 @@ done
 
 ## To-dos
 
-1. icon-view: Require dblclick to open folder; let click just select item
-1. Get thumbnails instead of icons for files that have them
 1. List view/Gallery view
 1. Ideally would allow separate windows and tabs, with menu bar
     1. At such point, ensure key commands (e.g., copy/cut/paste attached to
@@ -91,4 +89,6 @@ done
 
 ## Misc. to-dos
 
+1. icon-view: Require dblclick to open folder; let click just select item
+1. `cmd-[` and `cmd-]` for back/forward navigation
 1. Allow "Show package contents" context menu for apps

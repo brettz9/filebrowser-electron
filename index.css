@@ -3,8 +3,13 @@ nav img {
   height: 25px;
 }
 
-nav button.selected, .list-item.selected {
+nav button.selected {
   background-color: aqua;
+  color: white;
+}
+
+.list-item.selected {
+  background-color: blue;
   color: white;
 }
 
@@ -41,6 +46,10 @@ nav button.selected, .list-item.selected {
 
 .icon-container {
   text-align: center;
+}
+
+.icon-container a {
+  display: block;
 }
 
 /* .icon-container p {
