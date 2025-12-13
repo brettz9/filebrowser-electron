@@ -8,9 +8,9 @@ nav button.selected {
   color: white;
 }
 
-.list-item.selected {
+.list-item.selected, .list-item.selected a {
   background-color: blue;
-  color: white;
+  color: white !important;
 }
 
 .miller-column {
