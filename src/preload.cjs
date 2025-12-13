@@ -25,17 +25,49 @@ try {
 // With sandbox: false and contextIsolation: true, we can require Node.js modules
 // in the preload and expose them synchronously via contextBridge
 
+
+/**
+ * @param {number} originalWidth
+ * @param {number} originalHeight
+ * @param {number} maxWidth
+ * @param {number} maxHeight
+ * @returns {{width: number, height: number}}
+ */
+function scaleProportionally (
+  originalWidth, originalHeight, maxWidth, maxHeight
+) {
+  // Calculate the potential scaling percentages for width and height
+  const widthPercent = maxWidth / originalWidth;
+  const heightPercent = maxHeight / originalHeight;
+
+  // Use the smallest percentage to ensure the content fits
+  //   within BOTH limits
+  const smallestPercent = Math.min(widthPercent, heightPercent);
+
+  // Return the new, scaled dimensions
+  return {
+    width: Math.round(originalWidth * smallestPercent),
+    height: Math.round(originalHeight * smallestPercent)
+  };
+}
+
 contextBridge.exposeInMainWorld('electronAPI', {
   getFileThumbnail: async (filePath, size = 256) => {
     try {
-      const thumbnail = await nativeImage.createThumbnailFromPath(filePath, {
-        width: size,
-        height: size
-      });
-
-      if (thumbnail.isEmpty()) {
+      const originalImage = nativeImage.createFromPath(filePath);
+      const {width: originalWidth, height: originalHeight} = originalImage.getSize();
+      if (originalWidth === 0 || originalHeight === 0) {
         return null;
       }
+
+      const {width, height} = scaleProportionally(
+        originalWidth, originalHeight, size, size
+      );
+
+      const thumbnail = await nativeImage.createThumbnailFromPath(filePath, {
+        width,
+        height
+      });
 
       // Return as data URL for easy use in <img> tags
       return thumbnail.toDataURL();

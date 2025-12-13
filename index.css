@@ -33,6 +33,21 @@ nav button.selected, .list-item.selected {
   background-size: 25px;
 }
 
+.icon {
+  height: auto;
+  max-height: 80px;
+  max-width: 80px;
+}
+
+.icon-container {
+  text-align: center;
+}
+
+/* .icon-container p {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+} */
 
 .list-item.drag-over {
   background-color: #0047ab !important;

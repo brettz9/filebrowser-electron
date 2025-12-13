@@ -14296,6 +14296,91 @@
 	  });
 	};
 
+	const attributeName = 'data-middle-ellipsis';
+	const clamp = (
+	  val, min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY
+	) => Math.max(min, Math.min(max, val));
+	const ellipsis = '…';
+	const map = new Map();
+
+	/**
+	 * @see {@link https://stackoverflow.com/a/49349813/271577}
+	 * @param {HTMLElement[]} elems
+	 */
+	function middleEllipsis (elems) {
+	  elems.forEach((elm) => {
+	    // do not recalculate variables a second time
+	    const mapped = map.get(elm);
+	    let {
+	      text, textLength, from, multiplier, font, textWidth, elementWidth
+	    } = mapped || {};
+	    // first time
+	    if (!mapped) {
+	      text = elm.textContent;
+	      textLength = text.length;
+	      from = Number.parseFloat(elm.getAttribute(attributeName)) || 50;
+	      multiplier = from > 0 && from / 100;
+	      const computedStyle = globalThis.getComputedStyle(elm, null);
+	      font = `${computedStyle.getPropertyValue('font-weight')} ${
+        computedStyle.getPropertyValue('font-size')
+      } ${computedStyle.getPropertyValue('font-family')}`;
+	      textWidth = getTextWidth(text, font);
+	      elementWidth = elm.offsetWidth;
+	      map.set(elm, {
+	        text, textLength, from, multiplier, font, textWidth, elementWidth
+	      });
+	    }
+
+	    const {offsetWidth} = elm;
+	    const widthChanged = !mapped || elementWidth !== offsetWidth;
+	    if (mapped && widthChanged) {
+	      mapped.elementWidth = elementWidth = offsetWidth;
+	    }
+	    //
+	    if (widthChanged && textWidth > elementWidth) {
+	      elm.setAttribute('title', text);
+	      let smallerText = text;
+	      let smallerWidth = elementWidth;
+	      while (smallerText.length > 3) {
+	        const smallerTextLength = smallerText.length;
+	        const half = (multiplier &&
+	          clamp(
+	            Math.trunc(multiplier * smallerTextLength), 1, smallerTextLength - 2
+	          )) || Math.max(smallerTextLength + from - 1, 1);
+	        const half1 = smallerText.slice(0, Math.max(0, half)).replace(/\s*$/v, '');
+	        const half2 = smallerText.slice(half + 1).replace(/^\s*/v, '');
+	        smallerText = half1 + half2;
+	        smallerWidth = getTextWidth(smallerText + ellipsis, font);
+	        if (smallerWidth < elementWidth) {
+	          elm.textContent = half1 + ellipsis + half2;
+	          break;
+	        }
+	      }
+	    }
+	  });
+	}
+
+	/**
+	 * Get the text width.
+	 * @param {string} text
+	 * @param {string} font
+	 * @returns {number}
+	 */
+	function getTextWidth (text, font) {
+	  // eslint-disable-next-line prefer-destructuring -- TS
+	  let context = /** @type {CanvasRenderingContext2D} */ (
+	    getTextWidth.context
+	  );
+	  if (!context) {
+	    const canvas = document.createElement('canvas');
+	    context = canvas.getContext('2d');
+	    getTextWidth.context = context;
+	  }
+	  context.font = font;
+	  const metrics = context.measureText(text);
+	  return metrics.width;
+	}
+
 	// Get Node APIs from the preload script
 	const {storage} = globalThis.electronAPI;
 
@@ -30222,38 +30307,53 @@
 	    childDir,
 	    title
 	  ]) => {
+	    const fileOrFolder = isDir
+	      ? jmlExports.jml('a', {
+	        title: basePath + encodeURIComponent(title),
+	        $on: {
+	          contextmenu: folderContextmenu
+	        },
+	        dataset: {
+	          path: basePath + encodeURIComponent(title)
+	        },
+	        ...(view === 'icon-view'
+	          ? {
+	            href: '#path=' + basePath + encodeURIComponent(title)
+	          }
+	          : {})
+	      }, [
+	        title
+	      ])
+	      : jmlExports.jml('span', {
+	        title: basePath + encodeURIComponent(title),
+	        $on: {
+	          contextmenu
+	        },
+	        dataset: {
+	          path: basePath + encodeURIComponent(title)
+	        }
+	      }, [title]);
+	    const child = view === 'icon-view'
+	      ? jmlExports.jml('p', [
+	        fileOrFolder
+	      ])
+	      : fileOrFolder;
 	    const li = jmlExports.jml(
 	      view === 'icon-view' ? 'td' : 'li',
 	      {
-	        class: 'list-item'
-	        // style: url ? 'list-style-image: url("' + url + '")' : undefined
+	        class: 'list-item' + (view === 'icon-view' ? ' icon-container' : '')
 	      }, [
-	        isDir
-	          ? ['a', {
-	            title: basePath + encodeURIComponent(title),
-	            $on: {
-	              contextmenu: folderContextmenu
-	            },
-	            dataset: {
-	              path: basePath + encodeURIComponent(title)
-	            },
-	            ...(view === 'icon-view'
-	              ? {
-	                href: '#path=' + basePath + encodeURIComponent(title)
+	        view === 'icon-view'
+	          ? [
+	            'img', {
+	              class: 'icon',
+	              dataset: {
+	                path: basePath + encodeURIComponent(title)
 	              }
-	              : {})
-	          }, [
-	            title
-	          ]]
-	          : ['span', {
-	            title: basePath + encodeURIComponent(title),
-	            $on: {
-	              contextmenu
-	            },
-	            dataset: {
-	              path: basePath + encodeURIComponent(title)
 	            }
-	          }, [title]]
+	          ]
+	          : '',
+	        child
 	      ]
 	    );
 
@@ -30271,6 +30371,8 @@
 
 	        return await globalThis.electronAPI.getFileThumbnail(
 	          path.join(childDir, title), 256
+	        ) || await getIconDataURLForFile(
+	          path.join(childDir, title)
 	        );
 	      }
 	      : async () => {
@@ -30281,24 +30383,30 @@
 
 	    method().then((url) => {
 	      // Find the actual element in the DOM (plugin may have cloned it)
-	      const actualElement = view === 'three-columns'
-	        ? document.querySelector(
+	      if (view === 'three-columns') {
+	        const actualElement = document.querySelector(
 	          `a[data-path="${CSS.escape(dataPath)}"], span[data-path="${
             CSS.escape(dataPath)
           }"]`
-	        )?.parentElement
-	        : li;
+	        )?.parentElement;
 
-	      if (actualElement) {
-	        actualElement.setAttribute(
-	          'style',
-	          url
-	            ? `background-image: url(${
-              url
-            })`
-	            /* c8 ignore next -- url should be present */
-	            : ''
+	        if (actualElement) {
+	          actualElement.setAttribute(
+	            'style',
+	            url
+	              ? `background-image: url(${
+                url
+              })`
+	              /* c8 ignore next -- url should be present */
+	              : ''
+	          );
+	        }
+	      } else if (view === 'icon-view') {
+	        const actualElement = document.querySelector(
+	          `img[data-path="${CSS.escape(dataPath)}"]`
 	        );
+	        actualElement.src = url;
+	        middleEllipsis([child]);
 	      }
 	      return undefined;
 	    });
@@ -30553,36 +30661,13 @@
 	          const link = selectedCell.querySelector('a');
 	          const span = selectedCell.querySelector('span');
 
-	          // @ts-expect-error - Debug
-	          globalThis.cmdoDebug = {
-	            hasLink: Boolean(link),
-	            hasSpan: Boolean(span),
-	            spanPath: span?.dataset?.path,
-	            decodedPath: span?.dataset?.path
-	              ? decodeURIComponent(span.dataset.path)
-	              /* c8 ignore next -- Path always exists in icon view */
-	              : null
-	          };
-
 	          if (link) {
 	            // It's a folder - navigate into it
 	            link.click();
 	          } else if (span) {
 	            // It's a file - open with default application
 	            const itemPath = span.dataset?.path;
-	            // @ts-expect-error - Debug
-	            globalThis.cmdoDebug.itemPath = itemPath;
-	            // @ts-expect-error - Debug
-	            globalThis.cmdoDebug.itemPathTruthy = Boolean(itemPath);
-	            // @ts-expect-error - Debug
-	            globalThis.cmdoDebug.shellOpenPathType =
-	              typeof globalThis.electronAPI.shell.openPath;
-	            // @ts-expect-error - Debug
-	            globalThis.cmdoDebug.shellOpenPathString =
-	              globalThis.electronAPI.shell.openPath.toString();
 	            if (itemPath) {
-	              // @ts-expect-error - Debug
-	              globalThis.cmdoDebug.aboutToCall = true;
 	              const decodedPath = decodeURIComponent(itemPath);
 	              // @ts-expect-error - Test hook
 	              if (globalThis.testShellOpenPath) {
@@ -30592,8 +30677,6 @@
 	              } else {
 	                globalThis.electronAPI.shell.openPath(decodedPath);
 	              }
-	              // @ts-expect-error - Debug
-	              globalThis.cmdoDebug.calledOpenPath = true;
 	            }
 	          }
 	        }

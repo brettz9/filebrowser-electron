@@ -69,6 +69,7 @@ done
 
 ## To-dos
 
+1. icon-view: Require dblclick to open folder; let click just select item
 1. Get thumbnails instead of icons for files that have them
 1. List view/Gallery view
 1. Ideally would allow separate windows and tabs, with menu bar

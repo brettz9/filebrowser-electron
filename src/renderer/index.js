@@ -6,7 +6,7 @@ import jQuery from 'jquery';
 import addMillerColumnPlugin from 'miller-columns';
 import {filesize} from 'filesize';
 import {chunk} from './utils/array.js';
-import {$, $$} from './utils/dom.js';
+import {$, $$, middleEllipsis} from './utils/dom.js';
 // eslint-disable-next-line no-shadow -- Importing storage as `localStorage`
 import {localStorage} from './utils/storage.js';
 import {getBasePath, readDirectory} from './utils/path.js';
@@ -614,38 +614,53 @@ function addItems (result, basePath, currentBasePath) {
     childDir,
     title
   ]) => {
+    const fileOrFolder = isDir
+      ? jml('a', {
+        title: basePath + encodeURIComponent(title),
+        $on: {
+          contextmenu: folderContextmenu
+        },
+        dataset: {
+          path: basePath + encodeURIComponent(title)
+        },
+        ...(view === 'icon-view'
+          ? {
+            href: '#path=' + basePath + encodeURIComponent(title)
+          }
+          : {})
+      }, [
+        title
+      ])
+      : jml('span', {
+        title: basePath + encodeURIComponent(title),
+        $on: {
+          contextmenu
+        },
+        dataset: {
+          path: basePath + encodeURIComponent(title)
+        }
+      }, [title]);
+    const child = view === 'icon-view'
+      ? jml('p', [
+        fileOrFolder
+      ])
+      : fileOrFolder;
     const li = jml(
       view === 'icon-view' ? 'td' : 'li',
       {
-        class: 'list-item'
-        // style: url ? 'list-style-image: url("' + url + '")' : undefined
+        class: 'list-item' + (view === 'icon-view' ? ' icon-container' : '')
       }, [
-        isDir
-          ? ['a', {
-            title: basePath + encodeURIComponent(title),
-            $on: {
-              contextmenu: folderContextmenu
-            },
-            dataset: {
-              path: basePath + encodeURIComponent(title)
-            },
-            ...(view === 'icon-view'
-              ? {
-                href: '#path=' + basePath + encodeURIComponent(title)
+        view === 'icon-view'
+          ? [
+            'img', {
+              class: 'icon',
+              dataset: {
+                path: basePath + encodeURIComponent(title)
               }
-              : {})
-          }, [
-            title
-          ]]
-          : ['span', {
-            title: basePath + encodeURIComponent(title),
-            $on: {
-              contextmenu
-            },
-            dataset: {
-              path: basePath + encodeURIComponent(title)
             }
-          }, [title]]
+          ]
+          : '',
+        child
       ]
     );
 
@@ -663,6 +678,8 @@ function addItems (result, basePath, currentBasePath) {
 
         return await globalThis.electronAPI.getFileThumbnail(
           path.join(childDir, title), 256
+        ) || await getIconDataURLForFile(
+          path.join(childDir, title)
         );
       }
       : async () => {
@@ -673,24 +690,30 @@ function addItems (result, basePath, currentBasePath) {
 
     method().then((url) => {
       // Find the actual element in the DOM (plugin may have cloned it)
-      const actualElement = view === 'three-columns'
-        ? document.querySelector(
+      if (view === 'three-columns') {
+        const actualElement = document.querySelector(
           `a[data-path="${CSS.escape(dataPath)}"], span[data-path="${
             CSS.escape(dataPath)
           }"]`
-        )?.parentElement
-        : li;
+        )?.parentElement;
 
-      if (actualElement) {
-        actualElement.setAttribute(
-          'style',
-          url
-            ? `background-image: url(${
-              url
-            })`
-            /* c8 ignore next -- url should be present */
-            : ''
+        if (actualElement) {
+          actualElement.setAttribute(
+            'style',
+            url
+              ? `background-image: url(${
+                url
+              })`
+              /* c8 ignore next -- url should be present */
+              : ''
+          );
+        }
+      } else if (view === 'icon-view') {
+        const actualElement = document.querySelector(
+          `img[data-path="${CSS.escape(dataPath)}"]`
         );
+        actualElement.src = url;
+        middleEllipsis([child]);
       }
       return undefined;
     });
@@ -948,36 +971,13 @@ function addItems (result, basePath, currentBasePath) {
           const link = selectedCell.querySelector('a');
           const span = selectedCell.querySelector('span');
 
-          // @ts-expect-error - Debug
-          globalThis.cmdoDebug = {
-            hasLink: Boolean(link),
-            hasSpan: Boolean(span),
-            spanPath: span?.dataset?.path,
-            decodedPath: span?.dataset?.path
-              ? decodeURIComponent(span.dataset.path)
-              /* c8 ignore next -- Path always exists in icon view */
-              : null
-          };
-
           if (link) {
             // It's a folder - navigate into it
             link.click();
           } else if (span) {
             // It's a file - open with default application
             const itemPath = span.dataset?.path;
-            // @ts-expect-error - Debug
-            globalThis.cmdoDebug.itemPath = itemPath;
-            // @ts-expect-error - Debug
-            globalThis.cmdoDebug.itemPathTruthy = Boolean(itemPath);
-            // @ts-expect-error - Debug
-            globalThis.cmdoDebug.shellOpenPathType =
-              typeof globalThis.electronAPI.shell.openPath;
-            // @ts-expect-error - Debug
-            globalThis.cmdoDebug.shellOpenPathString =
-              globalThis.electronAPI.shell.openPath.toString();
             if (itemPath) {
-              // @ts-expect-error - Debug
-              globalThis.cmdoDebug.aboutToCall = true;
               const decodedPath = decodeURIComponent(itemPath);
               // @ts-expect-error - Test hook
               if (globalThis.testShellOpenPath) {
@@ -987,8 +987,6 @@ function addItems (result, basePath, currentBasePath) {
               } else {
                 globalThis.electronAPI.shell.openPath(decodedPath);
               }
-              // @ts-expect-error - Debug
-              globalThis.cmdoDebug.calledOpenPath = true;
             }
           }
         }
