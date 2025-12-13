@@ -30324,7 +30324,7 @@
 	      }, [
 	        title
 	      ])
-	      : jmlExports.jml('span', {
+	      : jmlExports.jml(view === 'icon-view' ? 'p' : 'span', {
 	        title: basePath + encodeURIComponent(title),
 	        $on: {
 	          contextmenu
@@ -30333,11 +30333,7 @@
 	          path: basePath + encodeURIComponent(title)
 	        }
 	      }, [title]);
-	    const child = view === 'icon-view'
-	      ? jmlExports.jml('p', [
-	        fileOrFolder
-	      ])
-	      : fileOrFolder;
+
 	    const li = jmlExports.jml(
 	      view === 'icon-view' ? 'td' : 'li',
 	      {
@@ -30353,7 +30349,7 @@
 	            }
 	          ]
 	          : '',
-	        child
+	        fileOrFolder
 	      ]
 	    );
 
@@ -30406,7 +30402,7 @@
 	          `img[data-path="${CSS.escape(dataPath)}"]`
 	        );
 	        actualElement.src = url;
-	        middleEllipsis([child]);
+	        middleEllipsis([fileOrFolder]);
 	      }
 	      return undefined;
 	    });
@@ -30506,7 +30502,7 @@
 	      cellEl.addEventListener('dblclick', (e) => {
 	        e.preventDefault();
 	        const anchor = cellEl.querySelector('a');
-	        const span = cellEl.querySelector('span');
+	        const span = cellEl.querySelector('p,span');
 
 	        if (anchor) {
 	          // It's a folder - navigate into it
@@ -30659,7 +30655,7 @@
 	        if (selectedCell) {
 	          e.preventDefault();
 	          const link = selectedCell.querySelector('a');
-	          const span = selectedCell.querySelector('span');
+	          const span = selectedCell.querySelector('p,span');
 
 	          if (link) {
 	            // It's a folder - navigate into it

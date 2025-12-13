@@ -631,7 +631,7 @@ function addItems (result, basePath, currentBasePath) {
       }, [
         title
       ])
-      : jml('span', {
+      : jml(view === 'icon-view' ? 'p' : 'span', {
         title: basePath + encodeURIComponent(title),
         $on: {
           contextmenu
@@ -640,11 +640,7 @@ function addItems (result, basePath, currentBasePath) {
           path: basePath + encodeURIComponent(title)
         }
       }, [title]);
-    const child = view === 'icon-view'
-      ? jml('p', [
-        fileOrFolder
-      ])
-      : fileOrFolder;
+
     const li = jml(
       view === 'icon-view' ? 'td' : 'li',
       {
@@ -660,7 +656,7 @@ function addItems (result, basePath, currentBasePath) {
             }
           ]
           : '',
-        child
+        fileOrFolder
       ]
     );
 
@@ -713,7 +709,7 @@ function addItems (result, basePath, currentBasePath) {
           `img[data-path="${CSS.escape(dataPath)}"]`
         );
         actualElement.src = url;
-        middleEllipsis([child]);
+        middleEllipsis([fileOrFolder]);
       }
       return undefined;
     });
@@ -813,7 +809,7 @@ function addItems (result, basePath, currentBasePath) {
       cellEl.addEventListener('dblclick', (e) => {
         e.preventDefault();
         const anchor = cellEl.querySelector('a');
-        const span = cellEl.querySelector('span');
+        const span = cellEl.querySelector('p,span');
 
         if (anchor) {
           // It's a folder - navigate into it
@@ -969,7 +965,7 @@ function addItems (result, basePath, currentBasePath) {
         if (selectedCell) {
           e.preventDefault();
           const link = selectedCell.querySelector('a');
-          const span = selectedCell.querySelector('span');
+          const span = selectedCell.querySelector('p,span');
 
           if (link) {
             // It's a folder - navigate into it
