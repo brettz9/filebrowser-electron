@@ -89,6 +89,6 @@ done
 
 ## Misc. to-dos
 
-1. icon-view: Require dblclick to open folder; let click just select item
 1. `cmd-[` and `cmd-]` for back/forward navigation
+
 1. Allow "Show package contents" context menu for apps

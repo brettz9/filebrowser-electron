@@ -30337,7 +30337,29 @@
 	    const li = jmlExports.jml(
 	      view === 'icon-view' ? 'td' : 'li',
 	      {
-	        class: 'list-item' + (view === 'icon-view' ? ' icon-container' : '')
+	        class: 'list-item' + (view === 'icon-view' ? ' icon-container' : ''),
+	        $on: {
+	          ...(view === 'icon-view'
+	            ? {
+	              click: [function (e) {
+	                e.preventDefault();
+	                // Remove previous selection
+	                const prevSelected =
+	                  this.parentElement.parentElement.querySelector(
+	                    'td.list-item.selected'
+	                  );
+	                if (prevSelected) {
+	                  prevSelected.classList.remove('selected');
+	                }
+	                this.classList.add('selected');
+	              }, true],
+	              dblclick: [function () {
+	                location.href = this.querySelector('a').href;
+	              }, true]
+	            }
+	            : {}
+	          )
+	        }
 	      }, [
 	        view === 'icon-view'
 	          ? [
@@ -30652,6 +30674,7 @@
 	        const selectedCell = iconViewTable.querySelector(
 	          'td.list-item.selected'
 	        );
+
 	        if (selectedCell) {
 	          e.preventDefault();
 	          const link = selectedCell.querySelector('a');
@@ -30659,7 +30682,11 @@
 
 	          if (link) {
 	            // It's a folder - navigate into it
-	            link.click();
+	            if (view === 'icon-view') {
+	              selectedCell.dispatchEvent(new Event('dblclick'));
+	            } else {
+	              link.click();
+	            }
 	          } else if (span) {
 	            // It's a file - open with default application
 	            const itemPath = span.dataset?.path;
