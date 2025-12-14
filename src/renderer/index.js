@@ -66,6 +66,7 @@ const {
   getOpenWithApps,
   getAppIcons,
   getIconDataURLForFile,
+  getXLargeIconDataURLForFile,
   getFileKind,
   getFileMetadata
 } = globalThis.electronAPI;
@@ -654,7 +655,23 @@ function addItems (result, basePath, currentBasePath) {
         $on: {
           ...(view === 'icon-view' || view === 'gallery-view'
             ? {
-              click: [function (e) {
+              click: [async function (e) {
+                /**
+                 * @returns {Promise<string>}
+                 */
+                async function getThumbnail () {
+                  if (isDir) {
+                    return await getXLargeIconDataURLForFile(
+                      path.join(childDir, title)
+                    );
+                  }
+
+                  return await globalThis.electronAPI.getFileThumbnail(
+                    path.join(childDir, title), 512
+                  ) || await getXLargeIconDataURLForFile(
+                    path.join(childDir, title)
+                  );
+                }
                 e.preventDefault();
                 // Remove previous selection
                 const prevSelected =
@@ -665,6 +682,13 @@ function addItems (result, basePath, currentBasePath) {
                   prevSelected.classList.remove('selected');
                 }
                 this.classList.add('selected');
+                if (view === 'gallery-view') {
+                  const tableElement = this.parentElement.parentElement;
+                  const imgElement =
+                    tableElement.previousElementSibling.querySelector('img');
+                  const url = await getThumbnail();
+                  imgElement.src = url;
+                }
               }, true],
               dblclick: [function () {
                 location.href = this.querySelector('a').href;
@@ -762,16 +786,27 @@ function addItems (result, basePath, currentBasePath) {
       ]
       : ''),
     ...(view === 'icon-view' || view === 'gallery-view'
-      ? /** @type {import('jamilih').JamilihArray[]} */ ([[
-        'table', {dataset: {basePath}},
-        view === 'gallery-view'
+      ? /** @type {import('jamilih').JamilihArray[]} */ ([
+        ...(view === 'gallery-view'
           ? [
-            ['tr', listItems]
+            ['div', [
+              ['img', {
+                class: 'gallery-icon-preview'
+              }]
+            ]]
           ]
-          : chunk(listItems, numIconColumns).map((innerArr) => {
-            return ['tr', innerArr];
-          })
-      ]])
+          : []),
+        [
+          'table', {dataset: {basePath}},
+          view === 'gallery-view'
+            ? [
+              ['tr', listItems]
+            ]
+            : chunk(listItems, numIconColumns).map((innerArr) => {
+              return ['tr', innerArr];
+            })
+        ]
+      ])
       : listItems)
   ]);
 

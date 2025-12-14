@@ -13,7 +13,8 @@ import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 
 // Load native modules in main process
-let openWithMe, parcelWatcher, getIconDataURLForFile;
+let openWithMe, parcelWatcher, getIconDataURLForFile,
+  getXLargeIconDataURLForFile;
 
 try {
   openWithMe = await import('open-with-me');
@@ -32,12 +33,12 @@ try {
 }
 
 try {
-  const iconModule = await import(
+  ({
+    getIconDataURLForFile,
+    getXLargeIconDataURLForFile
+  } = await import(
     '../src/renderer/utils/getIconDataURLForFile.cjs'
-  );
-  getIconDataURLForFile =
-    /* c8 ignore next -- ESM vs. CJS */
-    iconModule.default || iconModule.getIconDataURLForFile;
+  ));
 /* c8 ignore next 4 -- Guard */
 } catch (error) {
   // eslint-disable-next-line no-console -- Main process logging
@@ -99,6 +100,14 @@ ipcMain.handle('getIconDataURLForFile', (_event, filePath) => {
     return null;
   }
   return getIconDataURLForFile(filePath);
+});
+
+ipcMain.handle('getXLargeIconDataURLForFile', (_event, filePath) => {
+  /* c8 ignore next 3 -- Guard */
+  if (!getXLargeIconDataURLForFile) {
+    return null;
+  }
+  return getXLargeIconDataURLForFile(filePath);
 });
 
 // File watcher subscriptions stored by ID

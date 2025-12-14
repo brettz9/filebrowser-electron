@@ -52,6 +52,12 @@ nav button.selected {
   display: block;
 }
 
+.gallery-icon-preview {
+  height: auto;
+  max-height: 256px;
+  max-width: 256px;
+}
+
 /* .icon-container p {
   white-space: nowrap;
   overflow: hidden;

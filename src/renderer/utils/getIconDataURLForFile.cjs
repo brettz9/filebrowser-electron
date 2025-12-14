@@ -3,10 +3,11 @@
 const {fromByteArray} = require('base64-js');
 const {
   getIconForPath,
-  ICON_SIZE_EXTRA_SMALL
+  ICON_SIZE_EXTRA_SMALL,
   // ICON_SIZE_MEDIUM // ICON_SIZE_EXTRA_SMALL (16),
   // ICON_SIZE_SMALL (32), ICON_SIZE_MEDIUM (64),
-  // ICON_SIZE_LARGE (256), ICON_SIZE_EXTRA_LARGE (512; only 256 on Windows)
+  // ICON_SIZE_LARGE (256),
+  ICON_SIZE_EXTRA_LARGE // (512; only 256 on Windows)
 } = require('system-icon2');
 
 /**
@@ -24,4 +25,13 @@ async function getIconDataURLForFile (filePath, size = ICON_SIZE_EXTRA_SMALL) {
   return 'data:image/png;base64,' + encoded;
 }
 
-module.exports = getIconDataURLForFile;
+/**
+ * @param {string} filePath
+ * @returns {Promise<string>}
+ */
+async function getXLargeIconDataURLForFile (filePath) {
+  return await getIconDataURLForFile(filePath, ICON_SIZE_EXTRA_LARGE);
+}
+
+exports.getIconDataURLForFile = getIconDataURLForFile;
+exports.getXLargeIconDataURLForFile = getXLargeIconDataURLForFile;

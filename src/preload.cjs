@@ -251,6 +251,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getOpenWithApps: (filePath) => ipcRenderer.invoke('getOpenWithApps', filePath),
   getAppIcons: (appPaths) => ipcRenderer.invoke('getAppIcons', appPaths),
   getIconDataURLForFile: (filePath) => ipcRenderer.invoke('getIconDataURLForFile', filePath),
+  getXLargeIconDataURLForFile: (filePath) => ipcRenderer.invoke(
+    'getXLargeIconDataURLForFile', filePath
+  ),
   parcelWatcher: {
     subscribe: async (dir, callback) => {
       const watcherId = await ipcRenderer.invoke('parcelWatcher:subscribe', dir);
