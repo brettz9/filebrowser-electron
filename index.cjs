@@ -28166,7 +28166,9 @@
 	      // Re-select the item after view refresh
 	      setTimeout(() => {
 	        const itemElement = $(
-	          `[data-path="${CSS.escape(itemPath)}"]`
+	          `a[data-path="${CSS.escape(itemPath)}"], ` +
+	          `span[data-path="${CSS.escape(itemPath)}"], ` +
+	          `p[data-path="${CSS.escape(itemPath)}"]`
 	        );
 	        if (itemElement) {
 	          if (currentView === 'three-columns') {
@@ -28201,6 +28203,7 @@
 	              block: 'nearest',
 	              inline: 'nearest'
 	            });
+	            itemElement.closest('td').classList.add('selected');
 	          }
 	        }
 
@@ -28312,8 +28315,11 @@
 	      const normalizedFolderPath = folderPath.replace(/\/+$/v, '');
 	      const encodedPath = normalizedFolderPath + '/' +
 	        encodeURIComponentFn(newFolderName);
+	      // Find the text element (p, span, or a) specifically, not img elements
 	      const newFolderElement = $(
-	        `[data-path="${CSS.escape(encodedPath)}"]`
+	        `p[data-path="${CSS.escape(encodedPath)}"], ` +
+	        `span[data-path="${CSS.escape(encodedPath)}"], ` +
+	        `a[data-path="${CSS.escape(encodedPath)}"]`
 	      );
 	      if (newFolderElement) {
 	        startRename(newFolderElement, () => {
@@ -28585,9 +28591,11 @@
 	      $on: {
 	        click () {
 	          customContextMenu.style.display = 'none';
-	          // Find the element with this path
+	          // Find the text element (p, span, or a) with this path
 	          const targetElement = $(
-	            `[data-path="${CSS.escape(pth)}"]`
+	            `p[data-path="${CSS.escape(pth)}"], ` +
+	            `span[data-path="${CSS.escape(pth)}"], ` +
+	            `a[data-path="${CSS.escape(pth)}"]`
 	          );
 	          if (targetElement) {
 	            startRename(targetElement);
@@ -28812,9 +28820,11 @@
 	      $on: {
 	        click () {
 	          customContextMenu.style.display = 'none';
-	          // Find the element with this path
+	          // Find the text element (p, span, or a) with this path
 	          const targetElement = $(
-	            `[data-path="${CSS.escape(pth)}"]`
+	            `p[data-path="${CSS.escape(pth)}"], ` +
+	            `span[data-path="${CSS.escape(pth)}"], ` +
+	            `a[data-path="${CSS.escape(pth)}"]`
 	          );
 	          if (targetElement) {
 	            startRename(targetElement);
@@ -30544,7 +30554,7 @@
 	    const cells = iconViewTable.querySelectorAll('td.list-item');
 	    cells.forEach((cell) => {
 	      const cellEl = /** @type {HTMLElement} */ (cell);
-	      const link = cellEl.querySelector('a, span');
+	      const link = cellEl.querySelector('a, p');
 	      if (link) {
 	        const linkEl = /** @type {HTMLElement} */ (link);
 	        const itemPath = linkEl.dataset.path;
@@ -30694,7 +30704,7 @@
 	        // Find matching item
 	        const allCells = [...iconViewTable.querySelectorAll('td.list-item')];
 	        const matchingCell = allCells.find((cell) => {
-	          const link = cell.querySelector('a, span');
+	          const link = cell.querySelector('a, p');
 	          /* c8 ignore next -- Guard */
 	          const text = link?.textContent?.toLowerCase() || '';
 	          return text.startsWith(typeaheadBuffer);
@@ -30735,7 +30745,7 @@
 	        );
 	        if (selectedCell) {
 	          e.preventDefault();
-	          const link = selectedCell.querySelector('a, span');
+	          const link = selectedCell.querySelector('a, p');
 	          const itemPath = link?.dataset?.path;
 	          if (itemPath) {
 	            showInfoWindow({jml: jmlExports.jml, itemPath});
@@ -30784,7 +30794,7 @@
 	        );
 	        if (selectedCell) {
 	          e.preventDefault();
-	          const link = selectedCell.querySelector('a, span');
+	          const link = selectedCell.querySelector('a, p');
 	          const itemPath = link?.dataset?.path;
 	          if (itemPath) {
 	            setClipboard({path: itemPath, isCopy: true});
@@ -30798,7 +30808,7 @@
 	        );
 	        if (selectedCell) {
 	          e.preventDefault();
-	          const link = selectedCell.querySelector('a, span');
+	          const link = selectedCell.querySelector('a, p');
 	          const itemPath = link?.dataset?.path;
 	          if (itemPath) {
 	            setClipboard({path: itemPath, isCopy: false});
@@ -30821,7 +30831,7 @@
 	        );
 	        if (selectedCell) {
 	          e.preventDefault();
-	          const link = selectedCell.querySelector('a, span');
+	          const link = selectedCell.querySelector('a, p');
 	          const itemPath = link?.dataset?.path;
 	          if (itemPath) {
 	            deleteItem$1(itemPath);
@@ -30835,7 +30845,7 @@
 	        );
 	        if (selectedCell) {
 	          e.preventDefault();
-	          const textElement = selectedCell.querySelector('a, span');
+	          const textElement = selectedCell.querySelector('a, p');
 	          if (textElement) {
 	            startRename$1(textElement);
 	          }

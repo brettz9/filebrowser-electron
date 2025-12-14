@@ -231,9 +231,11 @@ export function showFolderContextMenu (
       $on: {
         click () {
           customContextMenu.style.display = 'none';
-          // Find the element with this path
+          // Find the text element (p, span, or a) with this path
           const targetElement = $(
-            `[data-path="${CSS.escape(pth)}"]`
+            `p[data-path="${CSS.escape(pth)}"], ` +
+            `span[data-path="${CSS.escape(pth)}"], ` +
+            `a[data-path="${CSS.escape(pth)}"]`
           );
           if (targetElement) {
             startRename(targetElement);
@@ -458,9 +460,11 @@ export async function showFileContextMenu (
       $on: {
         click () {
           customContextMenu.style.display = 'none';
-          // Find the element with this path
+          // Find the text element (p, span, or a) with this path
           const targetElement = $(
-            `[data-path="${CSS.escape(pth)}"]`
+            `p[data-path="${CSS.escape(pth)}"], ` +
+            `span[data-path="${CSS.escape(pth)}"], ` +
+            `a[data-path="${CSS.escape(pth)}"]`
           );
           if (targetElement) {
             startRename(targetElement);

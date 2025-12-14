@@ -395,12 +395,12 @@ describe('Icon View', () => {
       let targetCell = null;
 
       for (const cell of cells) {
-        const span = cell.querySelector('span[data-path]');
-        if (span) {
-          const spanEl = /** @type {HTMLElement} */ (span);
-          if (spanEl.dataset.path) {
-            foundPaths.push(spanEl.dataset.path);
-            if (spanEl.dataset.path.endsWith('.sh')) {
+        const p = cell.querySelector('p[data-path]');
+        if (p) {
+          const pEl = /** @type {HTMLElement} */ (p);
+          if (pEl.dataset.path) {
+            foundPaths.push(pEl.dataset.path);
+            if (pEl.dataset.path.endsWith('.sh')) {
               targetCell = cell;
               break;
             }

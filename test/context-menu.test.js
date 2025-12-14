@@ -120,7 +120,7 @@ describe('renderer', () => {
       expect(menuText).toContain('Create new folder');
 
       // Clean up
-      await page.mouse.click(100, 100);
+      await page.mouse.click(200, 200);
       await page.waitForTimeout(300);
     });
 
@@ -205,7 +205,7 @@ describe('renderer', () => {
       expect(contextMenu).toBeVisible();
 
       // Click somewhere else to hide the menu
-      await page.mouse.click(100, 100);
+      await page.mouse.click(200, 200);
       await page.waitForTimeout(300);
 
       // Verify context menu is removed from DOM
@@ -263,7 +263,7 @@ describe('renderer', () => {
           expect(menuRight).toBeLessThanOrEqual(viewport.width + 10);
         }
 
-        await page.mouse.click(100, 100);
+        await page.mouse.click(200, 200);
         await page.waitForTimeout(300);
 
         // Test bottom edge
@@ -300,7 +300,7 @@ describe('renderer', () => {
           expect(menuBottom).toBeLessThanOrEqual(viewport.height + 10);
         }
 
-        await page.mouse.click(100, 100);
+        await page.mouse.click(200, 200);
         await page.waitForTimeout(300);
 
         // Test left edge
@@ -335,7 +335,7 @@ describe('renderer', () => {
           expect(menuBox.x).toBeGreaterThanOrEqual(0);
         }
 
-        await page.mouse.click(100, 100);
+        await page.mouse.click(200, 200);
         await page.waitForTimeout(300);
 
         // Test top edge
@@ -370,7 +370,7 @@ describe('renderer', () => {
           expect(menuBox.y).toBeGreaterThanOrEqual(0);
         }
 
-        await page.mouse.click(100, 100);
+        await page.mouse.click(200, 200);
         await page.waitForTimeout(300);
       }
     );
@@ -409,7 +409,7 @@ describe('renderer', () => {
       expect(menuText).toContain('Delete');
 
       // Clean up
-      await page.mouse.click(100, 100);
+      await page.mouse.click(200, 200);
       await page.waitForTimeout(300);
     });
 
@@ -436,7 +436,7 @@ describe('renderer', () => {
 
         // Find our test file
         const testFile = await page.locator(
-          'span[data-path*="test-context-menu-file.txt"]'
+          'p[data-path*="test-context-menu-file.txt"]'
         ).first();
         await testFile.waitFor({state: 'visible', timeout: 5000});
 
@@ -448,7 +448,7 @@ describe('renderer', () => {
         // Right-click on the FILE
         await page.evaluate((path) => {
           const file = document.querySelector(
-            `span[data-path="${CSS.escape(path)}"]`
+            `p[data-path="${CSS.escape(path)}"]`
           );
           if (file) {
             const event = new MouseEvent('contextmenu', {
@@ -476,7 +476,7 @@ describe('renderer', () => {
         await expect(submenu).toBeAttached();
 
         // Clean up - close menu and delete test file
-        await page.mouse.click(100, 100);
+        await page.mouse.click(200, 200);
         await page.waitForTimeout(300);
 
         await page.evaluate(() => {
@@ -557,7 +557,7 @@ describe('renderer', () => {
       expect(backgroundStyle).toContain('url(');
 
       // Clean up
-      await page.mouse.click(100, 100);
+      await page.mouse.click(200, 200);
       await page.waitForTimeout(300);
 
       await page.evaluate(() => {
@@ -926,14 +926,14 @@ describe('renderer', () => {
 
         // Find the test file
         const testFile = await page.locator(
-          'span[data-path="/tmp/test-icon-rename.txt"]'
+          'p[data-path="/tmp/test-icon-rename.txt"]'
         ).first();
         await testFile.waitFor({state: 'visible', timeout: 5000});
 
         // Right-click on the file
         await page.evaluate(() => {
           const file = document.querySelector(
-            'span[data-path="/tmp/test-icon-rename.txt"]'
+            'p[data-path="/tmp/test-icon-rename.txt"]'
           );
           if (file) {
             const event = new MouseEvent('contextmenu', {
@@ -953,11 +953,13 @@ describe('renderer', () => {
         // Click "Rename" option
         const renameOption = await page.locator('.context-menu-item').
           filter({hasText: 'Rename'});
+        await renameOption.waitFor({state: 'visible', timeout: 5000});
         await renameOption.click();
-        await page.waitForTimeout(500);
+        await page.waitForTimeout(1000);
 
         // Verify rename input appears
         const renameInput = await page.locator('input[type="text"]');
+        await renameInput.waitFor({state: 'visible', timeout: 5000});
         await expect(renameInput).toBeVisible();
 
         // Press Enter without changing name (triggers else block)
@@ -968,7 +970,7 @@ describe('renderer', () => {
 
         // Verify the file is still visible (no selection class in icon-view)
         const fileElement = await page.locator(
-          '[data-path="/tmp/test-icon-rename.txt"]'
+          'p[data-path="/tmp/test-icon-rename.txt"]'
         );
         await expect(fileElement).toBeVisible();
 
@@ -1014,7 +1016,7 @@ describe('renderer', () => {
         // First rename: file1 -> file1-renamed (this will select it)
         await page.evaluate(() => {
           const file = document.querySelector(
-            'span[data-path="/tmp/test-icon-file1.txt"]'
+            'p[data-path="/tmp/test-icon-file1.txt"]'
           );
           if (file) {
             const event = new MouseEvent('contextmenu', {
@@ -1050,7 +1052,7 @@ describe('renderer', () => {
             forEach((menu) => menu.remove());
 
           const file = document.querySelector(
-            'span[data-path="/tmp/test-icon-file2.txt"]'
+            'p[data-path="/tmp/test-icon-file2.txt"]'
           );
           if (file) {
             const event = new MouseEvent('contextmenu', {
@@ -1095,7 +1097,7 @@ describe('renderer', () => {
 
         // Verify the renamed file exists (no selection in icon-view)
         const renamedFile = await page.locator(
-          '[data-path="/tmp/test-icon-file2-renamed.txt"]'
+          'p[data-path="/tmp/test-icon-file2-renamed.txt"]'
         );
         await expect(renamedFile).toBeVisible();
 
@@ -1366,14 +1368,14 @@ describe('renderer', () => {
 
         // Find the first file
         const testFile = await page.locator(
-          'span[data-path="/tmp/test-rename-error-1.txt"]'
+          'p[data-path="/tmp/test-rename-error-1.txt"]'
         ).first();
         await testFile.waitFor({state: 'visible', timeout: 5000});
 
         // Right-click on the file
         await page.evaluate(() => {
           const file = document.querySelector(
-            'span[data-path="/tmp/test-rename-error-1.txt"]'
+            'p[data-path="/tmp/test-rename-error-1.txt"]'
           );
           if (file) {
             const event = new MouseEvent('contextmenu', {
@@ -2027,7 +2029,7 @@ describe('renderer', () => {
       expect(submenuText).toContain('(default)');
 
       // Clean up - close menu and delete test file
-      await page.mouse.click(100, 100);
+      await page.mouse.click(200, 200);
       await page.waitForTimeout(300);
 
       await page.evaluate(() => {
@@ -2116,7 +2118,7 @@ describe('renderer', () => {
         }
 
         // Clean up - delete test file
-        await page.mouse.click(100, 100);
+        await page.mouse.click(200, 200);
         await page.waitForTimeout(300);
 
         await page.evaluate(() => {
@@ -2201,7 +2203,7 @@ describe('renderer', () => {
 
         // Reset viewport
         await page.setViewportSize({width: 800, height: 600});
-        await page.mouse.click(100, 100);
+        await page.mouse.click(200, 200);
         await page.waitForTimeout(300);
 
         await page.evaluate(() => {
@@ -2282,7 +2284,7 @@ describe('renderer', () => {
           expect(submenuBox.y).toBeLessThan(100);
         }
 
-        await page.mouse.click(100, 100);
+        await page.mouse.click(200, 200);
         await page.waitForTimeout(300);
 
         await page.evaluate(() => {
@@ -2366,7 +2368,7 @@ describe('renderer', () => {
         expect(submenuStyles.bottom).toBe('10px');
         expect(submenuStyles.top).toBe('auto');
 
-        await page.mouse.click(100, 100);
+        await page.mouse.click(200, 200);
         await page.waitForTimeout(300);
 
         await page.evaluate(() => {
@@ -2479,7 +2481,7 @@ describe('renderer', () => {
         // Should be visible
         expect(submenu).toBeVisible();
 
-        await page.mouse.click(100, 100);
+        await page.mouse.click(200, 200);
         await page.waitForTimeout(300);
 
         await page.evaluate(() => {
@@ -2572,7 +2574,7 @@ describe('renderer', () => {
         expect(submenuStyles.left).toBe('auto');
 
         await page.setViewportSize({width: 800, height: 600});
-        await page.mouse.click(100, 100);
+        await page.mouse.click(200, 200);
         await page.waitForTimeout(300);
 
         await page.evaluate(() => {
@@ -2672,7 +2674,7 @@ describe('renderer', () => {
         expect(submenuInfo.position).toBe('fixed');
         expect(submenuInfo.bottom).toBe('10px');
 
-        await page.mouse.click(100, 100);
+        await page.mouse.click(200, 200);
         await page.waitForTimeout(300);
 
         await page.evaluate(() => {
@@ -2756,7 +2758,7 @@ describe('renderer', () => {
         expect(submenuStyles.left).toBe('auto');
 
         await page.setViewportSize({width: 800, height: 600});
-        await page.mouse.click(100, 100);
+        await page.mouse.click(200, 200);
         await page.waitForTimeout(300);
 
         await page.evaluate(() => {
@@ -2845,7 +2847,7 @@ describe('renderer', () => {
         // Left should be set to pixel value (line 1587)
         expect(submenuStyles.left).toMatch(/^\d+px$/v);
 
-        await page.mouse.click(100, 100);
+        await page.mouse.click(200, 200);
         await page.waitForTimeout(300);
 
         await page.evaluate(() => {
@@ -2887,7 +2889,7 @@ describe('renderer', () => {
       await contextMenu.waitFor({state: 'visible', timeout: 5000});
 
       // Click elsewhere
-      await page.mouse.click(100, 100);
+      await page.mouse.click(200, 200);
       await page.waitForTimeout(300);
 
       // Menu should be hidden
@@ -2920,7 +2922,7 @@ describe('renderer', () => {
       await contextMenu.waitFor({state: 'visible', timeout: 5000});
 
       // Right-click elsewhere
-      await page.mouse.click(100, 100, {button: 'right'});
+      await page.mouse.click(200, 200, {button: 'right'});
       await page.waitForTimeout(300);
 
       // Original menu should be hidden
@@ -2984,7 +2986,7 @@ describe('renderer', () => {
           expect(menuBottom).toBeLessThanOrEqual(viewport.height + 10);
         }
 
-        await page.mouse.click(100, 100);
+        await page.mouse.click(200, 200);
         await page.waitForTimeout(300);
       }
     );
@@ -3043,7 +3045,7 @@ describe('renderer', () => {
           expect(menuRight).toBeLessThanOrEqual(viewport.width + 10);
         }
 
-        await page.mouse.click(100, 100);
+        await page.mouse.click(200, 200);
         await page.waitForTimeout(300);
       }
     );
@@ -3096,7 +3098,7 @@ describe('renderer', () => {
           expect(menuBox.x).toBeLessThanOrEqual(20);
         }
 
-        await page.mouse.click(100, 100);
+        await page.mouse.click(200, 200);
         await page.waitForTimeout(300);
       }
     );
@@ -3107,15 +3109,25 @@ describe('renderer', () => {
         await page.locator('#three-columns').click();
         await page.waitForTimeout(500);
 
-        // Navigate to /tmp which should be writable
+        // Navigate to /Users first
         await page.evaluate(() => {
-          globalThis.location.hash = '#path=/tmp';
+          globalThis.location.hash = '#path=/Users';
         });
         await page.waitForTimeout(1000);
 
         // Create a test subdirectory in /tmp that we can use
         const testDir = '/tmp/test-create-file-folder';
         await page.evaluate((dir) => {
+          // Clean up first if it exists
+          try {
+            // @ts-expect-error Our own API
+            globalThis.electronAPI.fs.rmSync(dir, {
+              recursive: true,
+              force: true
+            });
+          } catch {
+            // Ignore if doesn't exist
+          }
           // @ts-expect-error Our own API
           globalThis.electronAPI.fs.mkdirSync(dir, {recursive: true});
           // Pre-create untitled.txt to trigger filename collision logic
@@ -3133,17 +3145,26 @@ describe('renderer', () => {
             );
           }
         }, testDir);
-        await page.waitForTimeout(500);
 
-        // Refresh to show the new folder
+        // Navigate to /tmp to show the new folder
         await page.evaluate(() => {
           globalThis.location.hash = '#path=/tmp';
         });
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(2000);
+
+        // Wait for the test folder to appear in the DOM
+        await page.waitForFunction((dir) => {
+          const folder = document.querySelector(
+            `a[data-path="${dir}"]`
+          );
+          return folder !== null;
+        }, testDir, {timeout: 10000});
 
         // Right-click on the test folder to show context menu
         await page.evaluate((dir) => {
-          const folder = document.querySelector(`a[data-path="${dir}"]`);
+          const folder = document.querySelector(
+            `a[data-path="${dir}"]`
+          );
           if (folder) {
             const event = new MouseEvent('contextmenu', {
               bubbles: true,
@@ -3460,7 +3481,7 @@ describe('renderer', () => {
           expect(menuBox.x).toBeGreaterThanOrEqual(0);
         }
 
-        await page.mouse.click(100, 100);
+        await page.mouse.click(200, 200);
         await page.waitForTimeout(300);
 
         await page.evaluate(() => {
@@ -6239,7 +6260,7 @@ describe('renderer', () => {
           expect(submenuStyles.top).toBe('auto');
         }
 
-        await page.mouse.click(100, 100);
+        await page.mouse.click(200, 200);
         await page.waitForTimeout(300);
 
         await page.evaluate(() => {

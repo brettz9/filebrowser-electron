@@ -851,7 +851,7 @@ function addItems (result, basePath, currentBasePath) {
     const cells = iconViewTable.querySelectorAll('td.list-item');
     cells.forEach((cell) => {
       const cellEl = /** @type {HTMLElement} */ (cell);
-      const link = cellEl.querySelector('a, span');
+      const link = cellEl.querySelector('a, p');
       if (link) {
         const linkEl = /** @type {HTMLElement} */ (link);
         const itemPath = linkEl.dataset.path;
@@ -1004,7 +1004,7 @@ function addItems (result, basePath, currentBasePath) {
         // Find matching item
         const allCells = [...iconViewTable.querySelectorAll('td.list-item')];
         const matchingCell = allCells.find((cell) => {
-          const link = cell.querySelector('a, span');
+          const link = cell.querySelector('a, p');
           /* c8 ignore next -- Guard */
           const text = link?.textContent?.toLowerCase() || '';
           return text.startsWith(typeaheadBuffer);
@@ -1045,7 +1045,7 @@ function addItems (result, basePath, currentBasePath) {
         );
         if (selectedCell) {
           e.preventDefault();
-          const link = selectedCell.querySelector('a, span');
+          const link = selectedCell.querySelector('a, p');
           const itemPath = link?.dataset?.path;
           if (itemPath) {
             showInfoWindow({jml, itemPath});
@@ -1094,7 +1094,7 @@ function addItems (result, basePath, currentBasePath) {
         );
         if (selectedCell) {
           e.preventDefault();
-          const link = selectedCell.querySelector('a, span');
+          const link = selectedCell.querySelector('a, p');
           const itemPath = link?.dataset?.path;
           if (itemPath) {
             setClipboard({path: itemPath, isCopy: true});
@@ -1108,7 +1108,7 @@ function addItems (result, basePath, currentBasePath) {
         );
         if (selectedCell) {
           e.preventDefault();
-          const link = selectedCell.querySelector('a, span');
+          const link = selectedCell.querySelector('a, p');
           const itemPath = link?.dataset?.path;
           if (itemPath) {
             setClipboard({path: itemPath, isCopy: false});
@@ -1131,7 +1131,7 @@ function addItems (result, basePath, currentBasePath) {
         );
         if (selectedCell) {
           e.preventDefault();
-          const link = selectedCell.querySelector('a, span');
+          const link = selectedCell.querySelector('a, p');
           const itemPath = link?.dataset?.path;
           if (itemPath) {
             deleteItem(itemPath);
@@ -1145,7 +1145,7 @@ function addItems (result, basePath, currentBasePath) {
         );
         if (selectedCell) {
           e.preventDefault();
-          const textElement = selectedCell.querySelector('a, span');
+          const textElement = selectedCell.querySelector('a, p');
           if (textElement) {
             startRename(textElement);
           }

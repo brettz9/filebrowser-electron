@@ -70,8 +70,11 @@ export function createNewFolder (
       const normalizedFolderPath = folderPath.replace(/\/+$/v, '');
       const encodedPath = normalizedFolderPath + '/' +
         encodeURIComponentFn(newFolderName);
+      // Find the text element (p, span, or a) specifically, not img elements
       const newFolderElement = $(
-        `[data-path="${CSS.escape(encodedPath)}"]`
+        `p[data-path="${CSS.escape(encodedPath)}"], ` +
+        `span[data-path="${CSS.escape(encodedPath)}"], ` +
+        `a[data-path="${CSS.escape(encodedPath)}"]`
       );
       if (newFolderElement) {
         startRename(newFolderElement, () => {

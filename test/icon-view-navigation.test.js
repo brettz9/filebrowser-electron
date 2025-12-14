@@ -380,13 +380,13 @@ describe('Icon view keyboard navigation', () => {
 
     // Find and select the test file
     const testCell = page.locator(
-      `td.list-item:has(span[data-path*="test-cmdo-file.txt"])`
+      `td.list-item:has(p[data-path*="test-cmdo-file.txt"])`
     ).first();
 
     // Verify the cell exists and has the right structure
     const cellInfo = await testCell.evaluate((el) => {
       const link = el.querySelector('a');
-      const span = el.querySelector('span');
+      const span = el.querySelector('p');
       return {
         hasLink: link !== null,
         hasSpan: span !== null,
@@ -536,7 +536,7 @@ describe('Icon view keyboard navigation', () => {
 
     // Find and select the test file
     const testCell = page.locator(
-      `td.list-item:has(span[data-path*="test-delete-file.txt"])`
+      `td.list-item:has(p[data-path*="test-delete-file.txt"])`
     ).first();
     await testCell.click();
 
@@ -588,7 +588,7 @@ describe('Icon view keyboard navigation', () => {
 
     // Find and select the test file
     const testCell = page.locator(
-      `td.list-item:has(span[data-path*="test-rename-file.txt"])`
+      `td.list-item:has(p[data-path*="test-rename-file.txt"])`
     ).first();
     await testCell.click();
 
@@ -615,14 +615,14 @@ describe('Icon view keyboard navigation', () => {
     // Check that file was renamed and is still selected
     const renameDebug = await page.evaluate(() => {
       const selectedCell = document.querySelector('td.list-item.selected');
-      const span = selectedCell?.querySelector('span');
-      const allSpans = [...document.querySelectorAll('td.list-item span')].
+      const p = selectedCell?.querySelector('p');
+      const allPs = [...document.querySelectorAll('td.list-item p')].
         map((s) => s.textContent);
       return {
         hasSelectedCell: selectedCell !== null,
-        selectedSpanText: span?.textContent,
-        allFileNames: allSpans,
-        containsRenamed: span?.textContent?.
+        selectedSpanText: p?.textContent,
+        allFileNames: allPs,
+        containsRenamed: p?.dataset.path?.
           includes('test-rename-file-renamed.txt')
       };
     });
@@ -682,7 +682,7 @@ describe('Icon view keyboard navigation', () => {
 
       // Now find and click the test file (creates previous selection scenario)
       const testCell = page.locator(
-        `td.list-item:has(span[data-path*="test-oncomplete-file.txt"])`
+        `td.list-item:has(p[data-path*="test-oncomplete-file.txt"])`
       ).first();
       await testCell.click();
       await page.waitForTimeout(200);
@@ -704,16 +704,16 @@ describe('Icon view keyboard navigation', () => {
           globalThis.renameOnCompleteCalled = true;
         };
 
-        // Get the selected cell's span element
+        // Get the selected cell's p element
         const selectedCell = document.querySelector('td.list-item.selected');
-        const span = selectedCell?.querySelector('span');
+        const p = selectedCell?.querySelector('p');
 
-        if (!span) {
+        if (!p) {
           return {error: 'No span found'};
         }
 
         // Call startRename with onComplete callback
-        startRename(span, onComplete);
+        startRename(p, onComplete);
 
         return {success: true};
       });
@@ -794,7 +794,7 @@ describe('Icon view keyboard navigation', () => {
 
       // Find and click the test file to rename
       const testCell = page.locator(
-        `td.list-item:has(span[data-path*="test-prevsel-file1.txt"])`
+        `td.list-item:has(p[data-path*="test-prevsel-file1.txt"])`
       ).first();
       await testCell.click();
       await page.waitForTimeout(200);
@@ -804,9 +804,9 @@ describe('Icon view keyboard navigation', () => {
         // @ts-expect-error - Testing internal API
         const startRename = globalThis.startRenameForTesting;
         const selectedCell = document.querySelector('td.list-item.selected');
-        const span = selectedCell?.querySelector('span');
-        if (startRename && span) {
-          startRename(span);
+        const p = selectedCell?.querySelector('p');
+        if (startRename && p) {
+          startRename(p);
         }
       });
 
@@ -824,7 +824,7 @@ describe('Icon view keyboard navigation', () => {
       // This simulates having a previous selection when reselection happens
       await page.evaluate(() => {
         const anotherCell = document.querySelector(
-          'td.list-item:has(span[data-path*="test-prevsel-file2.txt"])'
+          'td.list-item:has(p[data-path*="test-prevsel-file2.txt"])'
         );
         if (anotherCell) {
           anotherCell.classList.add('selected');
@@ -840,8 +840,8 @@ describe('Icon view keyboard navigation', () => {
         return {
           selectedCount: selected.length,
           selectedPaths: [...selected].map((cell) => {
-            const span = cell.querySelector('span');
-            return span?.textContent || '';
+            const p = cell.querySelector('p');
+            return p?.dataset.path || '';
           })
         };
       });
@@ -946,7 +946,7 @@ describe('Icon view keyboard navigation', () => {
 
     // Find and double-click the test file
     const testCell = page.locator(
-      `td.list-item:has(span[data-path*="test-dblclick-file.txt"])`
+      `td.list-item:has(p[data-path*="test-dblclick-file.txt"])`
     ).first();
     await testCell.dblclick();
     await page.waitForTimeout(500);

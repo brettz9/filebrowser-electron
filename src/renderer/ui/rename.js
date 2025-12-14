@@ -315,7 +315,9 @@ export function startRename (
       // Re-select the item after view refresh
       setTimeout(() => {
         const itemElement = $(
-          `[data-path="${CSS.escape(itemPath)}"]`
+          `a[data-path="${CSS.escape(itemPath)}"], ` +
+          `span[data-path="${CSS.escape(itemPath)}"], ` +
+          `p[data-path="${CSS.escape(itemPath)}"]`
         );
         if (itemElement) {
           if (currentView === 'three-columns') {
@@ -350,6 +352,7 @@ export function startRename (
               block: 'nearest',
               inline: 'nearest'
             });
+            itemElement.closest('td').classList.add('selected');
           }
         }
 
