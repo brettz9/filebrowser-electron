@@ -318,7 +318,7 @@ describe('renderer', () => {
   });
 
   describe('column browser', () => {
-    test.skip('retains path upon refresh', async () => {
+    test('retains path upon refresh', async () => {
       await page.locator('#three-columns').click();
 
       // Wait for the MutationObserver debounce and save to complete

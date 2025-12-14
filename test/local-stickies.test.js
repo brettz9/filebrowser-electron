@@ -159,7 +159,7 @@ describe('renderer', () => {
         expect(noteContent).toBeHidden();
 
         const usersFolder = await page.locator('a[data-path="/Users"]');
-        await usersFolder.click();
+        await usersFolder.dblclick();
 
         await page.locator('button#create-sticky').click();
         noteContent = await page.locator('.sticky-note-content');
@@ -201,7 +201,7 @@ describe('renderer', () => {
         expect(noteContent).toBeHidden();
 
         const appFolder = await page.locator('a[data-path="/Applications"]');
-        await appFolder.click();
+        await appFolder.dblclick();
 
         // Hidden as this is a local sticky
         expect(noteContent).toBeHidden();
@@ -224,7 +224,7 @@ describe('renderer', () => {
 
         const usersFolderRefreshed =
           await page.locator('a[data-path="/Users"]');
-        await usersFolderRefreshed.click();
+        await usersFolderRefreshed.dblclick();
 
         // Get fresh locator after navigation and wait for it to be visible
         const noteContentAfterNav = await page.locator('.sticky-note-content');
@@ -1130,7 +1130,7 @@ describe('renderer', () => {
       }
     );
 
-    test.skip('undo and redo folder creation', async () => {
+    test('undo and redo folder creation', async () => {
       // Clean up any leftover test artifacts from previous runs
       await page.evaluate(() => {
         // @ts-expect-error - electronAPI available via preload
@@ -1535,7 +1535,7 @@ describe('renderer', () => {
 
       // Find the test file and right-click
       const fileCell = await page.locator(
-        'td.list-item:has(span[data-path*="test-rename-original.txt"])'
+        'td.list-item:has(p[data-path*="test-rename-original.txt"])'
       );
       await fileCell.waitFor({state: 'visible', timeout: 5000});
       await fileCell.click({button: 'right'});
@@ -1663,16 +1663,16 @@ describe('renderer', () => {
       const copyResult = await page.evaluate(() => {
         // Find the file cell
         const cell = document.querySelector(
-          'td.list-item:has(span[data-path*="test-copy-source.txt"])'
+          'td.list-item:has(p[data-path*="test-copy-source.txt"])'
         );
         if (!cell) {
           return {success: false, error: 'Cell not found'};
         }
 
-        // Get the file path from the span
-        const span = cell.querySelector('span[data-path]');
-        const path = span
-          ? /** @type {HTMLElement} */ (span).dataset.path
+        // Get the file path from the p
+        const p = cell.querySelector('p[data-path]');
+        const path = p
+          ? /** @type {HTMLElement} */ (p).dataset.path
           : null;
 
         if (!path) {
@@ -1870,15 +1870,15 @@ describe('renderer', () => {
       // Copy the source file
       const copyResult = await page.evaluate(() => {
         const cell = document.querySelector(
-          'td.list-item:has(span[data-path*="test-dup-source.txt"])'
+          'td.list-item:has(p[data-path*="test-dup-source.txt"])'
         );
         if (!cell) {
           return {success: false, error: 'Cell not found'};
         }
 
-        const span = cell.querySelector('span[data-path]');
-        const path = span
-          ? /** @type {HTMLElement} */ (span).dataset.path
+        const p = cell.querySelector('p[data-path]');
+        const path = p
+          ? /** @type {HTMLElement} */ (p).dataset.path
           : null;
 
         if (!path) {

@@ -30059,7 +30059,7 @@
 
 	  // Todo: Column view should, if clicked on breadcrumbs or such, be able to
 	  //         start from a non-root path as with other views
-	  const basePath = view === 'column-view' ? '/' : currentBasePath;
+	  const basePath = view === 'three-columns' ? '/' : currentBasePath;
 
 	  // Save scroll positions of selected items before refresh
 	  const scrollPositions = new Map();
@@ -30365,6 +30365,14 @@
 	        class: 'list-item' + (view === 'icon-view' || view === 'gallery-view'
 	          ? ' icon-container'
 	          : ''),
+	        ...(view === 'icon-view' || view === 'gallery-view'
+	          ? {
+	            dataset: {
+	              path: basePath + encodeURIComponent(title)
+	            }
+	          }
+	          : {}
+	        ),
 	        $on: {
 	          ...(view === 'icon-view' || view === 'gallery-view'
 	            ? {
@@ -30405,7 +30413,8 @@
 	              }, true],
 	              dblclick: [function () {
 	                location.href = this.querySelector('a').href;
-	              }, true]
+	              }, true],
+	              contextmenu: isDir ? folderContextmenu : contextmenu
 	            }
 	            : {}
 	          )
@@ -30417,7 +30426,10 @@
 	              class: 'icon',
 	              dataset: {
 	                path: basePath + encodeURIComponent(title)
-	              }
+	              },
+	              $on: isDir
+	                ? {contextmenu: folderContextmenu}
+	                : {contextmenu}
 	            }
 	          ]
 	          : '',

@@ -356,7 +356,7 @@ function changePath () {
 
   // Todo: Column view should, if clicked on breadcrumbs or such, be able to
   //         start from a non-root path as with other views
-  const basePath = view === 'column-view' ? '/' : currentBasePath;
+  const basePath = view === 'three-columns' ? '/' : currentBasePath;
 
   // Save scroll positions of selected items before refresh
   const scrollPositions = new Map();
@@ -662,6 +662,14 @@ function addItems (result, basePath, currentBasePath) {
         class: 'list-item' + (view === 'icon-view' || view === 'gallery-view'
           ? ' icon-container'
           : ''),
+        ...(view === 'icon-view' || view === 'gallery-view'
+          ? {
+            dataset: {
+              path: basePath + encodeURIComponent(title)
+            }
+          }
+          : {}
+        ),
         $on: {
           ...(view === 'icon-view' || view === 'gallery-view'
             ? {
@@ -702,7 +710,8 @@ function addItems (result, basePath, currentBasePath) {
               }, true],
               dblclick: [function () {
                 location.href = this.querySelector('a').href;
-              }, true]
+              }, true],
+              contextmenu: isDir ? folderContextmenu : contextmenu
             }
             : {}
           )
@@ -714,7 +723,10 @@ function addItems (result, basePath, currentBasePath) {
               class: 'icon',
               dataset: {
                 path: basePath + encodeURIComponent(title)
-              }
+              },
+              $on: isDir
+                ? {contextmenu: folderContextmenu}
+                : {contextmenu}
             }
           ]
           : '',
