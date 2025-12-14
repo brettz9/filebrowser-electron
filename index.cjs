@@ -30192,10 +30192,20 @@
 	  const view = getCurrentView();
 
 	  $('i').hidden = true;
-	  const ul = $('ul');
-	  while (ul.firstChild) {
-	    ul.firstChild.remove();
+
+	  const ulMiller = $('.miller-columns ul');
+	  while (ulMiller.firstChild) {
+	    ulMiller.firstChild.remove();
 	  }
+
+	  const ulIconOrGallery = $('.icon-or-gallery-view ul');
+	  while (ulIconOrGallery.firstChild) {
+	    ulIconOrGallery.firstChild.remove();
+	  }
+
+	  const ul = view === 'three-columns'
+	    ? ulMiller
+	    : ulIconOrGallery;
 
 	  /**
 	   * @param {string} itemPath
