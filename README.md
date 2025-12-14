@@ -69,7 +69,12 @@ done
 
 ## To-dos
 
-1. List view/Gallery view
+1. Gallery view
+    1. Add large Thumbnail preview
+    1. Add metadata preview column
+
+1. List view
+
 1. Ideally would allow separate windows and tabs, with menu bar
     1. At such point, ensure key commands (e.g., copy/cut/paste attached to
         icon table) work globally instead of only when the element (table)
@@ -90,3 +95,4 @@ done
 ## Misc. to-dos
 
 1. Allow "Show package contents" context menu for apps
+1. Allow column view to start from non-root (as with list and other views)

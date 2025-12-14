@@ -28196,7 +28196,7 @@
 	              });
 	            }
 	          } else {
-	            // For icon-view, just scroll into view
+	            // For icon-view and gallery-view, just scroll into view
 	            itemElement.scrollIntoView({
 	              block: 'nearest',
 	              inline: 'nearest'
@@ -30045,7 +30045,10 @@
 	  const view = getCurrentView();
 
 	  const currentBasePath = getBasePath();
-	  const basePath = view === 'icon-view' ? currentBasePath : '/';
+
+	  // Todo: Column view should, if clicked on breadcrumbs or such, be able to
+	  //         start from a non-root path as with other views
+	  const basePath = view === 'column-view' ? '/' : currentBasePath;
 
 	  // Save scroll positions of selected items before refresh
 	  const scrollPositions = new Map();
@@ -30317,7 +30320,7 @@
 	        dataset: {
 	          path: basePath + encodeURIComponent(title)
 	        },
-	        ...(view === 'icon-view'
+	        ...(view === 'icon-view' || view === 'gallery-view'
 	          ? {
 	            href: '#path=' + basePath + encodeURIComponent(title)
 	          }
@@ -30325,7 +30328,7 @@
 	      }, [
 	        title
 	      ])
-	      : jmlExports.jml(view === 'icon-view' ? 'p' : 'span', {
+	      : jmlExports.jml(view === 'icon-view' || view === 'gallery-view' ? 'p' : 'span', {
 	        title: basePath + encodeURIComponent(title),
 	        $on: {
 	          contextmenu
@@ -30336,11 +30339,13 @@
 	      }, [title]);
 
 	    const li = jmlExports.jml(
-	      view === 'icon-view' ? 'td' : 'li',
+	      view === 'icon-view' || view === 'gallery-view' ? 'td' : 'li',
 	      {
-	        class: 'list-item' + (view === 'icon-view' ? ' icon-container' : ''),
+	        class: 'list-item' + (view === 'icon-view' || view === 'gallery-view'
+	          ? ' icon-container'
+	          : ''),
 	        $on: {
-	          ...(view === 'icon-view'
+	          ...(view === 'icon-view' || view === 'gallery-view'
 	            ? {
 	              click: [function (e) {
 	                e.preventDefault();
@@ -30362,7 +30367,7 @@
 	          )
 	        }
 	      }, [
-	        view === 'icon-view'
+	        view === 'icon-view' || view === 'gallery-view'
 	          ? [
 	            'img', {
 	              class: 'icon',
@@ -30380,7 +30385,7 @@
 	    const dataPath = basePath + encodeURIComponent(title);
 	    li.dataset.iconPath = dataPath;
 
-	    const method = view === 'icon-view'
+	    const method = view === 'icon-view' || view === 'gallery-view'
 	      ? async () => {
 	        if (isDir) {
 	          return await getIconDataURLForFile(
@@ -30420,7 +30425,7 @@
 	              : ''
 	          );
 	        }
-	      } else if (view === 'icon-view') {
+	      } else if (view === 'icon-view' || view === 'gallery-view') {
 	        const actualElement = document.querySelector(
 	          `img[data-path="${CSS.escape(dataPath)}"]`
 	        );
@@ -30436,7 +30441,7 @@
 	  const numIconColumns = 4;
 
 	  jmlExports.jml(ul, [
-	    (view === 'icon-view' && basePath !== '/'
+	    ((view === 'icon-view' || view === 'gallery-view') && basePath !== '/'
 	      ? [
 	        'li', [
 	          ['a', {
@@ -30449,28 +30454,32 @@
 	        ]
 	      ]
 	      : ''),
-	    ...(view === 'icon-view'
+	    ...(view === 'icon-view' || view === 'gallery-view'
 	      ? /** @type {import('jamilih').JamilihArray[]} */ ([[
 	        'table', {dataset: {basePath}},
-	        chunk(listItems, numIconColumns).map((innerArr) => {
-	          return ['tr', innerArr];
-	        })
+	        view === 'gallery-view'
+	          ? [
+	            ['tr', listItems]
+	          ]
+	          : chunk(listItems, numIconColumns).map((innerArr) => {
+	            return ['tr', innerArr];
+	          })
 	      ]])
 	      : listItems)
 	  ]);
 
 	  if ($columns?.destroy) {
 	    $columns.destroy();
-	    if (view === 'icon-view') {
+	    if (view === 'icon-view' || view === 'gallery-view') {
 	      changePath();
 	    }
 	  }
 
-	  if (view === 'icon-view') {
+	  if (view === 'icon-view' || view === 'gallery-view') {
 	    // Update breadcrumbs for icon view
 	    updateBreadcrumbs(currentBasePath);
 
-	    // Add keyboard support for icon-view
+	    // Add keyboard support for icon-view and gallery-view
 	    const iconViewTable = $('table[data-base-path]');
 	    /* c8 ignore next 3 -- Unreachable: always returns above */
 	    if (!iconViewTable) {
@@ -30701,7 +30710,7 @@
 
 	          if (link) {
 	            // It's a folder - navigate into it
-	            if (view === 'icon-view') {
+	            if (view === 'icon-view' || view === 'gallery-view') {
 	              selectedCell.dispatchEvent(new Event('dblclick'));
 	            } else {
 	              link.click();
@@ -31700,6 +31709,10 @@ ${previewContent}
 	    // Cmd+3 to switch to three-columns view
 	    e.preventDefault();
 	    $('#three-columns').click();
+	  } else if (e.metaKey && e.key === '4') {
+	    // Cmd+4 to switch to gallery-view
+	    e.preventDefault();
+	    $('#gallery-view').click();
 	  } else if (e.metaKey && e.key === 'z' && !e.shiftKey) {
 	    // Cmd+Z for undo
 	    e.preventDefault();
@@ -31718,7 +31731,14 @@ ${previewContent}
 	  });
 	  this.classList.add('selected');
 	  localStorage.setItem('view', 'icon-view');
-	  $('.miller-breadcrumbs').style.display = 'block';
+	  changePath();
+	});
+	$('#gallery-view').addEventListener('click', function () {
+	  $$('nav button').forEach((button) => {
+	    button.classList.remove('selected');
+	  });
+	  this.classList.add('selected');
+	  localStorage.setItem('view', 'gallery-view');
 	  changePath();
 	});
 	$('#three-columns').addEventListener('click', function () {
@@ -31727,12 +31747,12 @@ ${previewContent}
 	  });
 	  this.classList.add('selected');
 	  localStorage.setItem('view', 'three-columns');
-	  $('.miller-breadcrumbs').style.display = 'block';
 	  changePath();
 	});
 
 	const view = getCurrentView();
 	switch (view) {
+	case 'gallery-view':
 	case 'three-columns':
 	case 'icon-view':
 	  $('#' + view).classList.add('selected');
@@ -31750,7 +31770,7 @@ ${previewContent}
 
 	$('#create-sticky').addEventListener('click', () => {
 	  const currentView = getCurrentView();
-	  const pth = currentView === 'icon-view'
+	  const pth = currentView === 'icon-view' || currentView === 'gallery-view'
 	    ? jQuery('table[data-base-path]').attr('data-base-path')
 	    : ($columns && $columns.find(
 	      'li.miller-selected a, li.miller-selected span'

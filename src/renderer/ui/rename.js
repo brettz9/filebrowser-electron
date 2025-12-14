@@ -345,7 +345,7 @@ export function startRename (
               });
             }
           } else {
-            // For icon-view, just scroll into view
+            // For icon-view and gallery-view, just scroll into view
             itemElement.scrollIntoView({
               block: 'nearest',
               inline: 'nearest'
