@@ -1,5 +1,12 @@
 # CHANGES to filebrowser-electron
 
+## 0.10.0 (unreleased)
+
+- feat: gallery view
+- feat: back/forward commands
+- fix: make icon view show thumbnails, requiring double-click to open
+- fix: ellipsis for long file names
+
 ## 0.9.0
 
 - feat: move/copy/cut
