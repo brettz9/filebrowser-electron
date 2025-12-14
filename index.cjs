@@ -13244,7 +13244,7 @@
 	 *     $columns: JQuery<HTMLElement>
 	 *   ) => void),
 	 *   animation: (li: JQuery<HTMLLIElement>, $columns: JQuery<HTMLElement>) => void,
-	 *   reset: ($columns: JQuery<HTMLElement>) => void,
+	 *   reset: ($columns: JQuery<HTMLElement>, resetByUser: boolean) => void,
 	 *   scroll?: ($column: JQuery<HTMLElement>|null, $columns: JQuery<HTMLElement>) => void
 	 * }} Settings
 	 */
@@ -13299,8 +13299,7 @@
 	        text(settings.breadcrumbRoot).
 	        on('click', function () {
 	          if ($columns) {
-	            reset($columns);
-	            scrollIntoView($columns);
+	            userReset($columns);
 	          }
 	        }).appendTo($breadcrumb);
 	    }
@@ -13410,7 +13409,7 @@
 	   * @returns {void}
 	   */
 	  function userReset ($columns) {
-	    reset($columns);
+	    reset($columns, true);
 	    scrollIntoView($columns);
 	  }
 
@@ -13418,15 +13417,16 @@
 	   * Hide columns (not the first), remove selections, update breadcrumb.
 	   *
 	   * @param {JQuery<HTMLElement>} $columns
+	   * @param {boolean} resetByUser
 	   * @returns {void}
 	   */
-	  function reset ($columns) {
+	  function reset ($columns, resetByUser) {
 	    collapse();
 	    chain().removeClass(`${namespace}-selected`);
 	    breadcrumb($columns);
 
 	    // Upon reset ensure no value is returned to the calling code.
-	    settings.reset($columns);
+	    settings.reset($columns, resetByUser);
 	    if (settings.preview) {
 	      $(`.${namespace}-preview`).remove();
 	    }
@@ -13614,7 +13614,7 @@
 	      // Use event delegation to handle dynamically added items
 	      $columns.on('click', itemSelector, function (ev) {
 	        const $this = $(this);
-	        reset($columns);
+	        reset($columns, false);
 
 	        const $child = $this.data(`${namespace}-child`);
 	        let $ancestor = $this;
@@ -31015,10 +31015,14 @@ ${previewContent}
 	    animation () {
 	      // No-op to avoid need for timeouts and jarring redraws
 	    },
-	    reset () {
+	    reset (_$columns, resetByUser) {
+	      if (!resetByUser) {
+	        return;
+	      }
+
 	      // Update URL to root when escape key resets to root
 	      const rootPath = '/';
-	      history.replaceState(
+	      history.pushState(
 	        null,
 	        '',
 	        location.pathname + '#path=' + encodeURIComponent(rootPath)

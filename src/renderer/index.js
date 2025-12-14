@@ -1325,10 +1325,14 @@ ${previewContent}
     animation () {
       // No-op to avoid need for timeouts and jarring redraws
     },
-    reset () {
+    reset (_$columns, resetByUser) {
+      if (!resetByUser) {
+        return;
+      }
+
       // Update URL to root when escape key resets to root
       const rootPath = '/';
-      history.replaceState(
+      history.pushState(
         null,
         '',
         location.pathname + '#path=' + encodeURIComponent(rootPath)
