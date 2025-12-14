@@ -30814,7 +30814,6 @@
 	      // Cmd+[ to go back in history
 	      } else if (e.metaKey && e.key === '[') {
 	        e.preventDefault();
-	        console.log('going back 2');
 	        history.back();
 
 	      // Cmd+] to go forward in history
@@ -31048,9 +31047,6 @@ ${previewContent}
 	       * @param {string} pth
 	       */
 	      const updateHistoryAndStickies = (pth) => {
-	        console.log('pushing state', location.pathname + '#path=' + encodeURIComponent(
-	          pth
-	        ));
 	        history.pushState(
 	          null,
 	          '',
@@ -31665,16 +31661,19 @@ ${previewContent}
 	  }
 	}
 
-	globalThis.addEventListener('hashchange', changePath);
-
-	globalThis.addEventListener('popstatechange', (e) => {
-	  if (!e.state) { // As for hashchange which we handle above
-	    console.log('hash change?');
-	    return;
-	  }
-	  console.log('popstatechange');
+	globalThis.addEventListener('hashchange', () => {
+	  // console.log('hash change');
 	  changePath();
 	});
+
+	// globalThis.addEventListener('popstate', (e) => {
+	//   if (!e.state) { // As for hashchange which we handle above
+	//     console.log('no state popstate');
+	//     return;
+	//   }
+	//   console.log('popstatechange');
+	//   changePath();
+	// });
 
 
 	// Add global keyboard handler for undo/redo
