@@ -483,6 +483,7 @@ const performRedo = () => performRedoOp(changePath);
 // Use imported references from watcher module
 const foldersWithPendingChanges = watcherFoldersWithPendingChanges;
 
+let allowHistoryUpdates = true;
 /**
  *
  * @param {Result[]} result
@@ -1357,13 +1358,15 @@ ${previewContent}
        * @param {string} pth
        */
       const updateHistoryAndStickies = (pth) => {
-        history.pushState(
-          null,
-          '',
-          location.pathname + '#path=' + encodeURIComponent(
-            pth
-          )
-        );
+        if (allowHistoryUpdates) {
+          history.pushState(
+            null,
+            '',
+            location.pathname + '#path=' + encodeURIComponent(
+              pth
+            )
+          );
+        }
         const saved = localStorage.getItem(`stickyNotes-local-${pth}`);
         stickyNotes.clear(({metadata}) => {
           return metadata.type === 'local';
@@ -1814,7 +1817,7 @@ ${previewContent}
 
   if (currentBasePath !== '/') {
     currentBasePath.split('/').slice(1).forEach(
-      (pathSegment, idx) => {
+      (pathSegment, idx, arr) => {
         /* c8 ignore next 3 -- Guard for poorly formed paths */
         if (pathSegment === '/') {
           return;
@@ -1831,6 +1834,7 @@ ${previewContent}
           }
         );
         // console.log('anchors', anchors.length);
+        allowHistoryUpdates = false;
         anchors.trigger('click');
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
@@ -1841,6 +1845,9 @@ ${previewContent}
                 block: 'start',
                 inline: 'start'
               });
+              if (idx === arr.length - 1) {
+                allowHistoryUpdates = true;
+              }
             }, 200);
           });
         });
