@@ -1085,11 +1085,7 @@ function addItems (result, basePath, currentBasePath) {
 
           if (link) {
             // It's a folder - navigate into it
-            if (view === 'icon-view' || view === 'gallery-view') {
-              selectedCell.dispatchEvent(new Event('dblclick'));
-            } else {
-              link.click();
-            }
+            selectedCell.dispatchEvent(new Event('dblclick'));
           } else if (span) {
             // It's a file - open with default application
             const itemPath = span.dataset?.path;

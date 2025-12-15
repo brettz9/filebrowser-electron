@@ -1809,6 +1809,12 @@ describe('renderer', () => {
     test(
       'startRename exits early if textElement has no dataset.path',
       async () => {
+        // Wait for startRenameForTesting to be available
+        await page.waitForFunction(() => {
+          // @ts-expect-error Testing internal API
+          return typeof globalThis.startRenameForTesting === 'function';
+        }, {timeout: 5000});
+
         const result = await page.evaluate(() => {
           // @ts-expect-error Testing internal API
           const startRename = globalThis.startRenameForTesting;

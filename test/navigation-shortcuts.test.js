@@ -217,5 +217,149 @@ describe('renderer', () => {
 
       expect(currentPath).toBe('/Applications/Utilities');
     });
+
+    test('Cmd+[ goes back in history in icon-view', async () => {
+      // Switch to icon-view
+      await page.locator('#icon-view').click();
+      await page.waitForSelector('table[data-base-path]', {state: 'visible'});
+      await page.waitForTimeout(500);
+
+      // Navigate to Applications
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/Applications';
+      });
+      await page.waitForTimeout(500);
+
+      // Navigate to Utilities
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/Applications/Utilities';
+      });
+      await page.waitForTimeout(500);
+
+      const table = await page.locator('table[data-base-path]');
+      await table.focus();
+
+      // Press Cmd+[ to go back
+      await page.keyboard.press('Meta+[');
+      await page.waitForTimeout(500);
+
+      const currentPath = await page.evaluate(() => {
+        return decodeURIComponent(
+          globalThis.location.hash.replace('#path=', '')
+        );
+      });
+
+      expect(currentPath).toBe('/Applications');
+    });
+
+    test('Cmd+] goes forward in history in icon-view', async () => {
+      // Switch to icon-view
+      await page.locator('#icon-view').click();
+      await page.waitForSelector('table[data-base-path]', {state: 'visible'});
+      await page.waitForTimeout(500);
+
+      // Navigate to Applications
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/Applications';
+      });
+      await page.waitForTimeout(500);
+
+      // Navigate to Utilities
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/Applications/Utilities';
+      });
+      await page.waitForTimeout(500);
+
+      const table = await page.locator('table[data-base-path]');
+      await table.focus();
+
+      // Go back first
+      await page.keyboard.press('Meta+[');
+      await page.waitForTimeout(500);
+
+      // Now press Cmd+] to go forward
+      await page.keyboard.press('Meta+]');
+      await page.waitForTimeout(500);
+
+      const currentPath = await page.evaluate(() => {
+        return decodeURIComponent(
+          globalThis.location.hash.replace('#path=', '')
+        );
+      });
+
+      expect(currentPath).toBe('/Applications/Utilities');
+    });
+
+    test('Cmd+[ goes back in history in three-columns', async () => {
+      // Switch to three-columns view
+      await page.locator('#three-columns').click();
+      await page.waitForSelector('div.miller-columns', {state: 'visible'});
+      await page.waitForTimeout(500);
+
+      // Navigate to Applications
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/Applications';
+      });
+      await page.waitForTimeout(500);
+
+      // Navigate to Utilities
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/Applications/Utilities';
+      });
+      await page.waitForTimeout(500);
+
+      const millerColumns = await page.locator('div.miller-columns');
+      await millerColumns.focus();
+
+      // Press Cmd+[ to go back
+      await page.keyboard.press('Meta+[');
+      await page.waitForTimeout(500);
+
+      const currentPath = await page.evaluate(() => {
+        return decodeURIComponent(
+          globalThis.location.hash.replace('#path=', '')
+        );
+      });
+
+      expect(currentPath).toBe('/Applications');
+    });
+
+    test('Cmd+] goes forward in history in three-columns', async () => {
+      // Switch to three-columns view
+      await page.locator('#three-columns').click();
+      await page.waitForSelector('div.miller-columns', {state: 'visible'});
+      await page.waitForTimeout(500);
+
+      // Navigate to Applications
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/Applications';
+      });
+      await page.waitForTimeout(500);
+
+      // Navigate to Utilities
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/Applications/Utilities';
+      });
+      await page.waitForTimeout(500);
+
+      const millerColumns = await page.locator('div.miller-columns');
+      await millerColumns.focus();
+
+      // Go back first
+      await page.keyboard.press('Meta+[');
+      await page.waitForTimeout(500);
+
+      // Now press Cmd+] to go forward
+      await page.keyboard.press('Meta+]');
+      await page.waitForTimeout(500);
+
+      const currentPath = await page.evaluate(() => {
+        return decodeURIComponent(
+          globalThis.location.hash.replace('#path=', '')
+        );
+      });
+
+      expect(currentPath).toBe('/Applications/Utilities');
+    });
   });
 });

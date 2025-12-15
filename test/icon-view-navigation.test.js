@@ -610,7 +610,17 @@ describe('Icon view keyboard navigation', () => {
     await page.keyboard.press('Meta+a');
     await page.keyboard.type('test-rename-file-renamed.txt');
     await page.keyboard.press('Enter');
-    await page.waitForTimeout(2000);
+
+    // Wait for the renamed file to appear (changePath is
+    //   called, then 1000ms delay before selection)
+    await page.waitForSelector(
+      'p[data-path*="test-rename-file-renamed.txt"]',
+      {timeout: 5000}
+    );
+
+    // Wait additional time for the selection to be
+    //   applied (the code has a 1000ms setTimeout)
+    await page.waitForTimeout(1500);
 
     // Check that file was renamed and is still selected
     const renameDebug = await page.evaluate(() => {
@@ -729,10 +739,16 @@ describe('Icon view keyboard navigation', () => {
       await page.keyboard.type('test-oncomplete-renamed.txt');
       await page.keyboard.press('Enter');
 
+      // Wait for the renamed file to appear in the DOM
+      await page.waitForSelector(
+        'p[data-path*="test-oncomplete-renamed.txt"]',
+        {timeout: 5000}
+      );
+
       // Wait for rename to complete and onComplete to be called
       // The onComplete is called after 100ms timeout following the 1000ms
       // reselection timeout
-      await page.waitForTimeout(2500);
+      await page.waitForTimeout(1500);
 
       // Check if onComplete was called (covers lines 285-286)
       const result = await page.evaluate(() => {

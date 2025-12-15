@@ -188,5 +188,111 @@ describe('Gallery View', () => {
     selectedBtn = await page.locator('#gallery-view.selected');
     expect(selectedBtn).toBeVisible();
   });
+
+  test('Cmd+O in gallery view dispatches dblclick on folder', async () => {
+    // Navigate to a directory with folders
+    await page.evaluate(() => {
+      globalThis.location.hash = '#path=/Users';
+    });
+    await page.waitForTimeout(500);
+
+    // Switch to gallery view
+    await page.locator('#gallery-view').click();
+    await page.waitForTimeout(500);
+
+    // Wait for items to load
+    await page.waitForFunction(() => {
+      const cells = document.querySelectorAll('td.list-item');
+      return cells.length > 0;
+    }, {timeout: 5000});
+
+    // Find and select a folder (has an 'a' element with href)
+    const folderCell = await page.locator(
+      'td.list-item:has(a[href^="#path="])'
+    ).first();
+
+    if (await folderCell.count() > 0) {
+      // Click to select the folder
+      await folderCell.click();
+      await page.waitForTimeout(300);
+
+      // Get the folder path before triggering Cmd+O
+      const folderPath = await folderCell.evaluate((el) => {
+        const link = el.querySelector('a[href^="#path="]');
+        return link ? link.getAttribute('href') : null;
+      });
+
+      // Focus the table for keyboard events
+      await page.locator('table[data-base-path]').focus();
+
+      // Press Cmd+O to trigger navigation (covers line 1088-1089)
+      await page.keyboard.press('Meta+o');
+      await page.waitForTimeout(500);
+
+      // Verify navigation occurred
+      const currentHash = await page.evaluate(() => {
+        return globalThis.location.hash;
+      });
+
+      expect(currentHash).toBe(folderPath);
+    }
+  });
+
+  test('should switch to gallery view with Cmd+4', async () => {
+    // Start in icon view
+    await page.click('#icon-view');
+    await page.waitForTimeout(500);
+
+    // Switch to gallery-view with Cmd+4 (covers lines 2084-2086)
+    await page.keyboard.press('Meta+4');
+    await page.waitForTimeout(500);
+
+    // Check that gallery-view is selected
+    const galleryViewSelected = await page.evaluate(() => {
+      return document.querySelector('#gallery-view')?.classList.
+        contains('selected');
+    });
+    expect(galleryViewSelected).toBe(true);
+
+    // Verify we're actually in gallery view
+    const isGalleryView = await page.evaluate(() => {
+      const galleryDiv = document.querySelector('.gallery');
+      return galleryDiv !== null;
+    });
+    expect(isGalleryView).toBe(true);
+  });
+
+  test(
+    'gallery-view button has selected class on load when view is gallery-view',
+    async () => {
+      // Set gallery-view in storage before page loads
+      //   (using electronAPI.storage)
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        globalThis.electronAPI.storage.setItem('view', 'gallery-view');
+      });
+
+      // Reload the page to trigger initialization with gallery-view
+      await page.reload();
+      await page.waitForTimeout(1000);
+
+      // Wait for the gallery-view button to be ready
+      await page.waitForSelector('#gallery-view', {timeout: 5000});
+
+      // Check that gallery-view button is selected on load (covers line 2126)
+      const galleryViewSelected = await page.evaluate(() => {
+        return document.querySelector('#gallery-view')?.classList.
+          contains('selected');
+      });
+      expect(galleryViewSelected).toBe(true);
+
+      // Verify we're actually in gallery view
+      const isGalleryView = await page.evaluate(() => {
+        const galleryDiv = document.querySelector('.gallery');
+        return galleryDiv !== null;
+      });
+      expect(isGalleryView).toBe(true);
+    }
+  );
 });
 
