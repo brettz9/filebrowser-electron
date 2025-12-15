@@ -68,6 +68,7 @@ export function middleEllipsis (elems) {
 
     const {offsetWidth} = elm;
     const widthChanged = !mapped || elementWidth !== offsetWidth;
+    /* c8 ignore next 3 -- Just caching */
     if (mapped && widthChanged) {
       mapped.elementWidth = elementWidth = offsetWidth;
     }

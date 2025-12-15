@@ -19,6 +19,12 @@ nav button.selected {
   width: 250px;
 }
 
+div.gallery {
+  overflow: scroll !important;
+  height: 350px;
+  width: 750px;
+}
+
 .miller-selected {
   background-color: #0078d4 !important;
   color: white !important;

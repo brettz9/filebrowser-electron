@@ -37,6 +37,7 @@ try {
  */
 export function deleteItem (itemPath) {
   // Prevent multiple simultaneous deletions
+  /* c8 ignore next 3 -- Guard */
   if (isDeleting) {
     return;
   }

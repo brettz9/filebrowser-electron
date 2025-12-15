@@ -25,6 +25,7 @@ export function createNewFolder (
   folderPath
 ) {
   // Prevent double-creation if already in progress
+  /* c8 ignore next -- Guard */
   if (isCreating) {
     return;
   }

@@ -1766,6 +1766,104 @@ describe('renderer', () => {
       });
     });
 
+    test('should copy and paste a folder using context menu', async () => {
+      // Create test folders
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const sourceFolder = path.join('/tmp', 'copy-source-folder');
+        const targetFolder = path.join('/tmp', 'copy-target-folder');
+        const testFile = path.join(sourceFolder, 'nested-file.txt');
+        fs.mkdirSync(sourceFolder, {recursive: true});
+        fs.mkdirSync(targetFolder, {recursive: true});
+        fs.writeFileSync(testFile, 'nested content for copy');
+      });
+
+      // Switch to three-columns view and navigate
+      await page.locator('#three-columns').click();
+      await page.waitForTimeout(500);
+
+      await page.evaluate(() => {
+        globalThis.location.hash = '#path=/tmp';
+      });
+      await page.waitForTimeout(1000);
+
+      // Right-click on source folder
+      const sourceFolderElement = page.locator(
+        'a[data-path="/tmp/copy-source-folder"]'
+      );
+      await sourceFolderElement.click({button: 'right'});
+      await page.waitForTimeout(100);
+
+      // Click Copy from context menu (covers lines 87-89)
+      const copyMenuItem = page.locator(
+        '.context-menu-item',
+        {hasText: 'Copy'}
+      );
+      await expect(copyMenuItem).toBeVisible();
+      await copyMenuItem.click();
+      await page.waitForTimeout(100);
+
+      // Right-click on target folder and paste
+      const targetFolderElement = page.locator(
+        'a[data-path="/tmp/copy-target-folder"]'
+      );
+      await targetFolderElement.click({button: 'right'});
+      await page.waitForTimeout(100);
+
+      const pasteMenuItem = page.locator(
+        '.context-menu-item',
+        {hasText: 'Paste'}
+      );
+      await expect(pasteMenuItem).toBeVisible();
+      await pasteMenuItem.click();
+      await page.waitForTimeout(500);
+
+      // Verify folder was copied (both original and copy exist)
+      const verification = await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        const copiedFolder = path.join(
+          '/tmp',
+          'copy-target-folder',
+          'copy-source-folder'
+        );
+        const copiedFile = path.join(copiedFolder, 'nested-file.txt');
+        const originalFolder = path.join('/tmp', 'copy-source-folder');
+        const originalFile = path.join(originalFolder, 'nested-file.txt');
+        return {
+          copiedFolderExists: fs.existsSync(copiedFolder),
+          copiedFileExists: fs.existsSync(copiedFile),
+          originalFolderExists: fs.existsSync(originalFolder),
+          originalFileExists: fs.existsSync(originalFile),
+          copiedContent: fs.existsSync(copiedFile)
+            ? fs.readFileSync(copiedFile, 'utf8')
+            : ''
+        };
+      });
+      expect(verification.copiedFolderExists).toBe(true);
+      expect(verification.copiedFileExists).toBe(true);
+      expect(verification.originalFolderExists).toBe(true);
+      expect(verification.originalFileExists).toBe(true);
+      expect(verification.copiedContent).toBe('nested content for copy');
+
+      // Cleanup
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI available
+        const {fs, path} = globalThis.electronAPI;
+        try {
+          fs.rmSync(
+            path.join('/tmp', 'copy-target-folder'),
+            {recursive: true, force: true}
+          );
+          fs.rmSync(
+            path.join('/tmp', 'copy-source-folder'),
+            {recursive: true, force: true}
+          );
+        } catch {}
+      });
+    });
+
     test(
       'should show paste option only when clipboard has content',
       async () => {

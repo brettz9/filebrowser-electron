@@ -14333,6 +14333,7 @@
 
 	    const {offsetWidth} = elm;
 	    const widthChanged = !mapped || elementWidth !== offsetWidth;
+	    /* c8 ignore next 3 -- Just caching */
 	    if (mapped && widthChanged) {
 	      mapped.elementWidth = elementWidth = offsetWidth;
 	    }
@@ -27101,6 +27102,7 @@
 	 */
 	function deleteItem (itemPath) {
 	  // Prevent multiple simultaneous deletions
+	  /* c8 ignore next 3 -- Guard */
 	  if (isDeleting) {
 	    return;
 	  }
@@ -28270,6 +28272,7 @@
 	  folderPath
 	) {
 	  // Prevent double-creation if already in progress
+	  /* c8 ignore next -- Guard */
 	  if (isCreating) {
 	    return;
 	  }
@@ -30404,9 +30407,10 @@
 	                }
 	                this.classList.add('selected');
 	                if (view === 'gallery-view') {
-	                  const tableElement = this.parentElement.parentElement;
+	                  const tableContainer =
+	                    this.parentElement.parentElement.parentElement;
 	                  const imgElement =
-	                    tableElement.previousElementSibling.querySelector('img');
+	                    tableContainer.previousElementSibling.querySelector('img');
 	                  const url = await getThumbnail();
 	                  imgElement.src = url;
 	                }
@@ -30521,16 +30525,23 @@
 	            ]]
 	          ]
 	          : []),
-	        [
-	          'table', {dataset: {basePath}},
-	          view === 'gallery-view'
+	        ['div', {
+	          ...(view === 'gallery-view'
+	            ? {
+	              class: 'gallery'
+	            }
+	            : {})
+	        }, [
+	          ['table', {
+	            dataset: {basePath}
+	          }, view === 'gallery-view'
 	            ? [
 	              ['tr', listItems]
 	            ]
 	            : chunk(listItems, numIconColumns).map((innerArr) => {
 	              return ['tr', innerArr];
-	            })
-	        ]
+	            })]
+	        ]]
 	      ])
 	      : listItems)
 	  ]);

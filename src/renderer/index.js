@@ -701,9 +701,10 @@ function addItems (result, basePath, currentBasePath) {
                 }
                 this.classList.add('selected');
                 if (view === 'gallery-view') {
-                  const tableElement = this.parentElement.parentElement;
+                  const tableContainer =
+                    this.parentElement.parentElement.parentElement;
                   const imgElement =
-                    tableElement.previousElementSibling.querySelector('img');
+                    tableContainer.previousElementSibling.querySelector('img');
                   const url = await getThumbnail();
                   imgElement.src = url;
                 }
@@ -818,16 +819,23 @@ function addItems (result, basePath, currentBasePath) {
             ]]
           ]
           : []),
-        [
-          'table', {dataset: {basePath}},
-          view === 'gallery-view'
+        ['div', {
+          ...(view === 'gallery-view'
+            ? {
+              class: 'gallery'
+            }
+            : {})
+        }, [
+          ['table', {
+            dataset: {basePath}
+          }, view === 'gallery-view'
             ? [
               ['tr', listItems]
             ]
             : chunk(listItems, numIconColumns).map((innerArr) => {
               return ['tr', innerArr];
-            })
-        ]
+            })]
+        ]]
       ])
       : listItems)
   ]);
