@@ -90,6 +90,7 @@ let mouseIsDown = false;
 let hoverOpenTimer = null;
 let currentHoverTarget = null;
 let clickTimer = null;
+let lastSelectedItemPath = null;
 
 // Track mouse button state globally
 document.addEventListener('mousedown', () => {
@@ -674,7 +675,7 @@ function addItems (result, basePath, currentBasePath) {
         $on: {
           ...(view === 'icon-view' || view === 'gallery-view'
             ? {
-              click: [async function (e) {
+              click: [function (e) {
                 /**
                  * @returns {Promise<string>}
                  */
@@ -692,6 +693,9 @@ function addItems (result, basePath, currentBasePath) {
                   );
                 }
                 e.preventDefault();
+
+                // Save the selected item path for restoration after refresh
+                lastSelectedItemPath = basePath + encodeURIComponent(title);
 
                 // Apply highlighting immediately
                 const prevSelected =
@@ -714,8 +718,8 @@ function addItems (result, basePath, currentBasePath) {
                   clickTimer = setTimeout(async () => {
                     const tableContainer =
                       this.parentElement.parentElement.parentElement;
-                    const imgElement =
-                      tableContainer.previousElementSibling.querySelector('img');
+                    const imgElement = tableContainer.
+                      previousElementSibling.querySelector('img');
                     const url = await getThumbnail();
                     imgElement.src = url;
                     clickTimer = null;
@@ -723,7 +727,8 @@ function addItems (result, basePath, currentBasePath) {
                 }
               }, true],
               dblclick: [function () {
-                // Clear the click timer to prevent thumbnail update on double-click
+                // Clear the click timer to prevent thumbnail
+                //   update on double-click
                 if (clickTimer) {
                   clearTimeout(clickTimer);
                   clickTimer = null;
@@ -964,6 +969,71 @@ function addItems (result, basePath, currentBasePath) {
       // @ts-expect-error Custom property
       cellEl._dblclickHandler = dblclickHandler;
     });
+
+    // Restore previously selected item after refresh
+    if (lastSelectedItemPath) {
+      const cellToSelect = [...cells].find((cell) => {
+        const cellEl = /** @type {HTMLElement} */ (cell);
+        const link = cellEl.querySelector('a, p');
+        if (link) {
+          const linkEl = /** @type {HTMLElement} */ (link);
+          return linkEl.dataset.path === lastSelectedItemPath;
+        }
+        return false;
+      });
+
+      if (cellToSelect) {
+        const cellEl = /** @type {HTMLElement} */ (cellToSelect);
+        // Remove any other selections first
+        const prevSelected = iconViewTable.querySelector(
+          'td.list-item.selected'
+        );
+        if (prevSelected) {
+          prevSelected.classList.remove('selected');
+        }
+        // Apply selection
+        cellEl.classList.add('selected');
+
+        // For gallery view, also update the preview image
+        if (view === 'gallery-view') {
+          const link = cellEl.querySelector('a, p');
+          if (link) {
+            const linkEl = /** @type {HTMLElement} */ (link);
+            const itemPath = linkEl.dataset.path;
+            if (itemPath) {
+              const decodedPath = decodeURIComponent(itemPath);
+              const isFolder = linkEl.tagName === 'A';
+
+              // Get appropriate thumbnail and update immediately
+              (async () => {
+                const url = isFolder
+                  ? await getXLargeIconDataURLForFile(decodedPath)
+                  : await globalThis.electronAPI.getFileThumbnail(
+                    decodedPath, 512
+                  ) || await getXLargeIconDataURLForFile(decodedPath);
+
+                // Use same DOM traversal as click handler
+                const tableContainer =
+                  cellEl.parentElement.parentElement.parentElement;
+                const imgElement =
+                  tableContainer.previousElementSibling?.querySelector('img');
+                if (imgElement && url) {
+                  imgElement.src = url;
+                }
+              /* c8 ignore next 9 -- Error handler */
+              })().catch(
+                // eslint-disable-next-line @stylistic/max-len -- Long
+                // eslint-disable-next-line promise/prefer-await-to-callbacks -- Catching block
+                (err) => {
+                  // eslint-disable-next-line no-console -- Error logging
+                  console.error('Failed to load gallery preview:', err);
+                }
+              );
+            }
+          }
+        }
+      }
+    }
 
     // Add new keydown listener
     let typeaheadBuffer = '';
