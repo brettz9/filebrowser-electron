@@ -238,13 +238,13 @@ export function startRename (
         } else {
           // For icon/gallery/list view, set the renamed path for reselection
           const encodedNewPath = parentPath + '/' + encodeURIComponent(newName);
-          
+
           // Set the path to reselect after refresh via global setter
-          if (typeof globalThis !== 'undefined' && 
+          if (typeof globalThis !== 'undefined' &&
               globalThis.setLastSelectedItemPath) {
             globalThis.setLastSelectedItemPath(encodedNewPath);
           }
-          
+
           // Manually refresh
           changePath();
 

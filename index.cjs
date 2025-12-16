@@ -28093,13 +28093,13 @@
 	        } else {
 	          // For icon/gallery/list view, set the renamed path for reselection
 	          const encodedNewPath = parentPath + '/' + encodeURIComponent(newName);
-	          
+
 	          // Set the path to reselect after refresh via global setter
-	          if (typeof globalThis !== 'undefined' && 
+	          if (typeof globalThis !== 'undefined' &&
 	              globalThis.setLastSelectedItemPath) {
 	            globalThis.setLastSelectedItemPath(encodedNewPath);
 	          }
-	          
+
 	          // Manually refresh
 	          changePath();
 
@@ -31245,13 +31245,24 @@
 	      {id: 'version', label: 'Version', width: '100px',
 	        visible: false, sortable: true},
 	      {id: 'comments', label: 'Comments', width: '200px',
-	        visible: false, sortable: false}
+	        visible: false, sortable: true}
 	    ];
 
 	    const storedColumns = localStorage.getItem('list-view-columns');
-	    const columns = storedColumns
+	    let columns = storedColumns
 	      ? JSON.parse(storedColumns)
 	      : defaultColumns;
+	    
+	    // Update sortable property from defaults (in case defaults changed)
+	    if (storedColumns) {
+	      columns = columns.map((col) => {
+	        const defaultCol = defaultColumns.find((dc) => dc.id === col.id);
+	        if (defaultCol && defaultCol.sortable !== col.sortable) {
+	          return {...col, sortable: defaultCol.sortable};
+	        }
+	        return col;
+	      });
+	    }
 
 	    // Get sorting state
 	    const storedSort = localStorage.getItem('list-view-sort');
@@ -31343,6 +31354,11 @@
 	          sensitivity: 'base'
 	        });
 	        break;
+	      case 'comments':
+	        comparison = (a.comments || '').localeCompare(b.comments || '', undefined, {
+	          sensitivity: 'base'
+	        });
+	        break;
 	      }
 
 	      return sortDirection === 'asc' ? comparison : -comparison;
@@ -31415,27 +31431,47 @@
 	      try {
 	        if (needsKind && item.kind === null) {
 	          item.kind = getFileKind(item.itemPath);
+	          console.log('[loadMetadata] kind for', item.title, ':', item.kind);
 	        }
 	        if (needsMetadata) {
 	          const metadata = getFileMetadata(item.itemPath);
+	          console.log('[loadMetadata] metadata for', item.title, ':', metadata);
 	          if (needsDateOpened && item.dateOpened === null) {
-	            item.dateOpened = metadata.ItemLastUsedDate || 0;
+	            // ItemLastUsedDate can be a Date object or string, convert to timestamp
+	            const dateOpened = metadata.ItemLastUsedDate;
+	            if (dateOpened instanceof Date) {
+	              item.dateOpened = dateOpened.getTime();
+	            } else if (typeof dateOpened === 'string' && dateOpened) {
+	              item.dateOpened = new Date(dateOpened).getTime();
+	            } else {
+	              item.dateOpened = 0;
+	            }
+	            console.log('[loadMetadata] dateOpened for', item.title, ':', item.dateOpened);
 	          }
 	          if (needsVersion && item.version === null) {
 	            item.version = metadata.ItemVersion || '';
+	            console.log('[loadMetadata] version for', item.title, ':', item.version);
 	          }
 	          if (needsComments && item.comments === null) {
-	            item.comments = metadata.Comment || '';
+	            item.comments = metadata.ItemFinderComment || '';
+	            console.log('[loadMetadata] comments for', item.title, ':', item.comments);
 	          }
 	        }
 	      } catch (err) {
+	        console.error('[loadMetadata] error for', item.title, ':', err);
 	        // Set defaults on error
 	        if (item.kind === null) {
 	          item.kind = item.isDir ? 'Folder' : 'Document';
 	        }
-	        item.dateOpened = item.dateOpened || 0;
-	        item.version = item.version || '';
-	        item.comments = item.comments || '';
+	        if (item.dateOpened === null) {
+	          item.dateOpened = 0;
+	        }
+	        if (item.version === null) {
+	          item.version = '';
+	        }
+	        if (item.comments === null) {
+	          item.comments = '';
+	        }
 	      }
 	    };
 
@@ -31502,20 +31538,20 @@
 	              if ('requestIdleCallback' in globalThis) {
 	                requestIdleCallback(() => {
 	                  loadMetadata(item);
-	                  td.textContent = item.dateOpened
+	                  td.textContent = item.dateOpened && item.dateOpened > 0
 	                    ? getFormattedDate(item.dateOpened)
 	                    : '';
 	                });
 	              } else {
 	                setTimeout(() => {
 	                  loadMetadata(item);
-	                  td.textContent = item.dateOpened
+	                  td.textContent = item.dateOpened && item.dateOpened > 0
 	                    ? getFormattedDate(item.dateOpened)
 	                    : '';
 	                }, 0);
 	              }
 	            } else {
-	              td.textContent = item.dateOpened
+	              td.textContent = item.dateOpened && item.dateOpened > 0
 	                ? getFormattedDate(item.dateOpened)
 	                : '';
 	            }
@@ -31526,13 +31562,17 @@
 	              // Lazy load in idle time
 	              if ('requestIdleCallback' in globalThis) {
 	                requestIdleCallback(() => {
+	                  console.log('[kind callback] loading for', item.title);
 	                  loadMetadata(item);
 	                  td.textContent = item.kind || '';
+	                  console.log('[kind callback] updated td to:', item.kind);
 	                });
 	              } else {
 	                setTimeout(() => {
+	                  console.log('[kind callback] loading for', item.title);
 	                  loadMetadata(item);
 	                  td.textContent = item.kind || '';
+	                  console.log('[kind callback] updated td to:', item.kind);
 	                }, 0);
 	              }
 	            } else {
@@ -31589,7 +31629,7 @@
 	      tr.addEventListener('click', (e) => {
 	        // Save the selected item path for restoration after refresh
 	        lastSelectedItemPath = item.encodedPath;
-	        
+
 	        // Remove previous selection
 	        const prevSelected = tbody.querySelector('tr.selected');
 	        if (prevSelected) {
@@ -31629,7 +31669,7 @@
 	    if (!isCreating) {
 	      const allRows = tbody.querySelectorAll('tr');
 	      let rowToSelect = null;
-	      
+
 	      if (lastSelectedItemPath) {
 	        rowToSelect = [...allRows].find((row) => {
 	          return row.dataset.path === lastSelectedItemPath;
@@ -31663,7 +31703,14 @@
 	      existingPicker.remove();
 	    }
 
-	    columnPickerButton.addEventListener('click', (e) => {
+	    // Remove any existing click listener to avoid duplicates
+	    // @ts-expect-error Custom property
+	    const oldPickerListener = columnPickerButton._pickerClickListener;
+	    if (oldPickerListener) {
+	      columnPickerButton.removeEventListener('click', oldPickerListener);
+	    }
+
+	    const pickerClickListener = (e) => {
 	      e.stopPropagation();
 
 	      // Remove existing picker if present
@@ -31716,7 +31763,12 @@
 	      setTimeout(() => {
 	        document.addEventListener('click', closePickerFn);
 	      }, 0);
-	    });
+	    };
+
+	    columnPickerButton.addEventListener('click', pickerClickListener);
+	    // Store reference for cleanup
+	    // @ts-expect-error Custom property
+	    columnPickerButton._pickerClickListener = pickerClickListener;
 
 	    // Add keyboard support
 	    listViewTable.setAttribute('tabindex', '0');
