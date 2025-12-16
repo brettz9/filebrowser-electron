@@ -1650,10 +1650,15 @@ function addItems (result, basePath, currentBasePath) {
         comparison = a.dateOpened - b.dateOpened;
         break;
       case 'kind':
-        comparison = a.kind.localeCompare(b.kind);
+        comparison = (a.kind || '').localeCompare(b.kind || '', undefined, {
+          sensitivity: 'base'
+        });
         break;
       case 'version':
-        comparison = a.version.localeCompare(b.version);
+        comparison = (a.version || '').localeCompare(b.version || '', undefined, {
+          numeric: true,
+          sensitivity: 'base'
+        });
         break;
       default:
         // comparison already 0
