@@ -32706,6 +32706,10 @@ ${previewContent}
 	  if (e.metaKey && e.key === '1') {
 	    e.preventDefault();
 	    $('#icon-view').click();
+	  } else if (e.metaKey && e.key === '2') {
+	    // Cmd+2 to switch to list view
+	    e.preventDefault();
+	    $('#list-view').click();
 	  } else if (e.metaKey && e.key === '3') {
 	    // Cmd+3 to switch to three-columns view
 	    e.preventDefault();
