@@ -29775,8 +29775,8 @@
 	// Expose setter for lastSelectedItemPath for use by rename operation
 	/* c8 ignore next 6 -- Test/operation helper */
 	if (typeof globalThis !== 'undefined') {
-	  /** @type {unknown} */ (globalThis).setLastSelectedItemPath = (path) => {
-	    lastSelectedItemPath = path;
+	  /** @type {unknown} */ (globalThis).setLastSelectedItemPath = (pth) => {
+	    lastSelectedItemPath = pth;
 	  };
 	}
 
@@ -31349,15 +31349,19 @@
 	        });
 	        break;
 	      case 'version':
-	        comparison = (a.version || '').localeCompare(b.version || '', undefined, {
-	          numeric: true,
-	          sensitivity: 'base'
-	        });
+	        comparison = (a.version || '').localeCompare(
+	          b.version || '', undefined, {
+	            numeric: true,
+	            sensitivity: 'base'
+	          }
+	        );
 	        break;
 	      case 'comments':
-	        comparison = (a.comments || '').localeCompare(b.comments || '', undefined, {
-	          sensitivity: 'base'
-	        });
+	        comparison = (a.comments || '').localeCompare(
+	          b.comments || '', undefined, {
+	            sensitivity: 'base'
+	          }
+	        );
 	        break;
 	      }
 
@@ -31527,7 +31531,7 @@
 	      });
 
 	      // Add click handler for row selection
-	      tr.addEventListener('click', (e) => {
+	      tr.addEventListener('click', () => {
 	        // Save the selected item path for restoration after refresh
 	        lastSelectedItemPath = item.encodedPath;
 
@@ -31600,7 +31604,8 @@
 	    // Batch load metadata for all pending items
 	    if (pendingMetadataItems.length > 0) {
 	      const loadBatchMetadata = () => {
-	        console.log('[batch] Loading metadata for', pendingMetadataItems.length, 'items');
+	        // eslint-disable-next-line @stylistic/max-len -- Long
+	        // console.log('[batch] Loading metadata for', pendingMetadataItems.length, 'items');
 
 	        // Group items by unique paths to avoid duplicate fetches
 	        const uniqueItems = new Map();
@@ -31611,7 +31616,7 @@
 	          uniqueItems.get(item.itemPath).cells.push({td, field});
 	        }
 
-	        const itemsArray = Array.from(uniqueItems.entries());
+	        const itemsArray = [...uniqueItems.entries()];
 	        const CHUNK_SIZE = 5; // Process 5 items at a time
 	        let currentIndex = 0;
 
@@ -31619,7 +31624,7 @@
 	          // Process items while we have time or until chunk is done
 	          while (currentIndex < itemsArray.length &&
 	                 (deadline.timeRemaining() > 0 || deadline.didTimeout)) {
-	            const [itemPath, {item, cells}] = itemsArray[currentIndex];
+	            const [/* itemPath */, {item, cells}] = itemsArray[currentIndex];
 	            currentIndex++;
 
 	            if (item._metadataLoaded) {
@@ -31659,7 +31664,8 @@
 
 	                if (needsDateOpened && item.dateOpened === null) {
 	                  const dateOpened = metadata.ItemLastUsedDate;
-	                  if (dateOpened instanceof Date) {
+	                  if (dateOpened && typeof dateOpened === 'object' &&
+	                    'getTime' in dateOpened) {
 	                    item.dateOpened = dateOpened.getTime();
 	                  } else if (typeof dateOpened === 'string' && dateOpened) {
 	                    item.dateOpened = new Date(dateOpened).getTime();
@@ -31694,10 +31700,14 @@
 	                case 'comments':
 	                  td.textContent = item.comments || '';
 	                  break;
+	                /* c8 ignore next 3 -- Guard */
+	                default:
+	                  break;
 	                }
 	              });
 	            } catch (err) {
-	              console.error('[batch] Error loading metadata for', item.title, ':', err);
+	              // eslint-disable-next-line @stylistic/max-len -- Long
+	              // console.error('[batch] Error loading metadata for', item.title, ':', err);
 	              // Set defaults on error
 	              if (item.kind === null) {
 	                item.kind = item.isDir ? 'Folder' : 'Document';
@@ -31742,9 +31752,12 @@
 	            if ('requestIdleCallback' in globalThis) {
 	              requestIdleCallback(processChunk, {timeout: 100});
 	            } else {
-	              setTimeout(() => processChunk({timeRemaining: () => 50, didTimeout: false}), 0);
+	              setTimeout(() => processChunk({
+	                timeRemaining: () => 50, didTimeout: false
+	              }), 0);
 	            }
 	          } else {
+	            // eslint-disable-next-line no-console -- Debugging
 	            console.log('[batch] Metadata loading complete');
 	          }
 	        };
@@ -31753,7 +31766,9 @@
 	        if ('requestIdleCallback' in globalThis) {
 	          requestIdleCallback(processChunk, {timeout: 100});
 	        } else {
-	          setTimeout(() => processChunk({timeRemaining: () => 50, didTimeout: false}), 0);
+	          setTimeout(() => processChunk({
+	            timeRemaining: () => 50, didTimeout: false
+	          }), 0);
 	        }
 	      };
 

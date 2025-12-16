@@ -4,8 +4,8 @@
   browser performance; otherwise becomes jarring */
 
 // eslint-disable-next-line @stylistic/max-len -- Long
-// eslint-disable-next-line n/no-unpublished-import -- electron-forge requires electron as devDep.
-import {app, BrowserWindow, ipcMain} from 'electron';
+// eslint-disable-next-line no-shadow, n/no-unpublished-import -- electron-forge requires electron as devDep.
+import {screen, app, BrowserWindow, ipcMain} from 'electron';
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -229,9 +229,11 @@ function createWindow () {
     new URL('preload.cjs', import.meta.url)
   );
 
+  const {width, height} = screen.getPrimaryDisplay().workAreaSize;
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 800, height: 600,
+    // width: 800, height: 600,
+    width, height,
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
