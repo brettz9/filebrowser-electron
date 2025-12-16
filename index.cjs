@@ -30654,6 +30654,11 @@
 
 	        // Add selection to clicked cell
 	        cellEl.classList.add('selected');
+
+	        // Update gallery preview if in gallery view
+	        if (view === 'gallery-view') {
+	          updateGalleryPreview(cellEl);
+	        }
 	      };
 	      cellEl.addEventListener('click', clickHandler);
 	      // @ts-expect-error Custom property
@@ -30724,6 +30729,7 @@
 	            ['-name', 'kMDItemContentType', '-raw', decodedPath],
 	            {encoding: 'utf8'}
 	          );
+	          /* c8 ignore next -- Guard */
 	          const uti = utiResult.stdout?.trim() || '';
 
 	          // Text-based files preview
