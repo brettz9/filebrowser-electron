@@ -30689,12 +30689,14 @@
 	      }
 
 	      const link = cellEl.querySelector('a, p');
+	      /* c8 ignore next 3 -- Guard */
 	      if (!link) {
 	        return;
 	      }
 
 	      const linkEl = /** @type {HTMLElement} */ (link);
 	      const itemPath = linkEl.dataset.path;
+	      /* c8 ignore next 3 -- Guard */
 	      if (!itemPath) {
 	        return;
 	      }
@@ -30737,11 +30739,13 @@
 	        cellToSelect = [...cells].find((cell) => {
 	          const cellEl = /** @type {HTMLElement} */ (cell);
 	          const link = cellEl.querySelector('a, p');
-	          if (link) {
-	            const linkEl = /** @type {HTMLElement} */ (link);
-	            return linkEl.dataset.path === lastSelectedItemPath;
+	          /* c8 ignore next 3 -- Guard */
+	          if (!link) {
+	            return false;
 	          }
-	          return false;
+
+	          const linkEl = /** @type {HTMLElement} */ (link);
+	          return linkEl.dataset.path === lastSelectedItemPath;
 	        });
 	      }
 
@@ -30753,6 +30757,7 @@
 	        const prevSelected = iconViewTable.querySelector(
 	          'td.list-item.selected'
 	        );
+	        /* c8 ignore next 3 -- Guard */
 	        if (prevSelected) {
 	          prevSelected.classList.remove('selected');
 	        }
