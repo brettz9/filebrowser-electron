@@ -98,6 +98,14 @@ describe('Icon view keyboard navigation', () => {
       await page.click('#icon-view');
       await page.waitForTimeout(500);
 
+      // Remove any auto-selected cell to test the no-selection scenario
+      await page.evaluate(() => {
+        const selected = document.querySelector('td.list-item.selected');
+        if (selected) {
+          selected.classList.remove('selected');
+        }
+      });
+
       // Focus the table WITHOUT selecting any cell
       await page.locator('table[data-base-path]').focus();
 

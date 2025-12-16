@@ -1022,40 +1022,43 @@ function addItems (result, basePath, currentBasePath) {
     };
 
     // Restore previously selected item after refresh
-    let cellToSelect = null;
-    if (lastSelectedItemPath) {
-      cellToSelect = [...cells].find((cell) => {
-        const cellEl = /** @type {HTMLElement} */ (cell);
-        const link = cellEl.querySelector('a, p');
-        if (link) {
-          const linkEl = /** @type {HTMLElement} */ (link);
-          return linkEl.dataset.path === lastSelectedItemPath;
-        }
-        return false;
-      });
-    }
-
-    // If we found the previously selected item, restore it
-    // Otherwise, select the first item
-    if (cellToSelect) {
-      const cellEl = /** @type {HTMLElement} */ (cellToSelect);
-      // Remove any other selections first
-      const prevSelected = iconViewTable.querySelector(
-        'td.list-item.selected'
-      );
-      if (prevSelected) {
-        prevSelected.classList.remove('selected');
+    // Skip auto-selection if creating/renaming (it will handle selection)
+    if (!isCreating) {
+      let cellToSelect = null;
+      if (lastSelectedItemPath) {
+        cellToSelect = [...cells].find((cell) => {
+          const cellEl = /** @type {HTMLElement} */ (cell);
+          const link = cellEl.querySelector('a, p');
+          if (link) {
+            const linkEl = /** @type {HTMLElement} */ (link);
+            return linkEl.dataset.path === lastSelectedItemPath;
+          }
+          return false;
+        });
       }
-      // Apply selection
-      cellEl.classList.add('selected');
 
-      // Update gallery preview if needed
-      updateGalleryPreview(cellEl);
-    } else if (cells.length > 0) {
-      // No previously selected item found, select the first item
-      const firstCell = /** @type {HTMLElement} */ (cells[0]);
-      firstCell.classList.add('selected');
-      updateGalleryPreview(firstCell);
+      // If we found the previously selected item, restore it
+      // Otherwise, select the first item
+      if (cellToSelect) {
+        const cellEl = /** @type {HTMLElement} */ (cellToSelect);
+        // Remove any other selections first
+        const prevSelected = iconViewTable.querySelector(
+          'td.list-item.selected'
+        );
+        if (prevSelected) {
+          prevSelected.classList.remove('selected');
+        }
+        // Apply selection
+        cellEl.classList.add('selected');
+
+        // Update gallery preview if needed
+        updateGalleryPreview(cellEl);
+      } else if (cells.length > 0) {
+        // No previously selected item found, select the first item
+        const firstCell = /** @type {HTMLElement} */ (cells[0]);
+        firstCell.classList.add('selected');
+        updateGalleryPreview(firstCell);
+      }
     }
 
     // Add new keydown listener

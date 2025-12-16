@@ -872,31 +872,19 @@ describe('renderer', () => {
       });
       await page.waitForTimeout(1000);
 
-      // Wait for folders to appear
+      // Wait for folders to appear and for initial auto-selection to complete
       await page.waitForFunction(() => {
         const cells = document.querySelectorAll('td.list-item');
         return cells.length >= 2;
       }, {timeout: 10000});
+      await page.waitForTimeout(500); // Wait for auto-selection to complete
 
-      // Select source-folder by clicking it and marking cell as selected
-      await page.evaluate(() => {
-        const sourceCell = document.querySelector(
-          'td.list-item:has(a[data-path*="source-folder"])'
-        );
-        if (sourceCell) {
-          sourceCell.classList.add('selected');
-        }
-      });
+      // Select source-folder by clicking its cell
+      const sourceCell = await page.locator(
+        'td.list-item:has(a[data-path*="source-folder"])'
+      ).first();
+      await sourceCell.click();
       await page.waitForTimeout(300);
-
-      // Focus the table to ensure keyboard events are captured
-      await page.evaluate(() => {
-        const table = document.querySelector('table[data-base-path]');
-        if (table) {
-          /** @type {HTMLElement} */ (table).focus();
-        }
-      });
-      await page.waitForTimeout(200);
 
       // Cut with Cmd+X
       await page.keyboard.press('Meta+x');
