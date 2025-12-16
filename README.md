@@ -70,10 +70,9 @@ done
 ## To-dos
 
 1. List view
-    1. File metadata fields disappearing after visiting new page with a long delay before repopulated, there appear to be many events triggered
     1. Nested folder opening by grippy click
 
-1. Allow icons to be draggable
+1. Allow icons to be draggable (Sort by None, Sort by Grid) or Sort by Metadata: Name, Kind, Date Last Opened, Date Added, Date Modified, Date Created, Size, Tags)
 
 1. Ideally would allow separate windows and tabs, with menu bar
     1. At such point, ensure key commands (e.g., copy/cut/paste attached to

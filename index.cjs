@@ -31252,7 +31252,7 @@
 	    let columns = storedColumns
 	      ? JSON.parse(storedColumns)
 	      : defaultColumns;
-	    
+
 	    // Update sortable property from defaults (in case defaults changed)
 	    if (storedColumns) {
 	      columns = columns.map((col) => {
@@ -31421,59 +31421,8 @@
 	    );
 	    const needsMetadata = needsDateOpened || needsVersion || needsComments;
 
-	    // Helper to load metadata for an item lazily
-	    const loadMetadata = (item) => {
-	      if (item._metadataLoaded) {
-	        return;
-	      }
-	      item._metadataLoaded = true;
-
-	      try {
-	        if (needsKind && item.kind === null) {
-	          item.kind = getFileKind(item.itemPath);
-	          console.log('[loadMetadata] kind for', item.title, ':', item.kind);
-	        }
-	        if (needsMetadata) {
-	          const metadata = getFileMetadata(item.itemPath);
-	          console.log('[loadMetadata] metadata for', item.title, ':', metadata);
-	          if (needsDateOpened && item.dateOpened === null) {
-	            // ItemLastUsedDate can be a Date object or string, convert to timestamp
-	            const dateOpened = metadata.ItemLastUsedDate;
-	            if (dateOpened instanceof Date) {
-	              item.dateOpened = dateOpened.getTime();
-	            } else if (typeof dateOpened === 'string' && dateOpened) {
-	              item.dateOpened = new Date(dateOpened).getTime();
-	            } else {
-	              item.dateOpened = 0;
-	            }
-	            console.log('[loadMetadata] dateOpened for', item.title, ':', item.dateOpened);
-	          }
-	          if (needsVersion && item.version === null) {
-	            item.version = metadata.ItemVersion || '';
-	            console.log('[loadMetadata] version for', item.title, ':', item.version);
-	          }
-	          if (needsComments && item.comments === null) {
-	            item.comments = metadata.ItemFinderComment || '';
-	            console.log('[loadMetadata] comments for', item.title, ':', item.comments);
-	          }
-	        }
-	      } catch (err) {
-	        console.error('[loadMetadata] error for', item.title, ':', err);
-	        // Set defaults on error
-	        if (item.kind === null) {
-	          item.kind = item.isDir ? 'Folder' : 'Document';
-	        }
-	        if (item.dateOpened === null) {
-	          item.dateOpened = 0;
-	        }
-	        if (item.version === null) {
-	          item.version = '';
-	        }
-	        if (item.comments === null) {
-	          item.comments = '';
-	        }
-	      }
-	    };
+	    // Track items and cells that need metadata updates
+	    const pendingMetadataItems = [];
 
 	    // Build rows
 	    listViewData.forEach((item) => {
@@ -31534,22 +31483,8 @@
 	          case 'dateOpened':
 	            if (item.dateOpened === null) {
 	              td.textContent = '';
-	              // Lazy load in idle time
-	              if ('requestIdleCallback' in globalThis) {
-	                requestIdleCallback(() => {
-	                  loadMetadata(item);
-	                  td.textContent = item.dateOpened && item.dateOpened > 0
-	                    ? getFormattedDate(item.dateOpened)
-	                    : '';
-	                });
-	              } else {
-	                setTimeout(() => {
-	                  loadMetadata(item);
-	                  td.textContent = item.dateOpened && item.dateOpened > 0
-	                    ? getFormattedDate(item.dateOpened)
-	                    : '';
-	                }, 0);
-	              }
+	              td.dataset.needsMetadata = 'dateOpened';
+	              pendingMetadataItems.push({item, td, field: 'dateOpened'});
 	            } else {
 	              td.textContent = item.dateOpened && item.dateOpened > 0
 	                ? getFormattedDate(item.dateOpened)
@@ -31559,22 +31494,8 @@
 	          case 'kind':
 	            if (item.kind === null) {
 	              td.textContent = item.isDir ? 'Folder' : '';
-	              // Lazy load in idle time
-	              if ('requestIdleCallback' in globalThis) {
-	                requestIdleCallback(() => {
-	                  console.log('[kind callback] loading for', item.title);
-	                  loadMetadata(item);
-	                  td.textContent = item.kind || '';
-	                  console.log('[kind callback] updated td to:', item.kind);
-	                });
-	              } else {
-	                setTimeout(() => {
-	                  console.log('[kind callback] loading for', item.title);
-	                  loadMetadata(item);
-	                  td.textContent = item.kind || '';
-	                  console.log('[kind callback] updated td to:', item.kind);
-	                }, 0);
-	              }
+	              td.dataset.needsMetadata = 'kind';
+	              pendingMetadataItems.push({item, td, field: 'kind'});
 	            } else {
 	              td.textContent = item.kind;
 	            }
@@ -31582,18 +31503,8 @@
 	          case 'version':
 	            if (item.version === null) {
 	              td.textContent = '';
-	              // Lazy load in idle time
-	              if ('requestIdleCallback' in globalThis) {
-	                requestIdleCallback(() => {
-	                  loadMetadata(item);
-	                  td.textContent = item.version || '';
-	                });
-	              } else {
-	                setTimeout(() => {
-	                  loadMetadata(item);
-	                  td.textContent = item.version || '';
-	                }, 0);
-	              }
+	              td.dataset.needsMetadata = 'version';
+	              pendingMetadataItems.push({item, td, field: 'version'});
 	            } else {
 	              td.textContent = item.version;
 	            }
@@ -31601,18 +31512,8 @@
 	          case 'comments':
 	            if (item.comments === null) {
 	              td.textContent = '';
-	              // Lazy load in idle time
-	              if ('requestIdleCallback' in globalThis) {
-	                requestIdleCallback(() => {
-	                  loadMetadata(item);
-	                  td.textContent = item.comments || '';
-	                });
-	              } else {
-	                setTimeout(() => {
-	                  loadMetadata(item);
-	                  td.textContent = item.comments || '';
-	                }, 0);
-	              }
+	              td.dataset.needsMetadata = 'comments';
+	              pendingMetadataItems.push({item, td, field: 'comments'});
 	            } else {
 	              td.textContent = item.comments;
 	            }
@@ -31694,6 +31595,169 @@
 	        // No previously selected item found, select the first item
 	        allRows[0].classList.add('selected');
 	      }
+	    }
+
+	    // Batch load metadata for all pending items
+	    if (pendingMetadataItems.length > 0) {
+	      const loadBatchMetadata = () => {
+	        console.log('[batch] Loading metadata for', pendingMetadataItems.length, 'items');
+
+	        // Group items by unique paths to avoid duplicate fetches
+	        const uniqueItems = new Map();
+	        for (const {item, td, field} of pendingMetadataItems) {
+	          if (!uniqueItems.has(item.itemPath)) {
+	            uniqueItems.set(item.itemPath, {item, cells: []});
+	          }
+	          uniqueItems.get(item.itemPath).cells.push({td, field});
+	        }
+
+	        const itemsArray = Array.from(uniqueItems.entries());
+	        const CHUNK_SIZE = 5; // Process 5 items at a time
+	        let currentIndex = 0;
+
+	        const processChunk = (deadline) => {
+	          // Process items while we have time or until chunk is done
+	          while (currentIndex < itemsArray.length && 
+	                 (deadline.timeRemaining() > 0 || deadline.didTimeout)) {
+	            const [itemPath, {item, cells}] = itemsArray[currentIndex];
+	            currentIndex++;
+
+	            if (item._metadataLoaded) {
+	              // Already loaded, just update cells
+	              cells.forEach(({td, field}) => {
+	                switch (field) {
+	                case 'kind':
+	                  td.textContent = item.kind || '';
+	                  break;
+	                case 'dateOpened':
+	                  td.textContent = item.dateOpened && item.dateOpened > 0
+	                    ? getFormattedDate(item.dateOpened)
+	                    : '';
+	                  break;
+	                case 'version':
+	                  td.textContent = item.version || '';
+	                  break;
+	                case 'comments':
+	                  td.textContent = item.comments || '';
+	                  break;
+	                }
+	              });
+	              continue;
+	            }
+
+	            item._metadataLoaded = true;
+
+	            try {
+	              // Load kind if needed
+	              if (needsKind && item.kind === null) {
+	                item.kind = getFileKind(item.itemPath);
+	              }
+
+	              // Load other metadata if needed
+	              if (needsMetadata) {
+	                const metadata = getFileMetadata(item.itemPath);
+
+	                if (needsDateOpened && item.dateOpened === null) {
+	                  const dateOpened = metadata.ItemLastUsedDate;
+	                  if (dateOpened instanceof Date) {
+	                    item.dateOpened = dateOpened.getTime();
+	                  } else if (typeof dateOpened === 'string' && dateOpened) {
+	                    item.dateOpened = new Date(dateOpened).getTime();
+	                  } else {
+	                    item.dateOpened = 0;
+	                  }
+	                }
+
+	                if (needsVersion && item.version === null) {
+	                  item.version = metadata.ItemVersion || '';
+	                }
+
+	                if (needsComments && item.comments === null) {
+	                  item.comments = metadata.ItemFinderComment || '';
+	                }
+	              }
+
+	              // Update all cells for this item
+	              cells.forEach(({td, field}) => {
+	                switch (field) {
+	                case 'kind':
+	                  td.textContent = item.kind || '';
+	                  break;
+	                case 'dateOpened':
+	                  td.textContent = item.dateOpened && item.dateOpened > 0
+	                    ? getFormattedDate(item.dateOpened)
+	                    : '';
+	                  break;
+	                case 'version':
+	                  td.textContent = item.version || '';
+	                  break;
+	                case 'comments':
+	                  td.textContent = item.comments || '';
+	                  break;
+	                }
+	              });
+	            } catch (err) {
+	              console.error('[batch] Error loading metadata for', item.title, ':', err);
+	              // Set defaults on error
+	              if (item.kind === null) {
+	                item.kind = item.isDir ? 'Folder' : 'Document';
+	              }
+	              if (item.dateOpened === null) {
+	                item.dateOpened = 0;
+	              }
+	              if (item.version === null) {
+	                item.version = '';
+	              }
+	              if (item.comments === null) {
+	                item.comments = '';
+	              }
+
+	              // Update cells with defaults
+	              cells.forEach(({td, field}) => {
+	                switch (field) {
+	                case 'kind':
+	                  td.textContent = item.kind || '';
+	                  break;
+	                case 'dateOpened':
+	                  td.textContent = '';
+	                  break;
+	                case 'version':
+	                  td.textContent = '';
+	                  break;
+	                case 'comments':
+	                  td.textContent = '';
+	                  break;
+	                }
+	              });
+	            }
+
+	            // Break after processing chunk size, even if we have time
+	            if (currentIndex % CHUNK_SIZE === 0) {
+	              break;
+	            }
+	          }
+
+	          // Schedule next chunk if there are more items
+	          if (currentIndex < itemsArray.length) {
+	            if ('requestIdleCallback' in globalThis) {
+	              requestIdleCallback(processChunk, {timeout: 100});
+	            } else {
+	              setTimeout(() => processChunk({timeRemaining: () => 50, didTimeout: false}), 0);
+	            }
+	          } else {
+	            console.log('[batch] Metadata loading complete');
+	          }
+	        };
+
+	        // Start processing
+	        if ('requestIdleCallback' in globalThis) {
+	          requestIdleCallback(processChunk, {timeout: 100});
+	        } else {
+	          setTimeout(() => processChunk({timeRemaining: () => 50, didTimeout: false}), 0);
+	        }
+	      };
+
+	      loadBatchMetadata();
 	    }
 
 	    // Column picker
