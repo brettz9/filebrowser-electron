@@ -120,6 +120,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   spawnSync: (...args) => spawnSync(...args),
   getFileMetadata: (filePath) => {
+    // Use native binding if available for better performance
+    if (mdlsNative && mdlsNative.mdlsSync) {
+      try {
+        const metadata = mdlsNative.mdlsSync(
+          filePath,
+          '-name kMDItemLastUsedDate -name kMDItemDateAdded ' +
+          '-name kMDItemVersion -name kMDItemFinderComment ' +
+          '-name kMDItemCopyright -name kMDItemWhereFroms'
+        );
+
+        return metadata;
+      } catch (err) {
+        console.log('Native metadata fetch failed, falling back:', err);
+      }
+    }
+
+    // Fallback to spawning mdls process
     // Get Finder comment from extended attributes (more reliable than Spotlight)
     let finderComment = null;
     try {

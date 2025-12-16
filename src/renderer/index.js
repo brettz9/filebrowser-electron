@@ -502,6 +502,32 @@ function addItems (result, basePath, currentBasePath) {
 
   $('i').hidden = true;
 
+  // Show/hide view containers based on current view
+  const iconOrGalleryView = $('.icon-or-gallery-view');
+  const millerColumnsContainer = $('.miller-columns-container');
+  const listView = $('.list-view');
+
+  switch (view) {
+  case 'icon-view':
+  case 'gallery-view':
+    iconOrGalleryView.style.display = 'block';
+    millerColumnsContainer.style.display = 'none';
+    listView.style.display = 'none';
+    break;
+  case 'three-columns':
+    iconOrGalleryView.style.display = 'none';
+    millerColumnsContainer.style.display = 'block';
+    listView.style.display = 'none';
+    break;
+  case 'list-view':
+    iconOrGalleryView.style.display = 'none';
+    millerColumnsContainer.style.display = 'none';
+    listView.style.display = 'block';
+    break;
+  default:
+    break;
+  }
+
   const ulMiller = $('.miller-columns ul');
   while (ulMiller.firstChild) {
     ulMiller.firstChild.remove();
@@ -1512,6 +1538,599 @@ function addItems (result, basePath, currentBasePath) {
     return;
   }
 
+  // List view implementation
+  if (view === 'list-view') {
+    // Update breadcrumbs for list view
+    updateBreadcrumbs(currentBasePath);
+
+    // Get or initialize column configuration
+    const defaultColumns = [
+      {id: 'icon', label: '', width: '40px',
+        visible: true, sortable: false},
+      {id: 'name', label: 'Name', width: 'auto',
+        visible: true, sortable: true},
+      {id: 'dateModified', label: 'Date Modified', width: '180px',
+        visible: true, sortable: true},
+      {id: 'dateCreated', label: 'Date Created', width: '180px',
+        visible: true, sortable: true},
+      {id: 'size', label: 'Size', width: '100px',
+        visible: true, sortable: true},
+      {id: 'kind', label: 'Kind', width: '150px',
+        visible: true, sortable: true},
+      {id: 'dateOpened', label: 'Date Last Opened', width: '180px',
+        visible: false, sortable: true},
+      {id: 'version', label: 'Version', width: '100px',
+        visible: false, sortable: true},
+      {id: 'comments', label: 'Comments', width: '200px',
+        visible: false, sortable: false}
+    ];
+
+    const storedColumns = localStorage.getItem('list-view-columns');
+    const columns = storedColumns
+      ? JSON.parse(storedColumns)
+      : defaultColumns;
+
+    // Get sorting state
+    const storedSort = localStorage.getItem('list-view-sort');
+    let sortColumn = 'name';
+    let sortDirection = 'asc';
+    if (storedSort) {
+      const sortState = JSON.parse(storedSort);
+      sortColumn = sortState.column;
+      sortDirection = sortState.direction;
+    }
+
+    // Prepare data for list view - only fetch minimal data initially
+    const listViewData = result.map(([isDir, childDir, title]) => {
+      const itemPath = path.join(childDir, title);
+      const encodedPath = basePath + encodeURIComponent(title);
+
+      try {
+        const lstat = lstatSync(itemPath);
+
+        return {
+          isDir,
+          title,
+          encodedPath,
+          itemPath,
+          size: lstat.size,
+          dateModified: lstat.mtimeMs,
+          dateCreated: lstat.birthtimeMs,
+          // Lazy-loaded fields - will be populated on demand
+          dateOpened: null,
+          version: null,
+          kind: null,
+          comments: null,
+          // Track if metadata has been loaded
+          _metadataLoaded: false
+        };
+      } catch (err) {
+        return {
+          isDir,
+          title,
+          encodedPath,
+          itemPath,
+          size: 0,
+          dateModified: 0,
+          dateCreated: 0,
+          dateOpened: null,
+          version: null,
+          kind: null,
+          comments: null,
+          _metadataLoaded: false
+        };
+      }
+    });
+
+    // Sort data
+    listViewData.sort((a, b) => {
+      // Folders always come first
+      if (a.isDir !== b.isDir) {
+        return a.isDir ? -1 : 1;
+      }
+
+      let comparison = 0;
+      switch (sortColumn) {
+      case 'name':
+        comparison = a.title.localeCompare(b.title, undefined, {
+          numeric: true,
+          sensitivity: 'base'
+        });
+        break;
+      case 'size':
+        comparison = a.size - b.size;
+        break;
+      case 'dateModified':
+        comparison = a.dateModified - b.dateModified;
+        break;
+      case 'dateCreated':
+        comparison = a.dateCreated - b.dateCreated;
+        break;
+      case 'dateOpened':
+        comparison = a.dateOpened - b.dateOpened;
+        break;
+      case 'kind':
+        comparison = a.kind.localeCompare(b.kind);
+        break;
+      case 'version':
+        comparison = a.version.localeCompare(b.version);
+        break;
+      default:
+        // comparison already 0
+        break;
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    // Build table
+    const listViewTable = $('.list-view-table');
+    const thead = listViewTable.querySelector('thead tr');
+    const tbody = listViewTable.querySelector('tbody');
+
+    // Clear existing content
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+
+    // Build header
+    columns.forEach((col) => {
+      if (col.visible) {
+        const th = document.createElement('th');
+        th.textContent = col.label;
+        th.dataset.columnId = col.id;
+        if (col.sortable) {
+          th.classList.add('sortable');
+          if (sortColumn === col.id) {
+            th.classList.add(
+              sortDirection === 'asc' ? 'sort-asc' : 'sort-desc'
+            );
+          }
+          th.addEventListener('click', () => {
+            // Toggle sort
+            if (sortColumn === col.id) {
+              sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+              sortColumn = col.id;
+              sortDirection = 'asc';
+            }
+            localStorage.setItem('list-view-sort', JSON.stringify({
+              column: sortColumn,
+              direction: sortDirection
+            }));
+            changePath();
+          });
+        }
+        if (col.width !== 'auto') {
+          th.style.width = col.width;
+        }
+        thead.append(th);
+      }
+    });
+
+    // Check which columns need metadata
+    const needsKind = columns.some((c) => c.id === 'kind' && c.visible);
+    const needsDateOpened = columns.some(
+      (c) => c.id === 'dateOpened' && c.visible
+    );
+    const needsVersion = columns.some(
+      (c) => c.id === 'version' && c.visible
+    );
+    const needsComments = columns.some(
+      (c) => c.id === 'comments' && c.visible
+    );
+    const needsMetadata = needsDateOpened || needsVersion || needsComments;
+
+    // Helper to load metadata for an item lazily
+    const loadMetadata = (item) => {
+      if (item._metadataLoaded) {
+        return;
+      }
+      item._metadataLoaded = true;
+
+      try {
+        if (needsKind && item.kind === null) {
+          item.kind = getFileKind(item.itemPath);
+        }
+        if (needsMetadata) {
+          const metadata = getFileMetadata(item.itemPath);
+          if (needsDateOpened && item.dateOpened === null) {
+            item.dateOpened = metadata.ItemLastUsedDate || 0;
+          }
+          if (needsVersion && item.version === null) {
+            item.version = metadata.ItemVersion || '';
+          }
+          if (needsComments && item.comments === null) {
+            item.comments = metadata.Comment || '';
+          }
+        }
+      } catch (err) {
+        // Set defaults on error
+        if (item.kind === null) {
+          item.kind = item.isDir ? 'Folder' : 'Document';
+        }
+        item.dateOpened = item.dateOpened || 0;
+        item.version = item.version || '';
+        item.comments = item.comments || '';
+      }
+    };
+
+    // Build rows
+    listViewData.forEach((item) => {
+      const tr = document.createElement('tr');
+      tr.dataset.path = item.encodedPath;
+
+      columns.forEach((col) => {
+        if (col.visible) {
+          const td = document.createElement('td');
+          td.classList.add(`list-view-${col.id}`);
+
+          switch (col.id) {
+          case 'icon':
+            // Add icon (will be loaded asynchronously)
+            td.innerHTML = '<img src="" alt="" />';
+            getIconDataURLForFile(item.itemPath).then((url) => {
+              const img = td.querySelector('img');
+              if (img && url) {
+                img.src = url;
+              }
+              return undefined;
+            });
+            break;
+          case 'name':
+            if (item.isDir) {
+              const a = document.createElement('a');
+              a.href = '#path=' + item.encodedPath;
+              a.textContent = item.title;
+              a.dataset.path = item.encodedPath;
+              a.addEventListener('contextmenu', folderContextmenu);
+              // Prevent navigation on single click
+              a.addEventListener('click', (e) => {
+                e.preventDefault();
+                // Selection is handled by the row click handler
+              });
+              td.append(a);
+            } else {
+              const span = document.createElement('span');
+              span.textContent = item.title;
+              span.dataset.path = item.encodedPath;
+              span.addEventListener('contextmenu', contextmenu);
+              td.append(span);
+            }
+            break;
+          case 'size':
+            td.textContent = item.isDir ? '--' : filesize(item.size);
+            break;
+          case 'dateModified':
+            td.textContent = item.dateModified
+              ? getFormattedDate(item.dateModified)
+              : '';
+            break;
+          case 'dateCreated':
+            td.textContent = item.dateCreated
+              ? getFormattedDate(item.dateCreated)
+              : '';
+            break;
+          case 'dateOpened':
+            if (item.dateOpened === null) {
+              td.textContent = '';
+              // Lazy load in idle time
+              if ('requestIdleCallback' in globalThis) {
+                requestIdleCallback(() => {
+                  loadMetadata(item);
+                  td.textContent = item.dateOpened
+                    ? getFormattedDate(item.dateOpened)
+                    : '';
+                });
+              } else {
+                setTimeout(() => {
+                  loadMetadata(item);
+                  td.textContent = item.dateOpened
+                    ? getFormattedDate(item.dateOpened)
+                    : '';
+                }, 0);
+              }
+            } else {
+              td.textContent = item.dateOpened
+                ? getFormattedDate(item.dateOpened)
+                : '';
+            }
+            break;
+          case 'kind':
+            if (item.kind === null) {
+              td.textContent = item.isDir ? 'Folder' : '';
+              // Lazy load in idle time
+              if ('requestIdleCallback' in globalThis) {
+                requestIdleCallback(() => {
+                  loadMetadata(item);
+                  td.textContent = item.kind || '';
+                });
+              } else {
+                setTimeout(() => {
+                  loadMetadata(item);
+                  td.textContent = item.kind || '';
+                }, 0);
+              }
+            } else {
+              td.textContent = item.kind;
+            }
+            break;
+          case 'version':
+            if (item.version === null) {
+              td.textContent = '';
+              // Lazy load in idle time
+              if ('requestIdleCallback' in globalThis) {
+                requestIdleCallback(() => {
+                  loadMetadata(item);
+                  td.textContent = item.version || '';
+                });
+              } else {
+                setTimeout(() => {
+                  loadMetadata(item);
+                  td.textContent = item.version || '';
+                }, 0);
+              }
+            } else {
+              td.textContent = item.version;
+            }
+            break;
+          case 'comments':
+            if (item.comments === null) {
+              td.textContent = '';
+              // Lazy load in idle time
+              if ('requestIdleCallback' in globalThis) {
+                requestIdleCallback(() => {
+                  loadMetadata(item);
+                  td.textContent = item.comments || '';
+                });
+              } else {
+                setTimeout(() => {
+                  loadMetadata(item);
+                  td.textContent = item.comments || '';
+                }, 0);
+              }
+            } else {
+              td.textContent = item.comments;
+            }
+            break;
+          default:
+            td.textContent = '';
+          }
+
+          tr.append(td);
+        }
+      });
+
+      // Add click handler for row selection
+      tr.addEventListener('click', (e) => {
+        // Remove previous selection
+        const prevSelected = tbody.querySelector('tr.selected');
+        if (prevSelected) {
+          prevSelected.classList.remove('selected');
+        }
+
+        // Add selection to clicked row
+        tr.classList.add('selected');
+      });
+
+      // Add double-click handler
+      tr.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        if (item.isDir) {
+          location.href = '#path=' + item.encodedPath;
+        } else {
+          const decodedPath = decodeURIComponent(item.encodedPath);
+          // @ts-expect-error - Test hook
+          if (globalThis.testShellOpenPath) {
+            // @ts-expect-error - Test hook
+            globalThis.testShellOpenPath(decodedPath);
+          /* c8 ignore next 3 -- Test hook bypasses this path */
+          } else {
+            globalThis.electronAPI.shell.openPath(decodedPath);
+          }
+        }
+      });
+
+      // Add drag-and-drop support
+      addDragAndDropSupport(tr, item.encodedPath, item.isDir);
+
+      tbody.append(tr);
+    });
+
+    // Column picker
+    const columnPickerButton = $('.column-picker-button');
+    const existingPicker = $('.column-picker-menu');
+    if (existingPicker) {
+      existingPicker.remove();
+    }
+
+    columnPickerButton.addEventListener('click', (e) => {
+      e.stopPropagation();
+
+      // Remove existing picker if present
+      const existing = $('.column-picker-menu');
+      if (existing) {
+        existing.remove();
+        return;
+      }
+
+      // Create column picker menu
+      const pickerMenu = document.createElement('div');
+      pickerMenu.className = 'column-picker-menu';
+
+      columns.forEach((col) => {
+        if (col.id === 'icon' || col.id === 'name') {
+          return; // Skip icon and name columns (always visible)
+        }
+
+        const label = document.createElement('label');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = col.visible;
+        checkbox.addEventListener('change', () => {
+          col.visible = checkbox.checked;
+          localStorage.setItem('list-view-columns', JSON.stringify(columns));
+          changePath();
+        });
+
+        label.append(checkbox);
+        label.append(document.createTextNode(col.label));
+        pickerMenu.append(label);
+      });
+
+      // Position near button
+      const buttonRect = columnPickerButton.getBoundingClientRect();
+      pickerMenu.style.position = 'absolute';
+      pickerMenu.style.top = (buttonRect.bottom + 5) + 'px';
+      pickerMenu.style.right = '10px';
+
+      document.body.append(pickerMenu);
+
+      // Close picker when clicking outside
+      const closePickerFn = (evt) => {
+        if (!pickerMenu.contains(/** @type {Node} */ (evt.target)) &&
+            evt.target !== columnPickerButton) {
+          pickerMenu.remove();
+          document.removeEventListener('click', closePickerFn);
+        }
+      };
+      setTimeout(() => {
+        document.addEventListener('click', closePickerFn);
+      }, 0);
+    });
+
+    // Add keyboard support
+    listViewTable.setAttribute('tabindex', '0');
+
+    // Remove any existing keydown listeners to avoid duplicates
+    // @ts-expect-error Custom property
+    const oldListener = listViewTable._keydownListener;
+    if (oldListener) {
+      listViewTable.removeEventListener('keydown', oldListener);
+    }
+
+    const keydownListener = (e) => {
+      const selectedRow = tbody.querySelector('tr.selected');
+      const allRows = [...tbody.querySelectorAll('tr')];
+
+      if (allRows.length === 0) {
+        return;
+      }
+
+      // Handle arrow key navigation
+      if (['ArrowUp', 'ArrowDown'].includes(e.key)) {
+        e.preventDefault();
+        const currentIndex = selectedRow ? allRows.indexOf(selectedRow) : -1;
+        let newIndex = currentIndex;
+
+        if (e.key === 'ArrowDown') {
+          newIndex = currentIndex + 1;
+        } else if (e.key === 'ArrowUp') {
+          newIndex = currentIndex - 1;
+        }
+
+        if (newIndex >= 0 && newIndex < allRows.length) {
+          if (selectedRow) {
+            selectedRow.classList.remove('selected');
+          }
+          const newRow = allRows[newIndex];
+          newRow.classList.add('selected');
+          newRow.scrollIntoView({block: 'nearest'});
+        }
+        return;
+      }
+
+      // Handle Enter key to open
+      if (e.key === 'Enter' && selectedRow) {
+        e.preventDefault();
+        selectedRow.dispatchEvent(new Event('dblclick'));
+        return;
+      }
+
+      // Cmd+O to open selected item
+      if (e.metaKey && e.key === 'o' && selectedRow) {
+        e.preventDefault();
+        selectedRow.dispatchEvent(new Event('dblclick'));
+        return;
+      }
+
+      // Other keyboard shortcuts
+      if (e.metaKey && e.shiftKey && e.key === 'n') {
+        e.preventDefault();
+        createNewFolder(currentBasePath);
+      } else if (e.metaKey && e.key === 'i' && selectedRow) {
+        e.preventDefault();
+        const itemPath = selectedRow.dataset.path;
+        if (itemPath) {
+          showInfoWindow({jml, itemPath});
+        }
+      } else if (e.metaKey && e.key === 'c' && selectedRow) {
+        e.preventDefault();
+        const itemPath = selectedRow.dataset.path;
+        if (itemPath) {
+          setClipboard({path: itemPath, isCopy: true});
+        }
+      } else if (e.metaKey && e.key === 'x' && selectedRow) {
+        e.preventDefault();
+        const itemPath = selectedRow.dataset.path;
+        if (itemPath) {
+          setClipboard({path: itemPath, isCopy: false});
+        }
+      } else if (e.metaKey && e.key === 'v' && getClipboard()) {
+        e.preventDefault();
+        const clip = getClipboard();
+        copyOrMoveItem(clip.path, currentBasePath, clip.isCopy);
+        setClipboard(null);
+      } else if (e.metaKey && e.key === 'Backspace' && selectedRow) {
+        e.preventDefault();
+        const itemPath = selectedRow.dataset.path;
+        if (itemPath) {
+          deleteItem(itemPath);
+        }
+      } else if (e.key === 'Enter' && selectedRow) {
+        e.preventDefault();
+        const link = selectedRow.querySelector('a, span');
+        if (link) {
+          startRename(link);
+        }
+      } else if (e.metaKey && e.shiftKey && e.key === 'h') {
+        e.preventDefault();
+        globalThis.location.hash = '#path=' +
+          encodeURIComponent(globalThis.electronAPI.os.homedir());
+      } else if (e.metaKey && e.shiftKey && e.key === 'd') {
+        e.preventDefault();
+        const desktopDir = path.join(
+          globalThis.electronAPI.os.homedir(),
+          'Desktop'
+        );
+        globalThis.location.hash = `#path=${encodeURIComponent(desktopDir)}`;
+      } else if (e.metaKey && e.shiftKey && e.key === 'a') {
+        e.preventDefault();
+        globalThis.location.hash = '#path=/Applications';
+      } else if (e.metaKey && e.shiftKey && e.key === 'u') {
+        e.preventDefault();
+        globalThis.location.hash = '#path=/Applications/Utilities';
+      } else if (e.metaKey && e.key === '[') {
+        e.preventDefault();
+        history.back();
+      } else if (e.metaKey && e.key === ']') {
+        e.preventDefault();
+        history.forward();
+      }
+    };
+
+    listViewTable.addEventListener('keydown', keydownListener);
+    // Store reference for cleanup
+    // @ts-expect-error Custom property
+    listViewTable._keydownListener = keydownListener;
+
+    // Focus the table
+    requestAnimationFrame(() => {
+      listViewTable.focus();
+    });
+
+    return;
+  }
+
   const millerColumns = jQuery('div.miller-columns');
   const parentMap = new WeakMap();
   const childMap = new WeakMap();
@@ -2380,6 +2999,7 @@ switch (view) {
 case 'gallery-view':
 case 'three-columns':
 case 'icon-view':
+case 'list-view':
   $('#' + view).classList.add('selected');
   break;
 /* c8 ignore next 3 -- Guard */

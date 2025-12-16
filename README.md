@@ -70,6 +70,7 @@ done
 ## To-dos
 
 1. List view
+1. Allow icons to be draggable
 
 1. Ideally would allow separate windows and tabs, with menu bar
     1. At such point, ensure key commands (e.g., copy/cut/paste attached to
