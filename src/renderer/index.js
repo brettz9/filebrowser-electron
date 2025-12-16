@@ -1945,7 +1945,7 @@ function addItems (result, basePath, currentBasePath) {
 
         const processChunk = (deadline) => {
           // Process items while we have time or until chunk is done
-          while (currentIndex < itemsArray.length && 
+          while (currentIndex < itemsArray.length &&
                  (deadline.timeRemaining() > 0 || deadline.didTimeout)) {
             const [itemPath, {item, cells}] = itemsArray[currentIndex];
             currentIndex++;

@@ -30,6 +30,7 @@ nav button.selected {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  align-items: center;
 }
 
 .gallery-preview-image {
@@ -38,6 +39,9 @@ nav button.selected {
   padding: 15px;
   border-bottom: 1px solid #ddd;
   background: #fafafa;
+  width: 100%;
+  display: flex;
+  justify-content: center;
 }
 
 div.gallery {
