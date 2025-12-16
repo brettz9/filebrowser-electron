@@ -32013,7 +32013,6 @@ ${previewContent}
 	//   changePath();
 	// });
 
-
 	// Add global keyboard handler for undo/redo
 	document.addEventListener('keydown', (e) => {
 	  // Only handle if not typing in an input field
@@ -32054,6 +32053,14 @@ ${previewContent}
 	  });
 	  this.classList.add('selected');
 	  localStorage.setItem('view', 'icon-view');
+	  changePath();
+	});
+	$('#list-view').addEventListener('click', function () {
+	  $$('nav button').forEach((button) => {
+	    button.classList.remove('selected');
+	  });
+	  this.classList.add('selected');
+	  localStorage.setItem('view', 'list-view');
 	  changePath();
 	});
 	$('#gallery-view').addEventListener('click', function () {

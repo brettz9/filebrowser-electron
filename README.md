@@ -69,10 +69,6 @@ done
 
 ## To-dos
 
-1. Gallery view
-    1. Add large Thumbnail preview
-    1. Add metadata preview column
-
 1. List view
 
 1. Ideally would allow separate windows and tabs, with menu bar
