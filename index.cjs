@@ -30678,6 +30678,57 @@
 	      cellEl._dblclickHandler = dblclickHandler;
 	    });
 
+	    // Helper function to update gallery preview for selected item
+	    /**
+	     * @param {HTMLElement} cellEl - The selected cell element
+	     * @returns {void}
+	     */
+	    const updateGalleryPreview = (cellEl) => {
+	      if (view !== 'gallery-view') {
+	        return;
+	      }
+
+	      const link = cellEl.querySelector('a, p');
+	      if (!link) {
+	        return;
+	      }
+
+	      const linkEl = /** @type {HTMLElement} */ (link);
+	      const itemPath = linkEl.dataset.path;
+	      if (!itemPath) {
+	        return;
+	      }
+
+	      const decodedPath = decodeURIComponent(itemPath);
+	      const isFolder = linkEl.tagName === 'A';
+
+	      // Get appropriate thumbnail and update immediately
+	      (async () => {
+	        const url = isFolder
+	          ? await getXLargeIconDataURLForFile(decodedPath)
+	          : await globalThis.electronAPI.getFileThumbnail(
+	            decodedPath, 512
+	          ) || await getXLargeIconDataURLForFile(decodedPath);
+
+	        // Use same DOM traversal as click handler
+	        const tableContainer =
+	          cellEl.parentElement.parentElement.parentElement;
+	        const imgElement =
+	          tableContainer.previousElementSibling?.querySelector('img');
+	        if (imgElement && url) {
+	          imgElement.src = url;
+	        }
+	      /* c8 ignore next 8 -- Error handler */
+	      })().catch(
+	        // eslint-disable-next-line @stylistic/max-len -- Long
+	        // eslint-disable-next-line promise/prefer-await-to-callbacks -- Catch block
+	        (err) => {
+	          // eslint-disable-next-line no-console -- Error logging
+	          console.error('Failed to load gallery preview:', err);
+	        }
+	      );
+	    };
+
 	    // Restore previously selected item after refresh
 	    if (lastSelectedItemPath) {
 	      const cellToSelect = [...cells].find((cell) => {
@@ -30702,44 +30753,8 @@
 	        // Apply selection
 	        cellEl.classList.add('selected');
 
-	        // For gallery view, also update the preview image
-	        if (view === 'gallery-view') {
-	          const link = cellEl.querySelector('a, p');
-	          if (link) {
-	            const linkEl = /** @type {HTMLElement} */ (link);
-	            const itemPath = linkEl.dataset.path;
-	            if (itemPath) {
-	              const decodedPath = decodeURIComponent(itemPath);
-	              const isFolder = linkEl.tagName === 'A';
-
-	              // Get appropriate thumbnail and update immediately
-	              (async () => {
-	                const url = isFolder
-	                  ? await getXLargeIconDataURLForFile(decodedPath)
-	                  : await globalThis.electronAPI.getFileThumbnail(
-	                    decodedPath, 512
-	                  ) || await getXLargeIconDataURLForFile(decodedPath);
-
-	                // Use same DOM traversal as click handler
-	                const tableContainer =
-	                  cellEl.parentElement.parentElement.parentElement;
-	                const imgElement =
-	                  tableContainer.previousElementSibling?.querySelector('img');
-	                if (imgElement && url) {
-	                  imgElement.src = url;
-	                }
-	              /* c8 ignore next 9 -- Error handler */
-	              })().catch(
-	                // eslint-disable-next-line @stylistic/max-len -- Long
-	                // eslint-disable-next-line promise/prefer-await-to-callbacks -- Catching block
-	                (err) => {
-	                  // eslint-disable-next-line no-console -- Error logging
-	                  console.error('Failed to load gallery preview:', err);
-	                }
-	              );
-	            }
-	          }
-	        }
+	        // Update gallery preview if needed
+	        updateGalleryPreview(cellEl);
 	      }
 	    }
 
@@ -30798,6 +30813,7 @@
 	          const newCell = allCells[newIndex];
 	          newCell.classList.add('selected');
 	          newCell.scrollIntoView({block: 'nearest', inline: 'nearest'});
+	          updateGalleryPreview(newCell);
 	        }
 	        return;
 	      }
@@ -30835,6 +30851,7 @@
 	          // Select matching cell
 	          matchingCell.classList.add('selected');
 	          matchingCell.scrollIntoView({block: 'nearest', inline: 'nearest'});
+	          updateGalleryPreview(matchingCell);
 	        }
 
 	        // Clear buffer after 1 second of inactivity
