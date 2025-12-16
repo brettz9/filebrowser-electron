@@ -29797,6 +29797,7 @@
 	let mouseIsDown = false;
 	let hoverOpenTimer = null;
 	let currentHoverTarget = null;
+	let clickTimer = null;
 
 	// Track mouse button state globally
 	document.addEventListener('mousedown', () => {
@@ -30399,7 +30400,8 @@
 	                  );
 	                }
 	                e.preventDefault();
-	                // Remove previous selection
+
+	                // Apply highlighting immediately
 	                const prevSelected =
 	                  this.parentElement.parentElement.querySelector(
 	                    'td.list-item.selected'
@@ -30408,16 +30410,32 @@
 	                  prevSelected.classList.remove('selected');
 	                }
 	                this.classList.add('selected');
+
+	                // Clear any existing click timer
+	                if (clickTimer) {
+	                  clearTimeout(clickTimer);
+	                  clickTimer = null;
+	                }
+
+	                // Only delay the gallery thumbnail update
 	                if (view === 'gallery-view') {
-	                  const tableContainer =
-	                    this.parentElement.parentElement.parentElement;
-	                  const imgElement =
-	                    tableContainer.previousElementSibling.querySelector('img');
-	                  const url = await getThumbnail();
-	                  imgElement.src = url;
+	                  clickTimer = setTimeout(async () => {
+	                    const tableContainer =
+	                      this.parentElement.parentElement.parentElement;
+	                    const imgElement =
+	                      tableContainer.previousElementSibling.querySelector('img');
+	                    const url = await getThumbnail();
+	                    imgElement.src = url;
+	                    clickTimer = null;
+	                  }, 250);
 	                }
 	              }, true],
 	              dblclick: [function () {
+	                // Clear the click timer to prevent thumbnail update on double-click
+	                if (clickTimer) {
+	                  clearTimeout(clickTimer);
+	                  clickTimer = null;
+	                }
 	                location.href = this.querySelector('a').href;
 	              }, true],
 	              contextmenu: isDir ? folderContextmenu : contextmenu
