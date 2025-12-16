@@ -31491,14 +31491,6 @@
 
 	          switch (col.id) {
 	          case 'icon': {
-	            // Prevent td clicks from bubbling to row (for expander clicks)
-	            td.addEventListener('click', (e) => {
-	              // Only stop propagation if clicking the expander
-	              if (e.target.classList.contains('tree-expander')) {
-	                e.stopPropagation();
-	              }
-	            });
-
 	            // Add expander triangle for folders in tree mode (before icon)
 	            if (listViewTreeMode && item.isDir) {
 	              const expander = document.createElement('span');
@@ -31506,16 +31498,15 @@
 	              expander.textContent = '▶';
 	              expander.dataset.path = item.encodedPath;
 
-	              // Check if folder is expanded
-	              const isExpanded = expandedPaths.has(item.itemPath);
-	              if (isExpanded) {
-	                expander.classList.add('expanded');
-	              }
+	              // Don't set expanded state here - let restoration logic handle it
+	              // This ensures children are properly loaded when restoring state
 
 	              expander.addEventListener('click', (e) => {
 	                e.stopPropagation();
 	                e.preventDefault();
-	                const isCurrentlyExpanded = expandedPaths.has(item.itemPath);
+	                // Check visual state instead of Set for restoration
+	                const isCurrentlyExpanded =
+	                  expander.classList.contains('expanded');
 
 	                if (isCurrentlyExpanded) {
 	                  // Collapse: remove from expanded set
@@ -31735,7 +31726,12 @@
 	      });
 
 	      // Add click handler for row selection
-	      tr.addEventListener('click', () => {
+	      tr.addEventListener('click', (e) => {
+	        // Don't handle selection if clicking expander
+	        if (e.target.classList.contains('tree-expander')) {
+	          return;
+	        }
+
 	        // Save the selected item path for restoration after refresh
 	        lastSelectedItemPath = item.encodedPath;
 
@@ -31751,6 +31747,11 @@
 
 	      // Add double-click handler
 	      tr.addEventListener('dblclick', (e) => {
+	        // Don't navigate if clicking expander
+	        if (e.target.classList.contains('tree-expander')) {
+	          return;
+	        }
+
 	        e.preventDefault();
 	        if (item.isDir) {
 	          location.href = '#path=' + item.encodedPath;
@@ -31781,20 +31782,41 @@
 
 	    // Restore expanded folders in tree mode
 	    if (listViewTreeMode && expandedPaths.size > 0) {
-	      // Trigger expansion for any folders that should be expanded
-	      const allRows = tbody.querySelectorAll('tr');
-	      allRows.forEach((row) => {
-	        const rowPath = row.dataset.path;
-	        // Find corresponding item
-	        const item = listViewData.find((i) => i.encodedPath === rowPath);
-	        if (item && item.isDir && expandedPaths.has(item.itemPath)) {
-	          const expander = row.querySelector('.tree-expander');
-	          if (expander && !expander.classList.contains('expanded')) {
-	            // Trigger click to expand
-	            expander.click();
+	      // Recursively expand folders that should be expanded
+	      // Process synchronously to ensure proper nesting
+	      const expandRowsRecursively = () => {
+	        // Get all current rows (including newly added children)
+	        const allRows = [...tbody.querySelectorAll('tr')];
+	        let expandedAny = false;
+
+	        for (const row of allRows) {
+	          const rowPath = row.dataset.path;
+	          if (!rowPath) {
+	            continue;
+	          }
+
+	          // Decode the path to get the actual item path
+	          const decodedPath = decodeURIComponent(rowPath);
+
+	          // Check if this folder should be expanded
+	          if (expandedPaths.has(decodedPath)) {
+	            const expander = row.querySelector('.tree-expander');
+	            if (expander && !expander.classList.contains('expanded')) {
+	              // Trigger click to expand
+	              expander.click();
+	              expandedAny = true;
+	            }
 	          }
 	        }
-	      });
+
+	        // If we expanded any folders, recursively check for nested folders
+	        // that also need to be expanded (using setTimeout to let DOM update)
+	        if (expandedAny) {
+	          setTimeout(expandRowsRecursively, 0);
+	        }
+	      };
+
+	      expandRowsRecursively();
 	    }
 
 	    // Restore previously selected item after refresh

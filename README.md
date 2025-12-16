@@ -69,9 +69,7 @@ done
 
 ## To-dos
 
-1. List view
-    1. Nested folder opening by grippy click
-
+1. Add tests for list view
 1. Allow icons to be draggable (Sort by None, Sort by Grid) or Sort by Metadata: Name, Kind, Date Last Opened, Date Added, Date Modified, Date Created, Size, Tags)
 
 1. Ideally would allow separate windows and tabs, with menu bar
