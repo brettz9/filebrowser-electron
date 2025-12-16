@@ -70,9 +70,7 @@ done
 ## To-dos
 
 1. List view
-    1. reselect after rename
     1. cmd-2 to activate
-    1. Ensure watcher code is applied to force refreshes
     1. Nested folder opening by grippy click
 
 1. Allow icons to be draggable

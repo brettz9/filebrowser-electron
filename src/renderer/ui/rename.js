@@ -236,55 +236,27 @@ export function startRename (
             }, 800);
           }
         } else {
-          // For icon view, manually refresh
+          // For icon/gallery/list view, set the renamed path for reselection
+          const encodedNewPath = parentPath + '/' + encodeURIComponent(newName);
+          
+          // Set the path to reselect after refresh via global setter
+          if (typeof globalThis !== 'undefined' && 
+              globalThis.setLastSelectedItemPath) {
+            globalThis.setLastSelectedItemPath(encodedNewPath);
+          }
+          
+          // Manually refresh
           changePath();
 
-          // Re-select the renamed item after view refresh
-          // Use longer delay to ensure all refresh operations complete
+          // Clear the isCreating flag quickly so watcher can detect changes
           setTimeout(() => {
-            const encodedNewPath = parentPath + '/' +
-              encodeURIComponent(newName);
-            const renamedElement = $(
-              `[data-path="${CSS.escape(encodedNewPath)}"]`
-            );
-            if (renamedElement) {
-              // Find the parent cell (td.list-item)
-              const cell = renamedElement.closest('td.list-item');
-              if (cell) {
-                // Remove previous selection
-                const iconViewTable = document.querySelector(
-                  'table[data-base-path]'
-                );
-                if (iconViewTable) {
-                  const prevSelected = iconViewTable.querySelector(
-                    'td.list-item.selected'
-                  );
-                  if (prevSelected) {
-                    prevSelected.classList.remove('selected');
-                  }
-                }
-
-                // Select the renamed cell
-                cell.classList.add('selected');
-              }
-
-              // Scroll into view
-              requestAnimationFrame(() => {
-                renamedElement.scrollIntoView({
-                  block: 'nearest',
-                  inline: 'nearest'
-                });
-              });
-            }
-
-            // Clear the flag after selection is complete
             setIsCreating(false);
+          }, 100);
 
-            // Call completion callback after everything is done
-            if (onComplete) {
-              setTimeout(onComplete, 100);
-            }
-          }, 1000);
+          // Call completion callback after flag is cleared
+          if (onComplete) {
+            setTimeout(onComplete, 200);
+          }
         }
       } catch (err) {
         // eslint-disable-next-line no-alert -- User feedback

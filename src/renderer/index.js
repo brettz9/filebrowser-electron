@@ -92,6 +92,14 @@ let currentHoverTarget = null;
 let clickTimer = null;
 let lastSelectedItemPath = null;
 
+// Expose setter for lastSelectedItemPath for use by rename operation
+/* c8 ignore next 6 -- Test/operation helper */
+if (typeof globalThis !== 'undefined') {
+  /** @type {unknown} */ (globalThis).setLastSelectedItemPath = (path) => {
+    lastSelectedItemPath = path;
+  };
+}
+
 // Track mouse button state globally
 document.addEventListener('mousedown', () => {
   mouseIsDown = true;
@@ -1907,6 +1915,9 @@ function addItems (result, basePath, currentBasePath) {
 
       // Add click handler for row selection
       tr.addEventListener('click', (e) => {
+        // Save the selected item path for restoration after refresh
+        lastSelectedItemPath = item.encodedPath;
+        
         // Remove previous selection
         const prevSelected = tbody.querySelector('tr.selected');
         if (prevSelected) {
@@ -1940,6 +1951,38 @@ function addItems (result, basePath, currentBasePath) {
 
       tbody.append(tr);
     });
+
+    // Restore previously selected item after refresh
+    // Skip auto-selection if creating/renaming (it will handle selection)
+    if (!isCreating) {
+      const allRows = tbody.querySelectorAll('tr');
+      let rowToSelect = null;
+      
+      if (lastSelectedItemPath) {
+        rowToSelect = [...allRows].find((row) => {
+          return row.dataset.path === lastSelectedItemPath;
+        });
+      }
+
+      // If we found the previously selected item, restore it
+      // Otherwise, select the first item
+      if (rowToSelect) {
+        // Remove any other selections first
+        const prevSelected = tbody.querySelector('tr.selected');
+        if (prevSelected) {
+          prevSelected.classList.remove('selected');
+        }
+        // Apply selection
+        rowToSelect.classList.add('selected');
+        // Scroll into view
+        requestAnimationFrame(() => {
+          rowToSelect.scrollIntoView({block: 'nearest'});
+        });
+      } else if (allRows.length > 0) {
+        // No previously selected item found, select the first item
+        allRows[0].classList.add('selected');
+      }
+    }
 
     // Column picker
     const columnPickerButton = $('.column-picker-button');
@@ -2085,10 +2128,14 @@ function addItems (result, basePath, currentBasePath) {
         return;
       }
 
-      // Handle Enter key to open
+      // Handle Enter key to rename selected item
       if (e.key === 'Enter' && selectedRow) {
         e.preventDefault();
-        selectedRow.dispatchEvent(new Event('dblclick'));
+        const nameCell = selectedRow.querySelector('.list-view-name');
+        const textElement = nameCell?.querySelector('a, span');
+        if (textElement) {
+          startRename(textElement);
+        }
         return;
       }
 
