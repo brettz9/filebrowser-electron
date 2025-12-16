@@ -30730,8 +30730,9 @@
 	    };
 
 	    // Restore previously selected item after refresh
+	    let cellToSelect = null;
 	    if (lastSelectedItemPath) {
-	      const cellToSelect = [...cells].find((cell) => {
+	      cellToSelect = [...cells].find((cell) => {
 	        const cellEl = /** @type {HTMLElement} */ (cell);
 	        const link = cellEl.querySelector('a, p');
 	        if (link) {
@@ -30740,22 +30741,29 @@
 	        }
 	        return false;
 	      });
+	    }
 
-	      if (cellToSelect) {
-	        const cellEl = /** @type {HTMLElement} */ (cellToSelect);
-	        // Remove any other selections first
-	        const prevSelected = iconViewTable.querySelector(
-	          'td.list-item.selected'
-	        );
-	        if (prevSelected) {
-	          prevSelected.classList.remove('selected');
-	        }
-	        // Apply selection
-	        cellEl.classList.add('selected');
-
-	        // Update gallery preview if needed
-	        updateGalleryPreview(cellEl);
+	    // If we found the previously selected item, restore it
+	    // Otherwise, select the first item
+	    if (cellToSelect) {
+	      const cellEl = /** @type {HTMLElement} */ (cellToSelect);
+	      // Remove any other selections first
+	      const prevSelected = iconViewTable.querySelector(
+	        'td.list-item.selected'
+	      );
+	      if (prevSelected) {
+	        prevSelected.classList.remove('selected');
 	      }
+	      // Apply selection
+	      cellEl.classList.add('selected');
+
+	      // Update gallery preview if needed
+	      updateGalleryPreview(cellEl);
+	    } else if (cells.length > 0) {
+	      // No previously selected item found, select the first item
+	      const firstCell = /** @type {HTMLElement} */ (cells[0]);
+	      firstCell.classList.add('selected');
+	      updateGalleryPreview(firstCell);
 	    }
 
 	    // Add new keydown listener
