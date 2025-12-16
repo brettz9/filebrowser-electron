@@ -169,9 +169,11 @@ div.gallery {
 .list-view-header {
   display: flex;
   justify-content: flex-end;
+  gap: 5px;
   margin-bottom: 5px;
 }
 
+.tree-mode-toggle,
 .column-picker-button {
   padding: 4px 8px;
   font-size: 16px;
@@ -315,6 +317,33 @@ div.gallery {
 
 .list-view-table tbody tr.selected td.list-view-name a {
   color: white;
+}
+
+/* Tree view expander */
+.tree-expander {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+  cursor: pointer;
+  user-select: none;
+  vertical-align: middle;
+  text-align: center;
+  line-height: 16px;
+  transition: transform 0.2s ease;
+}
+
+.tree-expander.expanded {
+  transform: rotate(90deg);
+}
+
+.tree-expander.empty {
+  visibility: hidden;
+}
+
+.tree-indent {
+  display: inline-block;
+  width: 20px;
 }
 
 /* .icon-container p {

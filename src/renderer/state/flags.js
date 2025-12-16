@@ -11,6 +11,10 @@ export let isCopyingOrMoving = false;
 export const isRefreshing = false;
 export let isWatcherRefreshing = false;
 
+// Tree view in list view
+export let listViewTreeMode =
+  localStorage.getItem('list-view-tree-mode') === 'true';
+
 /**
  * Set the $columns value.
  * @param {JQuery} value
@@ -55,4 +59,19 @@ export const getIsCopyingOrMoving = () => isCopyingOrMoving;
  */
 export const setIsWatcherRefreshing = (value) => {
   isWatcherRefreshing = value;
+};
+
+/**
+ * Toggle the list view tree mode.
+ * @param {boolean} [value] - Optional value to set
+ * @returns {boolean} - The new value
+ */
+export const toggleListViewTreeMode = (value) => {
+  if (typeof value === 'boolean') {
+    listViewTreeMode = value;
+  } else {
+    listViewTreeMode = !listViewTreeMode;
+  }
+  localStorage.setItem('list-view-tree-mode', listViewTreeMode.toString());
+  return listViewTreeMode;
 };

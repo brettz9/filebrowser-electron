@@ -23,7 +23,8 @@ import {
   $columns,
   set$columns,
   isCreating,
-  getIsCopyingOrMoving
+  getIsCopyingOrMoving,
+  listViewTreeMode
 } from './state/flags.js';
 import {
   pushUndo,
@@ -1551,6 +1552,20 @@ function addItems (result, basePath, currentBasePath) {
     // Update breadcrumbs for list view
     updateBreadcrumbs(currentBasePath);
 
+    // Tree view expansion state (persisted across refreshes)
+    const expansionStateKey = 'list-view-expansion-state';
+    const storedExpansionState = localStorage.getItem(expansionStateKey);
+    const expandedPaths = storedExpansionState
+      ? new Set(JSON.parse(storedExpansionState))
+      : new Set();
+
+    const saveExpansionState = () => {
+      localStorage.setItem(
+        expansionStateKey,
+        JSON.stringify([...expandedPaths])
+      );
+    };
+
     // Get or initialize column configuration
     const defaultColumns = [
       {id: 'icon', label: '', width: '40px',
@@ -1756,10 +1771,11 @@ function addItems (result, basePath, currentBasePath) {
     // Track items and cells that need metadata updates
     const pendingMetadataItems = [];
 
-    // Build rows
-    listViewData.forEach((item) => {
+    // Function to build a row with optional tree indentation
+    const buildRow = (item, depth = 0) => {
       const tr = document.createElement('tr');
       tr.dataset.path = item.encodedPath;
+      tr.dataset.depth = depth.toString();
 
       columns.forEach((col) => {
         if (col.visible) {
@@ -1767,18 +1783,171 @@ function addItems (result, basePath, currentBasePath) {
           td.classList.add(`list-view-${col.id}`);
 
           switch (col.id) {
-          case 'icon':
+          case 'icon': {
+            // Prevent td clicks from bubbling to row (for expander clicks)
+            td.addEventListener('click', (e) => {
+              // Only stop propagation if clicking the expander
+              if (e.target.classList.contains('tree-expander')) {
+                e.stopPropagation();
+              }
+            });
+
+            // Add expander triangle for folders in tree mode (before icon)
+            if (listViewTreeMode && item.isDir) {
+              const expander = document.createElement('span');
+              expander.className = 'tree-expander';
+              expander.textContent = '▶';
+              expander.dataset.path = item.encodedPath;
+
+              // Check if folder is expanded
+              const isExpanded = expandedPaths.has(item.itemPath);
+              if (isExpanded) {
+                expander.classList.add('expanded');
+              }
+
+              expander.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                const isCurrentlyExpanded = expandedPaths.has(item.itemPath);
+
+                if (isCurrentlyExpanded) {
+                  // Collapse: remove from expanded set
+                  expandedPaths.delete(item.itemPath);
+                  expander.classList.remove('expanded');
+
+                  // Remove all child rows
+                  let nextRow = tr.nextElementSibling;
+                  while (nextRow &&
+                    Number.parseInt(nextRow.dataset.depth) > depth) {
+                    const rowToRemove = nextRow;
+                    nextRow = nextRow.nextElementSibling;
+                    rowToRemove.remove();
+                  }
+                } else {
+                  // Expand: add to expanded set
+                  expandedPaths.add(item.itemPath);
+                  expander.classList.add('expanded');
+
+                  // Load and display children
+                  try {
+                    const childResult = readDirectory(item.itemPath);
+                    const childData = childResult.map(([
+                      isDir, childDir, title
+                    ]) => {
+                      const childItemPath = path.join(childDir, title);
+                      const childEncodedPath = item.encodedPath +
+                        '/' + encodeURIComponent(title);
+
+                      try {
+                        const lstat = lstatSync(childItemPath);
+                        return {
+                          isDir,
+                          title,
+                          encodedPath: childEncodedPath,
+                          itemPath: childItemPath,
+                          size: lstat.size,
+                          dateModified: lstat.mtimeMs,
+                          dateCreated: lstat.birthtimeMs,
+                          dateOpened: null,
+                          version: null,
+                          kind: null,
+                          comments: null,
+                          _metadataLoaded: false
+                        };
+                      } catch (err) {
+                        return {
+                          isDir,
+                          title,
+                          encodedPath: childEncodedPath,
+                          itemPath: childItemPath,
+                          size: 0,
+                          dateModified: 0,
+                          dateCreated: 0,
+                          dateOpened: null,
+                          version: null,
+                          kind: null,
+                          comments: null,
+                          _metadataLoaded: false
+                        };
+                      }
+                    });
+
+                    // Sort child data
+                    childData.sort((a, b) => {
+                      if (a.isDir !== b.isDir) {
+                        return a.isDir ? -1 : 1;
+                      }
+                      let comparison = 0;
+                      switch (sortColumn) {
+                      case 'name':
+                        comparison = a.title.localeCompare(b.title, undefined, {
+                          numeric: true,
+                          sensitivity: 'base'
+                        });
+                        break;
+                      case 'size':
+                        comparison = a.size - b.size;
+                        break;
+                      case 'dateModified':
+                        comparison = a.dateModified - b.dateModified;
+                        break;
+                      case 'dateCreated':
+                        comparison = a.dateCreated - b.dateCreated;
+                        break;
+                      default:
+                        break;
+                      }
+                      return sortDirection === 'asc' ? comparison : -comparison;
+                    });
+
+                    // Insert child rows after current row
+                    let insertAfter = tr;
+                    childData.forEach((childItem) => {
+                      const childRow = buildRow(childItem, depth + 1);
+                      insertAfter.after(childRow);
+                      insertAfter = childRow;
+                    });
+                  } catch (err) {
+                    // eslint-disable-next-line no-console -- Error logging
+                    console.error('Error loading child directory:', err);
+                  }
+                }
+
+                saveExpansionState();
+              });
+
+              td.append(expander);
+            } else if (listViewTreeMode) {
+              // Add empty expander space for non-folders
+              const expander = document.createElement('span');
+              expander.className = 'tree-expander empty';
+              expander.textContent = '▶';
+              td.append(expander);
+            }
+
             // Add icon (will be loaded asynchronously)
-            td.innerHTML = '<img src="" alt="" />';
+            const img = document.createElement('img');
+            img.src = '';
+            img.alt = '';
+            td.append(img);
             getIconDataURLForFile(item.itemPath).then((url) => {
-              const img = td.querySelector('img');
               if (img && url) {
                 img.src = url;
               }
               return undefined;
             });
             break;
+          }
           case 'name':
+            // Add tree indentation if in tree mode
+            if (listViewTreeMode && depth > 0) {
+              for (let i = 0; i < depth; i++) {
+                const indent = document.createElement('span');
+                indent.className = 'tree-indent';
+                td.append(indent);
+              }
+            }
+
             if (item.isDir) {
               const a = document.createElement('a');
               a.href = '#path=' + item.encodedPath;
@@ -1894,8 +2063,32 @@ function addItems (result, basePath, currentBasePath) {
       // Add drag-and-drop support
       addDragAndDropSupport(tr, item.encodedPath, item.isDir);
 
+      return tr;
+    };
+
+    // Build rows for all items at root level
+    listViewData.forEach((item) => {
+      const tr = buildRow(item, 0);
       tbody.append(tr);
     });
+
+    // Restore expanded folders in tree mode
+    if (listViewTreeMode && expandedPaths.size > 0) {
+      // Trigger expansion for any folders that should be expanded
+      const allRows = tbody.querySelectorAll('tr');
+      allRows.forEach((row) => {
+        const rowPath = row.dataset.path;
+        // Find corresponding item
+        const item = listViewData.find((i) => i.encodedPath === rowPath);
+        if (item && item.isDir && expandedPaths.has(item.itemPath)) {
+          const expander = row.querySelector('.tree-expander');
+          if (expander && !expander.classList.contains('expanded')) {
+            // Trigger click to expand
+            expander.click();
+          }
+        }
+      });
+    }
 
     // Restore previously selected item after refresh
     // Skip auto-selection if creating/renaming (it will handle selection)
@@ -2107,6 +2300,31 @@ function addItems (result, basePath, currentBasePath) {
       };
 
       loadBatchMetadata();
+    }
+
+    // Tree mode toggle button
+    const treeModeToggle = $('.tree-mode-toggle');
+    if (treeModeToggle) {
+      // Update button state
+      treeModeToggle.style.opacity = listViewTreeMode ? '1' : '0.5';
+
+      // Remove any existing click listener
+      // @ts-expect-error Custom property
+      const oldTreeToggleListener = treeModeToggle._treeToggleListener;
+      if (oldTreeToggleListener) {
+        treeModeToggle.removeEventListener('click', oldTreeToggleListener);
+      }
+
+      const treeToggleListener = async () => {
+        const {toggleListViewTreeMode} =
+          await import('./state/flags.js');
+        toggleListViewTreeMode();
+        changePath(); // Refresh the view
+      };
+
+      // @ts-expect-error Custom property
+      treeModeToggle._treeToggleListener = treeToggleListener;
+      treeModeToggle.addEventListener('click', treeToggleListener);
     }
 
     // Column picker
