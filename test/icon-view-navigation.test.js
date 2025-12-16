@@ -626,9 +626,13 @@ describe('Icon view keyboard navigation', () => {
       {timeout: 5000}
     );
 
-    // Wait additional time for the selection to be
-    //   applied (the code has a 1000ms setTimeout)
-    await page.waitForTimeout(1500);
+    // Wait for the selection to be applied to the renamed file
+    // (the code has a 1000ms setTimeout in rename.js)
+    await page.waitForFunction(() => {
+      const selectedCell = document.querySelector('td.list-item.selected');
+      const p = selectedCell?.querySelector('p');
+      return p?.dataset.path?.includes('test-rename-file-renamed.txt');
+    }, {timeout: 3000});
 
     // Check that file was renamed and is still selected
     const renameDebug = await page.evaluate(() => {
