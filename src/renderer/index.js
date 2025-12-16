@@ -2008,6 +2008,10 @@ function addItems (result, basePath, currentBasePath) {
       listViewTable.removeEventListener('keydown', oldListener);
     }
 
+    // Typeahead search state
+    let typeaheadBuffer = '';
+    let typeaheadTimeout = null;
+
     const keydownListener = (e) => {
       const selectedRow = tbody.querySelector('tr.selected');
       const allRows = [...tbody.querySelectorAll('tr')];
@@ -2036,6 +2040,43 @@ function addItems (result, basePath, currentBasePath) {
           newRow.classList.add('selected');
           newRow.scrollIntoView({block: 'nearest'});
         }
+        return;
+      }
+
+      // Handle typeahead search
+      if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+
+        // Clear existing timeout
+        if (typeaheadTimeout) {
+          clearTimeout(typeaheadTimeout);
+        }
+
+        // Add character to buffer
+        typeaheadBuffer += e.key.toLowerCase();
+
+        // Find matching row
+        const matchingRow = allRows.find((row) => {
+          const nameCell = row.querySelector('.list-view-name');
+          const text = nameCell?.textContent?.toLowerCase() || '';
+          return text.startsWith(typeaheadBuffer);
+        });
+
+        if (matchingRow) {
+          // Remove previous selection
+          if (selectedRow) {
+            selectedRow.classList.remove('selected');
+          }
+
+          // Select matching row
+          matchingRow.classList.add('selected');
+          matchingRow.scrollIntoView({block: 'nearest'});
+        }
+
+        // Clear buffer after 1 second of inactivity
+        typeaheadTimeout = setTimeout(() => {
+          typeaheadBuffer = '';
+        }, 1000);
         return;
       }
 
