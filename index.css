@@ -19,12 +19,99 @@ nav button.selected {
   width: 250px;
 }
 
+.gallery-container {
+  display: flex;
+  gap: 20px;
+  height: 600px;
+}
+
+.gallery-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.gallery-preview-image {
+  flex-shrink: 0;
+  text-align: center;
+  padding: 15px;
+  border-bottom: 1px solid #ddd;
+  background: #fafafa;
+}
+
 div.gallery {
   overflow: scroll !important;
-  height: 350px;
-  width: 750px;
-  margin-left: auto;
-  margin-right: auto;
+  flex: 1;
+  width: 100%;
+}
+
+.gallery-preview-panel {
+  width: 350px;
+  flex-shrink: 0;
+  border-left: 1px solid #ddd;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.gallery-preview-metadata {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.gallery-metadata-content {
+  padding: 15px;
+}
+
+.gallery-metadata-title {
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.gallery-metadata-subtitle {
+  color: #666;
+  margin-bottom: 15px;
+}
+
+.gallery-metadata-section-title {
+  font-weight: bold;
+  margin-top: 15px;
+  margin-bottom: 8px;
+}
+
+.gallery-metadata-table {
+  width: 100%;
+  font-size: 12px;
+}
+
+.gallery-metadata-table td:first-child {
+  padding: 4px 8px 4px 0;
+  color: #666;
+}
+
+.gallery-metadata-table td:last-child {
+  padding: 4px 0;
+}
+
+.gallery-text-preview {
+  margin: 10px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 10px;
+  font-family: monospace;
+  max-height: 150px;
+  overflow: auto;
+  background: #f5f5f5;
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.gallery-metadata-error {
+  padding: 15px;
+  color: #999;
 }
 
 .miller-selected {
@@ -63,11 +150,9 @@ div.gallery {
 .gallery-icon-preview {
   display: block;
   height: auto;
-  max-height: 256px;
-  max-width: 256px;
-  margin-left: auto;
-  margin-right: auto;
-  margin-bottom: 10px;
+  max-height: 200px;
+  max-width: 100%;
+  object-fit: contain;
 }
 
 /* .icon-container p {

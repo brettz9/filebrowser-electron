@@ -30543,30 +30543,47 @@
 	      ? /** @type {import('jamilih').JamilihArray[]} */ ([
 	        ...(view === 'gallery-view'
 	          ? [
-	            ['div', [
-	              ['img', {
-	                class: 'gallery-icon-preview'
-	              }]
+	            ['div', {
+	              class: 'gallery-container'
+	            }, [
+	              ['div', {
+	                class: 'gallery-main'
+	              }, [
+	                ['div', {
+	                  class: 'gallery-preview-image'
+	                }, [
+	                  ['img', {
+	                    class: 'gallery-icon-preview'
+	                  }]
+	                ]],
+	                ['div', {
+	                  class: 'gallery'
+	                }, [
+	                  ['table', {
+	                    dataset: {basePath}
+	                  }, [
+	                    ['tr', listItems]
+	                  ]]
+	                ]]
+	              ]],
+	              ['div', {
+	                class: 'gallery-preview-panel'
+	              }, [
+	                ['div', {
+	                  class: 'gallery-preview-metadata'
+	                }]
+	              ]]
 	            ]]
 	          ]
-	          : []),
-	        ['div', {
-	          ...(view === 'gallery-view'
-	            ? {
-	              class: 'gallery'
-	            }
-	            : {})
-	        }, [
-	          ['table', {
-	            dataset: {basePath}
-	          }, view === 'gallery-view'
-	            ? [
-	              ['tr', listItems]
-	            ]
-	            : chunk(listItems, numIconColumns).map((innerArr) => {
-	              return ['tr', innerArr];
-	            })]
-	        ]]
+	          : [
+	            ['div', [
+	              ['table', {
+	                dataset: {basePath}
+	              }, chunk(listItems, numIconColumns).map((innerArr) => {
+	                return ['tr', innerArr];
+	              })]
+	            ]]
+	          ])
 	      ])
 	      : listItems)
 	  ]);
@@ -30678,6 +30695,98 @@
 	      cellEl._dblclickHandler = dblclickHandler;
 	    });
 
+	    /**
+	     * Generate metadata HTML for gallery preview panel.
+	     * @param {string} itemPath - The path to the file/folder
+	     * @returns {string} HTML string with metadata
+	     */
+	    const generateGalleryMetadata = (itemPath) => {
+	      try {
+	        const decodedPath = decodeURIComponent(itemPath);
+	        const lstat = lstatSync(decodedPath);
+	        const kind = getFileKind(decodedPath);
+	        const metadata = getFileMetadata(decodedPath);
+	        const category = isMacApp(decodedPath)
+	          ? getMacAppCategory(decodedPath)
+	          : null;
+
+	        const fileName = path.basename(decodedPath);
+	        const escapedName = fileName.
+	          replaceAll('&', '&amp;').
+	          replaceAll('<', '&lt;').
+	          replaceAll('>', '&gt;');
+
+	        // Generate preview content for files
+	        let previewContent = '';
+	        if (lstat.isFile()) {
+	          const utiResult = spawnSync(
+	            'mdls',
+	            ['-name', 'kMDItemContentType', '-raw', decodedPath],
+	            {encoding: 'utf8'}
+	          );
+	          const uti = utiResult.stdout?.trim() || '';
+
+	          // Text-based files preview
+	          if ((/text|json|xml|javascript|source/v).test(uti) ||
+	            (/\.(?:txt|md|js|ts|html|css|json|xml|sh|py|rb)$/iv).
+	              test(decodedPath)) {
+	            try {
+	              const content = readFileSync(decodedPath, 'utf8');
+	              const preview = content.length > 500
+	                ? content.slice(0, 500) + '\n\n[... truncated]'
+	                : content;
+	              const escaped = preview.
+	                replaceAll('&', '&amp;').
+	                replaceAll('<', '&lt;').
+	                replaceAll('>', '&gt;');
+	              previewContent =
+	                `<div class="gallery-text-preview">${escaped}</div>`;
+	            /* c8 ignore next 3 -- Error handling */
+	            } catch {
+	              previewContent = '';
+	            }
+	          }
+	        }
+
+	        const versionRow = metadata.ItemVersion
+	          ? `<tr><td>Version</td><td>${metadata.ItemVersion}</td></tr>`
+	          : '';
+	        const categoryRow = category
+	          ? `<tr><td>Category</td><td>${category}</td></tr>`
+	          : '';
+
+	        return `<div class="gallery-metadata-content">
+  <div class="gallery-metadata-title">${escapedName}</div>
+  <div class="gallery-metadata-subtitle">${kind} - ${
+    filesize(lstat.size)
+  }</div>
+  ${previewContent}
+  <div class="gallery-metadata-section-title">Information</div>
+  <table class="gallery-metadata-table">
+    <tr><td>Created</td><td>${
+      getFormattedDate(lstat.birthtimeMs)
+    }</td></tr>
+    <tr><td>Modified</td><td>${
+      getFormattedDate(lstat.mtimeMs)
+    }</td></tr>
+    <tr><td>Last opened</td><td>${
+      getFormattedDate(metadata.ItemLastUsedDate)
+    }</td></tr>
+    ${versionRow}
+    ${categoryRow}
+  </table>
+</div>`;
+	      /* c8 ignore next 6 -- Error handling */
+	      } catch (err) {
+	        const errMsg = err && typeof err === 'object' && 'message' in err
+	          ? String(err.message)
+	          : 'Unknown error';
+	        return `<div class="gallery-metadata-error">Preview error: ${
+          errMsg
+        }</div>`;
+	      }
+	    };
+
 	    // Helper function to update gallery preview for selected item
 	    /**
 	     * @param {HTMLElement} cellEl - The selected cell element
@@ -30712,13 +30821,24 @@
 	            decodedPath, 512
 	          ) || await getXLargeIconDataURLForFile(decodedPath);
 
-	        // Use same DOM traversal as click handler
-	        const tableContainer =
-	          cellEl.parentElement.parentElement.parentElement;
-	        const imgElement =
-	          tableContainer.previousElementSibling?.querySelector('img');
+	        // Find the gallery container and update both image and metadata
+	        const table = cellEl.parentElement.parentElement;
+	        const galleryDiv = table.parentElement;
+	        const galleryMain = galleryDiv.parentElement;
+	        const galleryContainer = galleryMain.parentElement;
+
+	        // Update image (in gallery-main)
+	        const imgElement = galleryMain.querySelector('.gallery-icon-preview');
 	        if (imgElement && url) {
 	          imgElement.src = url;
+	        }
+
+	        // Update metadata (in side panel)
+	        const metadataDiv = galleryContainer.querySelector(
+	          '.gallery-preview-metadata'
+	        );
+	        if (metadataDiv) {
+	          metadataDiv.innerHTML = generateGalleryMetadata(itemPath);
 	        }
 	      /* c8 ignore next 8 -- Error handler */
 	      })().catch(
