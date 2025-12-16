@@ -23,6 +23,8 @@ div.gallery {
   overflow: scroll !important;
   height: 350px;
   width: 750px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .miller-selected {
@@ -59,9 +61,13 @@ div.gallery {
 }
 
 .gallery-icon-preview {
+  display: block;
   height: auto;
   max-height: 256px;
   max-width: 256px;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 10px;
 }
 
 /* .icon-container p {
