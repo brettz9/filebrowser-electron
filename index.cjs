@@ -26740,6 +26740,7 @@
 	 * @returns {boolean} - The new value
 	 */
 	const toggleListViewTreeMode = (value) => {
+	  /* c8 ignore next -- boolean not currently in use */
 	  listViewTreeMode = typeof value === 'boolean' ? value : !listViewTreeMode;
 	  localStorage.setItem('list-view-tree-mode', listViewTreeMode.toString());
 	  return listViewTreeMode;
@@ -30830,7 +30831,7 @@
     ${categoryRow}
   </table>
 </div>`;
-	      /* c8 ignore next 6 -- Error handling */
+	      /* c8 ignore next 8 -- Error handling */
 	      } catch (err) {
 	        const errMsg = err && typeof err === 'object' && 'message' in err
 	          ? String(err.message)
@@ -31356,6 +31357,7 @@
 	          // Track if metadata has been loaded
 	          _metadataLoaded: false
 	        };
+	      /* c8 ignore next 16 -- Guard */
 	      } catch (err) {
 	        return {
 	          isDir,
@@ -31560,6 +31562,7 @@
 	                          comments: null,
 	                          _metadataLoaded: false
 	                        };
+	                      /* c8 ignore next 16 -- Guard */
 	                      } catch (err) {
 	                        return {
 	                          isDir,
@@ -31613,6 +31616,7 @@
 	                      insertAfter.after(childRow);
 	                      insertAfter = childRow;
 	                    });
+	                  /* c8 ignore next 4 -- Guard */
 	                  } catch (err) {
 	                    // eslint-disable-next-line no-console -- Error logging
 	                    console.error('Error loading child directory:', err);
@@ -31799,6 +31803,7 @@
 
 	        for (const row of allRows) {
 	          const rowPath = row.dataset.path;
+	          /* c8 ignore next 3 -- Guard  */
 	          if (!rowPath) {
 	            continue;
 	          }
@@ -31963,6 +31968,7 @@
 	                  break;
 	                }
 	              });
+	            /* c8 ignore start -- Guard */
 	            } catch (err) {
 	              // eslint-disable-next-line @stylistic/max-len -- Long
 	              // console.error('[batch] Error loading metadata for', item.title, ':', err);
@@ -31998,6 +32004,7 @@
 	                }
 	              });
 	            }
+	            /* c8 ignore stop -- Guard */
 
 	            // Break after processing chunk size, even if we have time
 	            if (currentIndex % CHUNK_SIZE === 0) {
@@ -32427,6 +32434,7 @@ ${previewContent}
       : ''
   }</table>
 `;
+	      /* c8 ignore next 8 -- Guard */
 	      } catch (err) {
 	        // If preview fails, return a basic error message
 	        const errMsg = err && typeof err === 'object' && 'message' in err

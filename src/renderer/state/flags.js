@@ -79,6 +79,7 @@ export const getListViewTreeMode = () => {
  * @returns {boolean} - The new value
  */
 export const toggleListViewTreeMode = (value) => {
+  /* c8 ignore next -- boolean not currently in use */
   listViewTreeMode = typeof value === 'boolean' ? value : !listViewTreeMode;
   localStorage.setItem('list-view-tree-mode', listViewTreeMode.toString());
   return listViewTreeMode;

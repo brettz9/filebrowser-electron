@@ -1109,7 +1109,7 @@ function addItems (result, basePath, currentBasePath) {
     ${categoryRow}
   </table>
 </div>`;
-      /* c8 ignore next 6 -- Error handling */
+      /* c8 ignore next 8 -- Error handling */
       } catch (err) {
         const errMsg = err && typeof err === 'object' && 'message' in err
           ? String(err.message)
@@ -1638,6 +1638,7 @@ function addItems (result, basePath, currentBasePath) {
           // Track if metadata has been loaded
           _metadataLoaded: false
         };
+      /* c8 ignore next 16 -- Guard */
       } catch (err) {
         return {
           isDir,
@@ -1845,6 +1846,7 @@ function addItems (result, basePath, currentBasePath) {
                           comments: null,
                           _metadataLoaded: false
                         };
+                      /* c8 ignore next 16 -- Guard */
                       } catch (err) {
                         return {
                           isDir,
@@ -1898,6 +1900,7 @@ function addItems (result, basePath, currentBasePath) {
                       insertAfter.after(childRow);
                       insertAfter = childRow;
                     });
+                  /* c8 ignore next 4 -- Guard */
                   } catch (err) {
                     // eslint-disable-next-line no-console -- Error logging
                     console.error('Error loading child directory:', err);
@@ -2084,6 +2087,7 @@ function addItems (result, basePath, currentBasePath) {
 
         for (const row of allRows) {
           const rowPath = row.dataset.path;
+          /* c8 ignore next 3 -- Guard  */
           if (!rowPath) {
             continue;
           }
@@ -2251,6 +2255,7 @@ function addItems (result, basePath, currentBasePath) {
                   break;
                 }
               });
+            /* c8 ignore start -- Guard */
             } catch (err) {
               // eslint-disable-next-line @stylistic/max-len -- Long
               // console.error('[batch] Error loading metadata for', item.title, ':', err);
@@ -2289,6 +2294,7 @@ function addItems (result, basePath, currentBasePath) {
                 }
               });
             }
+            /* c8 ignore stop -- Guard */
 
             // Break after processing chunk size, even if we have time
             if (currentIndex % CHUNK_SIZE === 0) {
@@ -2718,6 +2724,7 @@ ${previewContent}
       : ''
   }</table>
 `;
+      /* c8 ignore next 8 -- Guard */
       } catch (err) {
         // If preview fails, return a basic error message
         const errMsg = err && typeof err === 'object' && 'message' in err

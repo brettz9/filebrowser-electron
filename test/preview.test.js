@@ -261,6 +261,12 @@ describe('Preview', () => {
     beforeEach(async () => {
       ({electron, page} = await initialize());
 
+      // Clear storage to remove sticky notes
+      await page.evaluate(() => {
+        // @ts-expect-error - electronAPI storage
+        globalThis.electronAPI.storage.clear();
+      });
+
       // Wait for app to fully load
       await page.waitForTimeout(1000);
     });
@@ -269,16 +275,23 @@ describe('Preview', () => {
     });
 
     test('loads sticky notes on reset to root', async () => {
+      await page.click('#three-columns');
+
       // Create a sticky note at root using the sticky notes button
       await page.click('button#create-sticky');
       await page.waitForSelector('.sticky-note', {timeout: 3000});
-      await page.waitForTimeout(1000);
 
-      // Switch to three-columns view
-      await page.click('#three-columns');
-      await page.waitForTimeout(500);
+      // Trigger a change to the sticky note to ensure MutationObserver fires
+      // and saves it to storage
+      await page.click('.sticky-note-content');
+      await page.keyboard.type('Test');
+
+      // Wait for the sticky note to be saved to storage
+      await page.waitForTimeout(2000);
+
+
       // Navigate away from root by clicking on a folder in three-columns view
-      const folderLink = await page.locator('a[data-path]').first();
+      const folderLink = await page.locator('ul.miller-column a[data-path]').first();
       await folderLink.click();
       await page.waitForTimeout(1000);
 
@@ -310,7 +323,8 @@ describe('Preview', () => {
       // Sticky notes aren't automatically reloaded after reset in three-columns view
       // Manually trigger reload to ensure they're loaded (and cover line 1414)
       await page.evaluate(() => {
-        const saved = localStorage.getItem('stickyNotes-local-/');
+        // @ts-expect-error - electronAPI storage
+        const saved = globalThis.electronAPI.storage.getItem('stickyNotes-local-/');
         if (saved) {
           // @ts-expect-error - stickyNotes global
           globalThis.stickyNotes.clear(({metadata}) => {
@@ -368,11 +382,11 @@ describe('Preview', () => {
       await page.waitForTimeout(3000);
 
       // Verify we're back at root
-      const currentPath = await page.evaluate(() => {
+      const currentPath2 = await page.evaluate(() => {
         return globalThis.location.hash;
       });
-      const isAtRoot = currentPath === '#path=/' || currentPath === '#path=%2F';
-      expect(isAtRoot).toBe(true);
+      const isAtRoot2 = currentPath2 === '#path=/' || currentPath2 === '#path=%2F';
+      expect(isAtRoot2).toBe(true);
 
       // Lines 971-977 execute when reset() callback runs with saved sticky notes data
     });

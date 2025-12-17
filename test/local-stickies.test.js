@@ -34,6 +34,15 @@ let dragAndDropRelativeToElement;
 
 beforeEach(async () => {
   ({electron, page} = await initialize());
+  await page.evaluate(() => {
+    // @ts-expect-error - electronAPI storage
+    globalThis.electronAPI.storage.clear();
+  });
+
+  // Clear ALL localStorage to ensure clean state
+  await page.evaluate(() => {
+    localStorage.clear();
+  });
   dragAndDropRelativeToElement = getDragAndDropRelativeToElement(page);
 });
 
@@ -61,10 +70,17 @@ describe('renderer', () => {
         await page.locator('#three-columns').click();
         await page.waitForTimeout(300);
 
+        // Wait for Miller columns to be visible
+        await page.waitForSelector('ul.miller-column', {
+          state: 'visible', timeout: 5000
+        });
+
         let noteContent = await page.locator('.sticky-note-content');
         await expect(noteContent).toBeHidden();
 
-        const usersFolder = await page.locator('a[data-path="/Users"]');
+        const usersFolder = await page.locator(
+          'ul.miller-column a[data-path="/Users"]'
+        );
         await usersFolder.click();
         await page.waitForTimeout(300);
 
@@ -100,7 +116,9 @@ describe('renderer', () => {
         // // eslint-disable-next-line no-console -- Debug
         // console.log('Saved sticky data:', savedData);
 
-        const appFolder = await page.locator('a[data-path="/Applications"]');
+        const appFolder = await page.locator(
+          'ul.miller-column a[data-path="/Applications"]'
+        );
         await appFolder.click();
 
         // Hidden as this is a local sticky
@@ -122,8 +140,9 @@ describe('renderer', () => {
         expect(noteContentRefreshed).toBeHidden();
 
 
-        const usersFolderRefreshed =
-          await page.locator('a[data-path="/Users"]');
+        const usersFolderRefreshed = await page.locator(
+          'ul.miller-column a[data-path="/Users"]'
+        );
         await usersFolderRefreshed.click();
 
         // Get fresh locator after navigation and wait for it to be visible

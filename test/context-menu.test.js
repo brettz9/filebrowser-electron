@@ -50,8 +50,15 @@ describe('renderer', () => {
       await page.locator('#three-columns').click();
       await page.waitForTimeout(500);
 
+      // Wait for Miller columns to be visible
+      await page.waitForSelector('ul.miller-column', {
+        state: 'visible', timeout: 5000
+      });
+
       // Navigate to /Users to have columns visible
-      const usersFolder = await page.locator('a[data-path="/Users"]');
+      const usersFolder = await page.locator(
+        'ul.miller-column a[data-path="/Users"]'
+      );
       await usersFolder.click();
       await page.waitForTimeout(500);
 
@@ -2326,10 +2333,10 @@ describe('renderer', () => {
         });
         await page.waitForTimeout(1000);
 
-        // Trigger context menu near bottom but with room to fit above
-        // Position at 60% down viewport to ensure submenu has room to fit above
+        // Trigger context menu in middle area so submenu overflows bottom
+        // but doesn't have room to fit above (submenu needs to be > parentTop)
         const viewportHeight = await page.evaluate(() => window.innerHeight);
-        const contextY = Math.floor(viewportHeight * 0.6);
+        const contextY = Math.floor(viewportHeight * 0.4);
 
         await page.evaluate((yPos) => {
           const event = new MouseEvent('contextmenu', {
@@ -2906,13 +2913,22 @@ describe('renderer', () => {
       await page.locator('#three-columns').click();
       await page.waitForTimeout(500);
 
-      const usersFolder = await page.locator('a[data-path="/Users"]');
+      // Wait for Miller columns to be visible
+      await page.waitForSelector('ul.miller-column', {
+        state: 'visible', timeout: 5000
+      });
+
+      const usersFolder = await page.locator(
+        'ul.miller-column a[data-path="/Users"]'
+      );
       await usersFolder.click();
       await page.waitForTimeout(500);
 
       // Right-click to show context menu
       await page.evaluate(() => {
-        const folder = document.querySelector('a[data-path="/Users"]');
+        const folder = document.querySelector(
+          'ul.miller-column a[data-path="/Users"]'
+        );
         if (folder) {
           const event = new MouseEvent('contextmenu', {
             bubbles: true,
@@ -2927,12 +2943,18 @@ describe('renderer', () => {
       const contextMenu = await page.locator('.context-menu');
       await contextMenu.waitFor({state: 'visible', timeout: 5000});
 
-      // Right-click elsewhere
+      // Store the menu element handle to track this specific instance
+      const firstMenuElement = await contextMenu.elementHandle();
+
+      // Right-click elsewhere to trigger hiding the first menu
       await page.mouse.click(200, 200, {button: 'right'});
       await page.waitForTimeout(300);
 
-      // Original menu should be hidden
-      await expect(contextMenu).not.toBeVisible();
+      // Check that the first menu instance is no longer attached/visible
+      const isAttached = await firstMenuElement?.evaluate((el) => {
+        return el.isConnected && el.style.display !== 'none';
+      });
+      expect(isAttached).toBe(false);
     });
 
     test(
