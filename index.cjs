@@ -26673,6 +26673,7 @@
 	let isWatcherRefreshing = false;
 
 	// Tree view in list view
+	// Initialize from storage on module load, but re-check on access
 	let listViewTreeMode =
 	  localStorage.getItem('list-view-tree-mode') === 'true';
 
@@ -26723,16 +26724,23 @@
 	};
 
 	/**
+	 * Get the list view tree mode flag.
+	 * @returns {boolean}
+	 */
+	const getListViewTreeMode = () => {
+	  // Re-sync with storage on every access to handle cleared storage
+	  const stored = localStorage.getItem('list-view-tree-mode');
+	  listViewTreeMode = stored === 'true';
+	  return listViewTreeMode;
+	};
+
+	/**
 	 * Toggle the list view tree mode.
 	 * @param {boolean} [value] - Optional value to set
 	 * @returns {boolean} - The new value
 	 */
 	const toggleListViewTreeMode = (value) => {
-	  if (typeof value === 'boolean') {
-	    listViewTreeMode = value;
-	  } else {
-	    listViewTreeMode = !listViewTreeMode;
-	  }
+	  listViewTreeMode = typeof value === 'boolean' ? value : !listViewTreeMode;
 	  localStorage.setItem('list-view-tree-mode', listViewTreeMode.toString());
 	  return listViewTreeMode;
 	};
@@ -26741,11 +26749,11 @@
 		__proto__: null,
 		get $columns () { return $columns; },
 		getIsCopyingOrMoving: getIsCopyingOrMoving,
+		getListViewTreeMode: getListViewTreeMode,
 		get isCopyingOrMoving () { return isCopyingOrMoving; },
 		get isCreating () { return isCreating; },
 		get isDeleting () { return isDeleting; },
 		get isWatcherRefreshing () { return isWatcherRefreshing; },
-		get listViewTreeMode () { return listViewTreeMode; },
 		set$columns: set$columns,
 		setIsCopyingOrMoving: setIsCopyingOrMoving,
 		setIsCreating: setIsCreating,
@@ -31492,7 +31500,7 @@
 	          switch (col.id) {
 	          case 'icon': {
 	            // Add expander triangle for folders in tree mode (before icon)
-	            if (listViewTreeMode && item.isDir) {
+	            if (getListViewTreeMode() && item.isDir) {
 	              const expander = document.createElement('span');
 	              expander.className = 'tree-expander';
 	              expander.textContent = '▶';
@@ -31615,7 +31623,7 @@
 	              });
 
 	              td.append(expander);
-	            } else if (listViewTreeMode) {
+	            } else if (getListViewTreeMode()) {
 	              // Add empty expander space for non-folders
 	              const expander = document.createElement('span');
 	              expander.className = 'tree-expander empty';
@@ -31638,7 +31646,7 @@
 	          }
 	          case 'name':
 	            // Add tree indentation if in tree mode
-	            if (listViewTreeMode && depth > 0) {
+	            if (getListViewTreeMode() && depth > 0) {
 	              for (let i = 0; i < depth; i++) {
 	                const indent = document.createElement('span');
 	                indent.className = 'tree-indent';
@@ -31781,7 +31789,7 @@
 	    });
 
 	    // Restore expanded folders in tree mode
-	    if (listViewTreeMode && expandedPaths.size > 0) {
+	    if (getListViewTreeMode() && expandedPaths.size > 0) {
 	      // Recursively expand folders that should be expanded
 	      // Process synchronously to ensure proper nesting
 	      const expandRowsRecursively = () => {
@@ -32029,7 +32037,7 @@
 	    const treeModeToggle = $('.tree-mode-toggle');
 	    if (treeModeToggle) {
 	      // Update button state
-	      treeModeToggle.style.opacity = listViewTreeMode ? '1' : '0.5';
+	      treeModeToggle.style.opacity = getListViewTreeMode() ? '1' : '0.5';
 
 	      // Remove any existing click listener
 	      // @ts-expect-error Custom property

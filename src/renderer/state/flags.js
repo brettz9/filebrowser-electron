@@ -12,7 +12,8 @@ export const isRefreshing = false;
 export let isWatcherRefreshing = false;
 
 // Tree view in list view
-export let listViewTreeMode =
+// Initialize from storage on module load, but re-check on access
+let listViewTreeMode =
   localStorage.getItem('list-view-tree-mode') === 'true';
 
 /**
@@ -62,16 +63,23 @@ export const setIsWatcherRefreshing = (value) => {
 };
 
 /**
+ * Get the list view tree mode flag.
+ * @returns {boolean}
+ */
+export const getListViewTreeMode = () => {
+  // Re-sync with storage on every access to handle cleared storage
+  const stored = localStorage.getItem('list-view-tree-mode');
+  listViewTreeMode = stored === 'true';
+  return listViewTreeMode;
+};
+
+/**
  * Toggle the list view tree mode.
  * @param {boolean} [value] - Optional value to set
  * @returns {boolean} - The new value
  */
 export const toggleListViewTreeMode = (value) => {
-  if (typeof value === 'boolean') {
-    listViewTreeMode = value;
-  } else {
-    listViewTreeMode = !listViewTreeMode;
-  }
+  listViewTreeMode = typeof value === 'boolean' ? value : !listViewTreeMode;
   localStorage.setItem('list-view-tree-mode', listViewTreeMode.toString());
   return listViewTreeMode;
 };

@@ -24,7 +24,7 @@ import {
   set$columns,
   isCreating,
   getIsCopyingOrMoving,
-  listViewTreeMode
+  getListViewTreeMode
 } from './state/flags.js';
 import {
   pushUndo,
@@ -1785,7 +1785,7 @@ function addItems (result, basePath, currentBasePath) {
           switch (col.id) {
           case 'icon': {
             // Add expander triangle for folders in tree mode (before icon)
-            if (listViewTreeMode && item.isDir) {
+            if (getListViewTreeMode() && item.isDir) {
               const expander = document.createElement('span');
               expander.className = 'tree-expander';
               expander.textContent = '▶';
@@ -1908,7 +1908,7 @@ function addItems (result, basePath, currentBasePath) {
               });
 
               td.append(expander);
-            } else if (listViewTreeMode) {
+            } else if (getListViewTreeMode()) {
               // Add empty expander space for non-folders
               const expander = document.createElement('span');
               expander.className = 'tree-expander empty';
@@ -1931,7 +1931,7 @@ function addItems (result, basePath, currentBasePath) {
           }
           case 'name':
             // Add tree indentation if in tree mode
-            if (listViewTreeMode && depth > 0) {
+            if (getListViewTreeMode() && depth > 0) {
               for (let i = 0; i < depth; i++) {
                 const indent = document.createElement('span');
                 indent.className = 'tree-indent';
@@ -2074,7 +2074,7 @@ function addItems (result, basePath, currentBasePath) {
     });
 
     // Restore expanded folders in tree mode
-    if (listViewTreeMode && expandedPaths.size > 0) {
+    if (getListViewTreeMode() && expandedPaths.size > 0) {
       // Recursively expand folders that should be expanded
       // Process synchronously to ensure proper nesting
       const expandRowsRecursively = () => {
@@ -2328,7 +2328,7 @@ function addItems (result, basePath, currentBasePath) {
     const treeModeToggle = $('.tree-mode-toggle');
     if (treeModeToggle) {
       // Update button state
-      treeModeToggle.style.opacity = listViewTreeMode ? '1' : '0.5';
+      treeModeToggle.style.opacity = getListViewTreeMode() ? '1' : '0.5';
 
       // Remove any existing click listener
       // @ts-expect-error Custom property
