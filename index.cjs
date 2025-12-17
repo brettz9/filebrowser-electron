@@ -27950,7 +27950,8 @@
 	  const input = document.createElement('input');
 	  input.type = 'text';
 	  input.value = oldName;
-	  input.style.width = '100%';
+	  input.style.width = '300px'; // Fixed width to ensure visibility
+	  input.style.display = 'inline-block'; // Explicit display mode
 	  input.style.boxSizing = 'border-box';
 	  input.style.position = 'relative';
 	  input.style.zIndex = '9999'; // Above sticky headers
@@ -27963,12 +27964,19 @@
 	  // Replace text with input
 	  const originalContent = textElement.textContent;
 	  textElement.textContent = '';
+
+	  // Make parent behave as block element to properly contain the input
+	  // Store original styles to restore later
+	  textElement.style.display;
+	  textElement.style.width;
+	  textElement.style.display = 'block';
+	  textElement.style.width = '100%'; // Fill the table cell
+
 	  textElement.append(input);
 
 	  // Focus and select the text
 	  input.focus();
 	  input.select();
-
 	  let isFinishing = false;
 
 	  const finishRename = () => {
@@ -28329,8 +28337,8 @@
 	    // Watcher setup will be skipped due to isCreating flag
 	    changePath();
 
-	    // Wait for the view to refresh, then find and start renaming
-	    // Use setTimeout instead of nested requestAnimationFrame to avoid freeze
+	    // Wait for the view to refresh AND for any watcher activity to settle
+	    // before trying to add the rename input
 	    setTimeout(() => {
 	      // The data-path attribute uses encodeURIComponent for the folder name
 	      // Remove trailing slash from folderPath to avoid double slashes
@@ -28338,11 +28346,59 @@
 	      const encodedPath = normalizedFolderPath + '/' +
 	        encodeURIComponentFn(newFolderName);
 	      // Find the text element (p, span, or a) specifically, not img elements
-	      const newFolderElement = $(
-	        `p[data-path="${CSS.escape(encodedPath)}"], ` +
-	        `span[data-path="${CSS.escape(encodedPath)}"], ` +
-	        `a[data-path="${CSS.escape(encodedPath)}"]`
-	      );
+	      // Need to search within the active view container, not globally,
+	      // since elements with the same path may exist in hidden views
+
+	      // Try finding in list view first (most specific)
+	      const listTable = $('.list-view-table');
+	      let newFolderElement = null;
+
+	      if (listTable && listTable.offsetWidth > 0) {
+	        // In list view - search within the table
+	        const row = listTable.querySelector(
+	          `tr[data-path="${CSS.escape(encodedPath)}"]`
+	        );
+	        if (row) {
+	          newFolderElement = row.querySelector(
+	            '.list-view-name a, .list-view-name span'
+	          );
+	        }
+	      }
+
+	      // If not found, try icon view
+	      if (!newFolderElement) {
+	        const iconTable = $('.icon-view-table');
+	        if (iconTable && iconTable.offsetWidth > 0) {
+	          newFolderElement = iconTable.querySelector(
+	            `p[data-path="${CSS.escape(encodedPath)}"], ` +
+	            `span[data-path="${CSS.escape(encodedPath)}"], ` +
+	            `a[data-path="${CSS.escape(encodedPath)}"]`
+	          );
+	        }
+	      }
+
+	      // If still not found, try Miller columns
+	      if (!newFolderElement) {
+	        const millerColumns = $('.miller-columns');
+	        if (millerColumns && millerColumns.offsetWidth > 0) {
+	          newFolderElement = millerColumns.querySelector(
+	            `span[data-path="${CSS.escape(encodedPath)}"], ` +
+	            `a[data-path="${CSS.escape(encodedPath)}"]`
+	          );
+	        }
+	      }
+
+	      // Legacy fallback - remove the row-based search since
+	      //   it's now handled above
+	      if (!newFolderElement) {
+	        const row = $(`tr[data-path="${CSS.escape(encodedPath)}"]`);
+	        if (row) {
+	          newFolderElement = row.querySelector(
+	            '.list-view-name a, .list-view-name span'
+	          );
+	        }
+	      }
+
 	      if (newFolderElement) {
 	        startRename(newFolderElement, () => {
 	          // Clear flag after rename completes
@@ -28374,7 +28430,7 @@
 	        console.warn('Could not find new folder element');
 	        setIsCreating(false);
 	      }
-	    }, 150);
+	    }, 300); // Wait 300ms for watcher and DOM to settle
 	  } catch (err) {
 	    setIsCreating(false);
 	    // eslint-disable-next-line no-alert -- User feedback

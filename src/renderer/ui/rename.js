@@ -50,7 +50,8 @@ export function startRename (
   const input = document.createElement('input');
   input.type = 'text';
   input.value = oldName;
-  input.style.width = '100%';
+  input.style.width = '300px'; // Fixed width to ensure visibility
+  input.style.display = 'inline-block'; // Explicit display mode
   input.style.boxSizing = 'border-box';
   input.style.position = 'relative';
   input.style.zIndex = '9999'; // Above sticky headers
@@ -63,12 +64,19 @@ export function startRename (
   // Replace text with input
   const originalContent = textElement.textContent;
   textElement.textContent = '';
+
+  // Make parent behave as block element to properly contain the input
+  // Store original styles to restore later
+  const originalDisplay = textElement.style.display;
+  const originalWidth = textElement.style.width;
+  textElement.style.display = 'block';
+  textElement.style.width = '100%'; // Fill the table cell
+
   textElement.append(input);
 
   // Focus and select the text
   input.focus();
   input.select();
-
   let isFinishing = false;
 
   const finishRename = () => {
