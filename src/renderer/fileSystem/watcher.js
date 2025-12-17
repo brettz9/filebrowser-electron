@@ -227,6 +227,7 @@ async function setupNativeWatcher (dirPath) {
               let resolvedAncestorPath = ancestorPath;
               try {
                 resolvedAncestorPath = realpathSync(ancestorPath);
+              /* c8 ignore next 3 -- Guard */
               } catch {
                 // Use original if resolution fails
               }

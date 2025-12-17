@@ -66,9 +66,6 @@ export function startRename (
   textElement.textContent = '';
 
   // Make parent behave as block element to properly contain the input
-  // Store original styles to restore later
-  const originalDisplay = textElement.style.display;
-  const originalWidth = textElement.style.width;
   textElement.style.display = 'block';
   textElement.style.width = '100%'; // Fill the table cell
 

@@ -84,3 +84,7 @@ export const toggleListViewTreeMode = (value) => {
   localStorage.setItem('list-view-tree-mode', listViewTreeMode.toString());
   return listViewTreeMode;
 };
+
+// Export for testing
+// @ts-ignore
+globalThis.__getIsCreatingForTest = () => isCreating;

@@ -2754,5 +2754,67 @@ describe('renderer', () => {
       expect(stacksAfterRedo.undoLength).toBe(0);
       expect(stacksAfterRedo.redoLength).toBe(0);
     });
+
+    test(
+      'loads local sticky notes and adds listeners in three-columns',
+      async () => {
+        // Covers lines 2788-2794 in index.js (forEach loop with
+        //   addLocalStickyInputListeners)
+
+        // Create a local sticky note
+        await page.locator('#three-columns').click();
+        await page.waitForTimeout(300);
+
+        await page.waitForSelector('ul.miller-column', {
+          state: 'visible', timeout: 5000
+        });
+
+        const usersFolder = await page.locator(
+          'ul.miller-column a[data-path="/Users"]'
+        );
+        await usersFolder.click();
+        await page.waitForTimeout(300);
+
+        await page.locator('button#create-sticky').click();
+        const noteContent = await page.locator('.sticky-note-content');
+        await noteContent.fill('Test local note');
+        await page.waitForTimeout(1000);
+
+        // Navigate away
+        const appFolder = await page.locator(
+          'ul.miller-column a[data-path="/Applications"]'
+        );
+        await appFolder.click();
+        await page.waitForTimeout(300);
+
+        // Navigate back - this triggers updateHistoryAndStickies which calls
+        // loadNotes and forEach with addLocalStickyInputListeners
+        const usersFolderAgain = await page.locator(
+          'ul.miller-column a[data-path="/Users"]'
+        );
+        await usersFolderAgain.click();
+        await page.waitForTimeout(500);
+
+        // Verify the sticky note was loaded and listeners added
+        const noteContentReloaded = await page.locator('.sticky-note-content');
+        await expect(noteContentReloaded).toBeVisible();
+        expect(await noteContentReloaded.textContent()).toBe('Test local note');
+
+        // Verify listeners work by editing the note
+        await noteContentReloaded.click();
+        await noteContentReloaded.press('End');
+        await page.keyboard.type(' edited');
+        await page.waitForTimeout(1000);
+
+        // Navigate away and back to verify the edit was saved
+        await appFolder.click();
+        await page.waitForTimeout(300);
+        await usersFolderAgain.click();
+        await page.waitForTimeout(500);
+
+        const finalContent = await page.locator('.sticky-note-content');
+        expect(await finalContent.textContent()).toContain('edited');
+      }
+    );
   });
 });

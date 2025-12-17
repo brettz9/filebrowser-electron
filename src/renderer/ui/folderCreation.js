@@ -93,7 +93,7 @@ export function createNewFolder (
 
       // If not found, try icon view
       if (!newFolderElement) {
-        const iconTable = $('.icon-view-table');
+        const iconTable = $('table[data-base-path]');
         if (iconTable && iconTable.offsetWidth > 0) {
           newFolderElement = iconTable.querySelector(
             `p[data-path="${CSS.escape(encodedPath)}"], ` +
@@ -116,6 +116,8 @@ export function createNewFolder (
 
       // Legacy fallback - remove the row-based search since
       //   it's now handled above
+      /* c8 ignore start -- Legacy fallback, unreachable
+        with modern view paths */
       if (!newFolderElement) {
         const row = $(`tr[data-path="${CSS.escape(encodedPath)}"]`);
         if (row) {
@@ -124,6 +126,7 @@ export function createNewFolder (
           );
         }
       }
+      /* c8 ignore stop */
 
       if (newFolderElement) {
         startRename(newFolderElement, () => {

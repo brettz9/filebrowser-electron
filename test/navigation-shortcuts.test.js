@@ -361,5 +361,33 @@ describe('renderer', () => {
 
       expect(currentPath).toBe('/Applications/Utilities');
     });
+
+    test('Cmd+2 switches to list view', async () => {
+      // Covers lines 3422-3424 in index.js
+      // Start in icon view
+      await page.click('#icon-view');
+      await page.waitForTimeout(300);
+
+      // Press Cmd+2 by dispatching event on document
+      await page.evaluate(() => {
+        const event = new KeyboardEvent('keydown', {
+          key: '2',
+          code: 'Digit2',
+          metaKey: true,
+          bubbles: true,
+          cancelable: true
+        });
+        document.dispatchEvent(event);
+      });
+      await page.waitForTimeout(300);
+
+      // Should be in list view
+      const listViewActive = await page.evaluate(() => {
+        const btn = document.querySelector('#list-view');
+        return btn?.classList.contains('selected');
+      });
+
+      expect(listViewActive).toBe(true);
+    });
   });
 });
