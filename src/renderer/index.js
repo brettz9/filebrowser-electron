@@ -561,6 +561,71 @@ function addItems (result, basePath, currentBasePath) {
     ulIconOrGallery.firstChild.remove();
   }
 
+  // Apply icon-view sorting logic (for gallery-view and icon-view)
+  if (view === 'icon-view' || view === 'gallery-view') {
+    const iconSortMode = localStorage.getItem('icon-view-sort-mode') ||
+      'name';
+
+    if (iconSortMode === 'none' || iconSortMode === 'snap') {
+      // Use custom positions if available
+      const customPositionsKey = `icon-positions-${currentBasePath}`;
+      const storedPositions = localStorage.getItem(customPositionsKey);
+
+      if (storedPositions) {
+        try {
+          const positions = JSON.parse(storedPositions);
+          // Sort by stored position (row, col)
+          result.sort((a, b) => {
+            const [, , titleA] = a;
+            const [, , titleB] = b;
+            const posA = positions[titleA];
+            const posB = positions[titleB];
+
+            // Items without positions go to the end
+            if (!posA && !posB) {
+              return 0;
+            }
+            if (!posA) {
+              return 1;
+            }
+            if (!posB) {
+              return -1;
+            }
+
+            // Compare by row first, then column
+            if (posA.row !== posB.row) {
+              return posA.row - posB.row;
+            }
+            return posA.col - posB.col;
+          });
+        /* c8 ignore next 3 -- JSON parse error handling */
+        } catch {
+          // Invalid JSON, fall back to name sort
+        }
+      }
+    } else {
+      // Apply metadata-based sorting
+      result.sort((a, b) => {
+        const [isDirA, , titleA] = a;
+        const [isDirB, , titleB] = b;
+
+        // Folders always come first
+        if (isDirA && !isDirB) {
+          return -1;
+        }
+        if (!isDirA && isDirB) {
+          return 1;
+        }
+
+        // Sort by selected metadata field
+        // For now, all modes sort by name (metadata sorting TODO)
+        return titleA.localeCompare(titleB, undefined, {
+          sensitivity: 'base'
+        });
+      });
+    }
+  }
+
   const ul = view === 'three-columns'
     ? ulMiller
     : ulIconOrGallery;
@@ -1040,6 +1105,135 @@ function addItems (result, basePath, currentBasePath) {
       // @ts-expect-error Custom property
       cellEl._dblclickHandler = dblclickHandler;
     });
+
+    // Add icon repositioning support for 'none' and 'snap' modes
+    const iconSortMode = localStorage.getItem('icon-view-sort-mode') ||
+      'name';
+    if (iconSortMode === 'none' || iconSortMode === 'snap') {
+      cells.forEach((cell) => {
+        const cellEl = /** @type {HTMLElement} */ (cell);
+        cellEl.setAttribute('draggable', 'true');
+
+        // Store drag data
+        cellEl.addEventListener('dragstart', (e) => {
+          if (e.dataTransfer) {
+            const link = cellEl.querySelector('a, p');
+            if (link) {
+              const linkEl = /** @type {HTMLElement} */ (link);
+              const itemPath = linkEl.dataset.path;
+              const itemName = linkEl.textContent;
+              if (itemPath && itemName) {
+                e.dataTransfer.setData('icon-reposition', itemName);
+                e.dataTransfer.effectAllowed = 'move';
+                cellEl.classList.add('dragging-icon');
+              }
+            }
+          }
+        });
+
+        cellEl.addEventListener('dragend', () => {
+          cellEl.classList.remove('dragging-icon');
+        });
+
+        // Handle drop on cells for repositioning
+        cellEl.addEventListener('dragover', (e) => {
+          if (e.dataTransfer?.types.includes('icon-reposition')) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            cellEl.classList.add('drop-target-icon');
+          }
+        });
+
+        cellEl.addEventListener('dragleave', () => {
+          cellEl.classList.remove('drop-target-icon');
+        });
+
+        cellEl.addEventListener('drop', (e) => {
+          if (e.dataTransfer?.types.includes('icon-reposition')) {
+            e.preventDefault();
+            e.stopPropagation();
+            cellEl.classList.remove('drop-target-icon');
+
+            const draggedItemName =
+              e.dataTransfer.getData('icon-reposition');
+            const targetLink = cellEl.querySelector('a, p');
+
+            if (draggedItemName && targetLink) {
+              const targetEl = /** @type {HTMLElement} */ (targetLink);
+              const targetName = targetEl.textContent;
+
+              if (draggedItemName !== targetName) {
+                // Get current positions
+                const customPositionsKey =
+                  `icon-positions-${currentBasePath}`;
+                const storedPositions =
+                  localStorage.getItem(customPositionsKey);
+                const positions = storedPositions
+                  ? /** @type {Record<string, {row: number, col: number}>} */ (
+                    JSON.parse(storedPositions)
+                  )
+                  : /** @type {Record<string, {row: number, col: number}>} */ (
+                    {}
+                  );
+
+                // Find cell positions in grid
+                const allCells = [
+                  ...iconViewTable.querySelectorAll('td.list-item')
+                ];
+                const draggedCell = allCells.find((c) => {
+                  const l = c.querySelector('a, p');
+                  return l && l.textContent === draggedItemName;
+                });
+                const targetCell = cellEl;
+
+                if (draggedCell) {
+                  const draggedRow = draggedCell.parentElement;
+                  const targetRow = targetCell.parentElement;
+
+                  if (draggedRow && targetRow) {
+                    const allRows = [
+                      ...iconViewTable.querySelectorAll('tr')
+                    ];
+                    const draggedRowIndex = allRows.indexOf(draggedRow);
+                    const targetRowIndex = allRows.indexOf(targetRow);
+
+                    const draggedColIndex = [
+                      ...draggedRow.children
+                    ].indexOf(draggedCell);
+                    const targetColIndex = [
+                      ...targetRow.children
+                    ].indexOf(targetCell);
+
+                    // Swap positions
+                    positions[draggedItemName] = {
+                      row: targetRowIndex,
+                      col: targetColIndex
+                    };
+
+                    // If target has a position, swap it
+                    if (targetName && positions[targetName]) {
+                      positions[targetName] = {
+                        row: draggedRowIndex,
+                        col: draggedColIndex
+                      };
+                    }
+
+                    // Save positions
+                    localStorage.setItem(
+                      customPositionsKey,
+                      JSON.stringify(positions)
+                    );
+
+                    // Refresh view to show new positions
+                    changePath();
+                  }
+                }
+              }
+            }
+          }
+        });
+      });
+    }
 
     /**
      * Generate metadata HTML for gallery preview panel.
@@ -1553,6 +1747,248 @@ function addItems (result, basePath, currentBasePath) {
     iconViewTable.addEventListener('drop', dropHandler);
     // @ts-expect-error Custom property
     iconViewTable._dropHandler = dropHandler;
+
+    // Add context menu for empty space in icon-view
+    const contextmenuHandler = (e) => {
+      const {target} = e;
+      const targetEl = /** @type {HTMLElement} */ (target);
+      // Only show context menu on empty space (table, tr, or empty td)
+      if (targetEl === iconViewTable || targetEl.tagName === 'TR' ||
+          (targetEl.tagName === 'TD' &&
+            !targetEl.classList.contains('list-item'))) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Remove any existing context menus
+        for (const menu of $$('.context-menu')) {
+          menu.remove();
+        }
+
+        // Get current sort mode for icon-view
+        const currentIconSortMode =
+          localStorage.getItem('icon-view-sort-mode') || 'name';
+
+        const customContextMenu = jml('ul', {
+          class: 'context-menu',
+          style: {
+            left: e.pageX + 'px',
+            top: e.pageY + 'px'
+          }
+        }, [
+          ['li', {
+            class: 'context-menu-item',
+            $on: {
+              click () {
+                customContextMenu.remove();
+                createNewFolder(currentBasePath);
+              }
+            }
+          }, [
+            'Create new folder'
+          ]],
+          ...(getClipboard()
+            ? [['li', {
+              class: 'context-menu-item',
+              $on: {
+                click () {
+                  customContextMenu.remove();
+                  const clip = getClipboard();
+                  if (clip) {
+                    copyOrMoveItem(clip.path, currentBasePath, clip.isCopy);
+                  }
+                }
+              }
+            }, [
+              'Paste'
+            ]]]
+            : []),
+          ['li', {class: 'context-menu-separator'}],
+          ['li', {
+            class: 'context-menu-item has-submenu'
+          }, [
+            'Sort by',
+            ['ul', {
+              class: 'context-submenu'
+            }, [
+              ['li', {
+                class: 'context-menu-item',
+                $on: {
+                  click () {
+                    customContextMenu.remove();
+                    localStorage.setItem('icon-view-sort-mode', 'none');
+                    changePath();
+                  }
+                }
+              }, [
+                currentIconSortMode === 'none' ? '✓ None' : 'None'
+              ]],
+              ['li', {
+                class: 'context-menu-item',
+                $on: {
+                  click () {
+                    customContextMenu.remove();
+                    localStorage.setItem('icon-view-sort-mode', 'snap');
+                    changePath();
+                  }
+                }
+              }, [
+                currentIconSortMode === 'snap'
+                  ? '✓ Snap to Grid'
+                  : 'Snap to Grid'
+              ]],
+              ['li', {class: 'context-menu-separator'}],
+              ['li', {
+                class: 'context-menu-item',
+                $on: {
+                  click () {
+                    customContextMenu.remove();
+                    localStorage.setItem('icon-view-sort-mode', 'name');
+                    changePath();
+                  }
+                }
+              }, [
+                currentIconSortMode === 'name' ? '✓ Name' : 'Name'
+              ]],
+              ['li', {
+                class: 'context-menu-item',
+                $on: {
+                  click () {
+                    customContextMenu.remove();
+                    localStorage.setItem('icon-view-sort-mode', 'kind');
+                    changePath();
+                  }
+                }
+              }, [
+                currentIconSortMode === 'kind' ? '✓ Kind' : 'Kind'
+              ]],
+              ['li', {
+                class: 'context-menu-item',
+                $on: {
+                  click () {
+                    customContextMenu.remove();
+                    localStorage.setItem('icon-view-sort-mode', 'dateOpened');
+                    changePath();
+                  }
+                }
+              }, [
+                currentIconSortMode === 'dateOpened'
+                  ? '✓ Date Last Opened'
+                  : 'Date Last Opened'
+              ]],
+              ['li', {
+                class: 'context-menu-item',
+                $on: {
+                  click () {
+                    customContextMenu.remove();
+                    localStorage.setItem('icon-view-sort-mode', 'dateAdded');
+                    changePath();
+                  }
+                }
+              }, [
+                currentIconSortMode === 'dateAdded'
+                  ? '✓ Date Added'
+                  : 'Date Added'
+              ]],
+              ['li', {
+                class: 'context-menu-item',
+                $on: {
+                  click () {
+                    customContextMenu.remove();
+                    localStorage.setItem(
+                      'icon-view-sort-mode',
+                      'dateModified'
+                    );
+                    changePath();
+                  }
+                }
+              }, [
+                currentIconSortMode === 'dateModified'
+                  ? '✓ Date Modified'
+                  : 'Date Modified'
+              ]],
+              ['li', {
+                class: 'context-menu-item',
+                $on: {
+                  click () {
+                    customContextMenu.remove();
+                    localStorage.setItem(
+                      'icon-view-sort-mode',
+                      'dateCreated'
+                    );
+                    changePath();
+                  }
+                }
+              }, [
+                currentIconSortMode === 'dateCreated'
+                  ? '✓ Date Created'
+                  : 'Date Created'
+              ]],
+              ['li', {
+                class: 'context-menu-item',
+                $on: {
+                  click () {
+                    customContextMenu.remove();
+                    localStorage.setItem('icon-view-sort-mode', 'size');
+                    changePath();
+                  }
+                }
+              }, [
+                currentIconSortMode === 'size' ? '✓ Size' : 'Size'
+              ]]
+            ]]
+          ]]
+        ], document.body);
+
+        // Ensure main context menu is visible within viewport
+        requestAnimationFrame(() => {
+          const menuRect = customContextMenu.getBoundingClientRect();
+          const viewportWidth = window.innerWidth;
+          const viewportHeight = window.innerHeight;
+
+          // Adjust horizontal position if needed
+          if (menuRect.right > viewportWidth) {
+            customContextMenu.style.left =
+              (viewportWidth - menuRect.width - 10) + 'px';
+          }
+
+          if (menuRect.left < 0) {
+            customContextMenu.style.left = '10px';
+          }
+
+          // Adjust vertical position if needed
+          if (menuRect.bottom > viewportHeight) {
+            customContextMenu.style.top =
+              (viewportHeight - menuRect.height - 10) + 'px';
+          }
+
+          if (menuRect.top < 0) {
+            customContextMenu.style.top = '10px';
+          }
+        });
+
+        // Hide the custom context menu when clicking anywhere else
+        const hideCustomContextMenu = () => {
+          customContextMenu.remove();
+          document.removeEventListener('click', hideCustomContextMenu);
+          document.removeEventListener('contextmenu', hideCustomContextMenu);
+        };
+        document.addEventListener('click', hideCustomContextMenu, {
+          capture: true
+        });
+        document.addEventListener('contextmenu', hideCustomContextMenu, {
+          capture: true
+        });
+      }
+    };
+
+    // Remove old context menu handler if it exists
+    const oldContextmenuHandler = iconViewTable._contextmenuHandler;
+    if (oldContextmenuHandler) {
+      iconViewTable.removeEventListener('contextmenu', oldContextmenuHandler);
+    }
+    iconViewTable.addEventListener('contextmenu', contextmenuHandler);
+    // @ts-expect-error Custom property
+    iconViewTable._contextmenuHandler = contextmenuHandler;
 
     // Focus the table for keyboard navigation
     requestAnimationFrame(() => {
