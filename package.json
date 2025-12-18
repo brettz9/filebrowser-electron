@@ -43,7 +43,7 @@
     "filesize": "^11.0.13",
     "jamilih": "^0.63.1",
     "jquery": "^3.7.1",
-    "jsdom": "^27.3.0",
+    "jsdom": "^27.4.0",
     "load-stylesheets": "^0.13.0",
     "mdls-ts": "^2.3.1",
     "miller-columns": "0.17.0",
@@ -70,9 +70,9 @@
     "c8": "^10.1.3",
     "electron": "^39.2.7",
     "eslint": "^9.39.2",
-    "eslint-config-ash-nazg": "^39.8.0",
+    "eslint-config-ash-nazg": "^39.10.0",
     "playwright": "^1.57.0",
-    "rollup": "^4.53.3",
+    "rollup": "^4.55.1",
     "typescript": "^5.9.3"
   }
 }

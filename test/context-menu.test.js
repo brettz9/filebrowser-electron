@@ -1475,7 +1475,10 @@ describe('renderer', () => {
             `${testDir}/folder-a/large-file.txt`,
             'x'.repeat(1000)
           );
-          fs.writeFileSync(`${testDir}/folder-a/medium-file.txt`, 'x'.repeat(100));
+          fs.writeFileSync(
+            `${testDir}/folder-a/medium-file.txt`,
+            'x'.repeat(100)
+          );
           fs.mkdirSync(`${testDir}/folder-a/subfolder`);
           fs.mkdirSync(`${testDir}/folder-a/another-folder`);
           fs.writeFileSync(`${testDir}/file3.txt`, 'content3');

@@ -30344,6 +30344,71 @@
 	    ulIconOrGallery.firstChild.remove();
 	  }
 
+	  // Apply icon-view sorting logic (for gallery-view and icon-view)
+	  if (view === 'icon-view' || view === 'gallery-view') {
+	    const iconSortMode = localStorage$1.getItem('icon-view-sort-mode') ||
+	      'name';
+
+	    if (iconSortMode === 'none' || iconSortMode === 'snap') {
+	      // Use custom positions if available
+	      const customPositionsKey = `icon-positions-${currentBasePath}`;
+	      const storedPositions = localStorage$1.getItem(customPositionsKey);
+
+	      if (storedPositions) {
+	        try {
+	          const positions = JSON.parse(storedPositions);
+	          // Sort by stored position (row, col)
+	          result.sort((a, b) => {
+	            const [, , titleA] = a;
+	            const [, , titleB] = b;
+	            const posA = positions[titleA];
+	            const posB = positions[titleB];
+
+	            // Items without positions go to the end
+	            if (!posA && !posB) {
+	              return 0;
+	            }
+	            if (!posA) {
+	              return 1;
+	            }
+	            if (!posB) {
+	              return -1;
+	            }
+
+	            // Compare by row first, then column
+	            if (posA.row !== posB.row) {
+	              return posA.row - posB.row;
+	            }
+	            return posA.col - posB.col;
+	          });
+	        /* c8 ignore next 3 -- JSON parse error handling */
+	        } catch {
+	          // Invalid JSON, fall back to name sort
+	        }
+	      }
+	    } else {
+	      // Apply metadata-based sorting
+	      result.sort((a, b) => {
+	        const [isDirA, , titleA] = a;
+	        const [isDirB, , titleB] = b;
+
+	        // Folders always come first
+	        if (isDirA && !isDirB) {
+	          return -1;
+	        }
+	        if (!isDirA && isDirB) {
+	          return 1;
+	        }
+
+	        // Sort by selected metadata field
+	        // For now, all modes sort by name (metadata sorting TODO)
+	        return titleA.localeCompare(titleB, undefined, {
+	          sensitivity: 'base'
+	        });
+	      });
+	    }
+	  }
+
 	  const ul = view === 'three-columns'
 	    ? ulMiller
 	    : ulIconOrGallery;
@@ -30701,11 +30766,164 @@
 	          ]
 	          : [
 	            ['div', [
-	              ['table', {
-	                dataset: {basePath}
-	              }, chunk(listItems, numIconColumns).map((innerArr) => {
-	                return ['tr', innerArr];
-	              })]
+	              (() => {
+	                const sortMode = localStorage$1.getItem('icon-view-sort-mode') ||
+	                  'name';
+
+	                if (sortMode === 'none') {
+	                  // Free-form positioning mode - use absolute positioning
+	                  const customPositionsKey = `icon-positions-${basePath}`;
+	                  const storedPositions =
+	                    localStorage$1.getItem(customPositionsKey);
+	                  const positions = storedPositions
+	                    ? JSON.parse(storedPositions)
+	                    : {};
+
+	                  // Calculate default grid for items without positions
+	                  const itemsPerRow = 4;
+	                  const itemWidth = 140;
+	                  const itemHeight = 120;
+	                  let nextX = 20;
+	                  let nextY = 20;
+	                  let itemsInRow = 0;
+
+	                  const positionedItems = listItems.map((item) => {
+	                    // Get text from the td element's link or p tag
+	                    const link = item.querySelector('a, p');
+	                    const itemText = link ? link.textContent : '';
+	                    const pos = positions[itemText];
+
+	                    let x, y;
+	                    if (pos && typeof pos.x === 'number') {
+	                      // Use stored free-form position
+	                      ({x, y} = pos);
+	                    } else {
+	                      // Auto-layout in grid for new items
+	                      x = nextX;
+	                      y = nextY;
+	                      nextX += itemWidth;
+	                      itemsInRow++;
+	                      if (itemsInRow >= itemsPerRow) {
+	                        nextX = 20;
+	                        nextY += itemHeight;
+	                        itemsInRow = 0;
+	                      }
+	                    }
+
+	                    // Clone the item and modify it for absolute positioning
+	                    const clonedItem = item.cloneNode(true);
+
+	                    // Wrap td content in positioned div
+	                    return ['div', {
+	                      class: 'icon-freeform-item list-item',
+	                      style: {
+	                        left: `${x}px`,
+	                        top: `${y}px`
+	                      },
+	                      dataset: {
+	                        itemName: itemText,
+	                        path: item.dataset.path
+	                      }
+	                    }, [...clonedItem.childNodes]];
+	                  });
+
+	                  return ['div', {
+	                    class: 'icon-freeform-container',
+	                    dataset: {basePath}
+	                  }, positionedItems];
+	                }
+
+	                // Grid-based modes (snap or metadata sorting)
+	                return ['table', {
+	                  dataset: {basePath}
+	                }, (() => {
+	                  if (sortMode === 'snap') {
+	                    // Grid with custom positions for snap mode
+	                    const customPositionsKey = `icon-positions-${basePath}`;
+	                    const storedPositions =
+	                      localStorage$1.getItem(customPositionsKey);
+	                    const positions = storedPositions
+	                      ? JSON.parse(storedPositions)
+	                      : {};
+
+	                    // Calculate required grid size
+	                    const maxRow = Math.max(...Object.values(positions).
+	                      map((/** @type {{row: number}} */ p) => {
+	                        return p.row || 0;
+	                      }), -1);
+	                    const maxCol = Math.max(...Object.values(positions).
+	                      map((/** @type {{col: number}} */ p) => {
+	                        return p.col || 0;
+	                      }), -1);
+
+	                    // Ensure minimum grid size
+	                    const minRows = Math.ceil(listItems.length /
+	                      numIconColumns) + 2;
+	                    const numRows = Math.max(maxRow + 3, minRows);
+	                    const numCols = Math.max(maxCol + 1, numIconColumns);
+
+	                    // Create position map for quick lookup
+	                    const positionMap =
+	                      /**
+	                       * @type {Map<
+	                       *   string,
+	                       *   import('jamilih').JamilihArray
+	                       * >}
+	                       */ (
+	                        new Map()
+	                      );
+	                    listItems.forEach((item) => {
+	                      const link = item.querySelector('a, p');
+	                      const itemText = link ? link.textContent : '';
+	                      const pos = positions[itemText];
+	                      if (pos && typeof pos.row === 'number') {
+	                        const key = `${pos.row}-${pos.col}`;
+	                        positionMap.set(key, item);
+	                      }
+	                    });
+
+	                    // Place items without positions
+	                    const unpositionedItems = listItems.filter((item) => {
+	                      const link = item.querySelector('a, p');
+	                      const itemText = link ? link.textContent : '';
+	                      const itemPos = positions[itemText];
+	                      return !itemPos || typeof itemPos.row !== 'number';
+	                    });
+
+	                    let unpositionedIndex = 0;
+	                    const rows = [];
+
+	                    for (let r = 0; r < numRows; r++) {
+	                      const rowCells = [];
+	                      for (let c = 0; c < numCols; c++) {
+	                        const key = `${r}-${c}`;
+	                        const item = positionMap.get(key);
+
+	                        if (item) {
+	                          rowCells.push(item);
+	                        } else if (unpositionedIndex <
+	                            unpositionedItems.length) {
+	                          // Fill empty spots with unpositioned items
+	                          rowCells.push(
+	                            unpositionedItems[unpositionedIndex++]
+	                          );
+	                        } else {
+	                          // Empty cell
+	                          rowCells.push(['td', {}]);
+	                        }
+	                      }
+	                      rows.push(['tr', rowCells]);
+	                    }
+
+	                    return rows;
+	                  }
+
+	                  // Default grid layout for other modes
+	                  return chunk(listItems, numIconColumns).map((innerArr) => {
+	                    return ['tr', innerArr];
+	                  });
+	                })()];
+	              })()
 	            ]]
 	          ])
 	      ])
@@ -30724,23 +30942,24 @@
 	    updateBreadcrumbs(currentBasePath);
 
 	    // Add keyboard support for icon-view and gallery-view
-	    const iconViewTable = $('table[data-base-path]');
+	    const iconViewContainer = $('table[data-base-path]') ||
+	      $('.icon-freeform-container');
 	    /* c8 ignore next 3 -- Unreachable: always returns above */
-	    if (!iconViewTable) {
+	    if (!iconViewContainer) {
 	      return;
 	    }
 
-	    // Make table focusable
-	    iconViewTable.setAttribute('tabindex', '0');
+	    // Make container focusable
+	    iconViewContainer.setAttribute('tabindex', '0');
 
 	    // Remove any existing keydown listeners to avoid duplicates
-	    const oldListener = iconViewTable._keydownListener;
+	    const oldListener = iconViewContainer._keydownListener;
 	    if (oldListener) {
-	      iconViewTable.removeEventListener('keydown', oldListener);
+	      iconViewContainer.removeEventListener('keydown', oldListener);
 	    }
 
 	    // Add drag-and-drop support to all cells
-	    const cells = iconViewTable.querySelectorAll('td.list-item');
+	    const cells = iconViewContainer.querySelectorAll('td.list-item');
 	    cells.forEach((cell) => {
 	      const cellEl = /** @type {HTMLElement} */ (cell);
 	      const link = cellEl.querySelector('a, p');
@@ -30769,7 +30988,7 @@
 	        }
 
 	        // Remove previous selection
-	        const prevSelected = iconViewTable.querySelector(
+	        const prevSelected = iconViewContainer.querySelector(
 	          'td.list-item.selected'
 	        );
 	        if (prevSelected) {
@@ -30823,6 +31042,300 @@
 	      // @ts-expect-error Custom property
 	      cellEl._dblclickHandler = dblclickHandler;
 	    });
+
+	    // Add icon repositioning support for 'none' and 'snap' modes
+	    const iconSortMode = localStorage$1.getItem('icon-view-sort-mode') ||
+	      'name';
+	    if (iconSortMode === 'none' || iconSortMode === 'snap') {
+	      if (iconSortMode === 'none') {
+	        // Free-form positioning using absolute coordinates
+	        const freeformContainer = $('.icon-freeform-container');
+	        if (freeformContainer) {
+	          const freeformItems =
+	            freeformContainer.querySelectorAll('.icon-freeform-item');
+	          let draggedItem = /** @type {HTMLElement | null} */ (null);
+	          let dragOffsetX = 0;
+	          let dragOffsetY = 0;
+
+	          freeformItems.forEach((item) => {
+	            const itemEl = /** @type {HTMLElement} */ (item);
+	            itemEl.setAttribute('draggable', 'true');
+
+	            // Add click handler for selection
+	            const clickHandler = (e) => {
+	              // Don't interfere with link navigation
+	              if (e.target !== itemEl &&
+	                  !itemEl.contains(/** @type {Node} */ (e.target))) {
+	                return;
+	              }
+
+	              // Remove previous selection
+	              const prevSelected = freeformContainer.querySelector(
+	                '.icon-freeform-item.selected'
+	              );
+	              if (prevSelected) {
+	                prevSelected.classList.remove('selected');
+	              }
+
+	              // Add selection to clicked item
+	              itemEl.classList.add('selected');
+	            };
+	            itemEl.addEventListener('click', clickHandler);
+
+	            // Add double-click handler to open folders/files
+	            const dblclickHandler = (e) => {
+	              e.preventDefault();
+	              const anchor = itemEl.querySelector('a');
+	              const span = itemEl.querySelector('p,span');
+
+	              if (anchor) {
+	                // It's a folder - navigate into it
+	                anchor.click();
+	              } else if (span) {
+	                // It's a file - open with default application
+	                const itemPath = span.dataset?.path;
+	                if (itemPath) {
+	                  const decodedPath = decodeURIComponent(itemPath);
+	                  // @ts-expect-error - Test hook
+	                  if (globalThis.testShellOpenPath) {
+	                    // @ts-expect-error - Test hook
+	                    globalThis.testShellOpenPath(decodedPath);
+	                  /* c8 ignore next 3 -- Test hook bypasses this path */
+	                  } else {
+	                    globalThis.electronAPI.shell.openPath(decodedPath);
+	                  }
+	                }
+	              }
+	            };
+	            itemEl.addEventListener('dblclick', dblclickHandler);
+
+	            itemEl.addEventListener('dragstart', (e) => {
+	              if (e.dataTransfer) {
+	                const link = itemEl.querySelector('a, p');
+	                if (link) {
+	                  const linkEl = /** @type {HTMLElement} */ (link);
+	                  const itemPath = linkEl.dataset.path;
+	                  const itemName = linkEl.textContent;
+	                  if (itemPath && itemName) {
+	                    draggedItem = itemEl;
+	                    const rect = itemEl.getBoundingClientRect();
+	                    dragOffsetX = e.clientX - rect.left;
+	                    dragOffsetY = e.clientY - rect.top;
+	                    e.dataTransfer.setData('icon-freeform', itemName);
+	                    e.dataTransfer.effectAllowed = 'move';
+
+	                    // Create custom drag image with icon and text
+	                    const dragImage = itemEl.cloneNode(true);
+	                    const dragImageEl = /** @type {HTMLElement} */ (
+	                      dragImage
+	                    );
+	                    dragImageEl.style.position = 'absolute';
+	                    dragImageEl.style.top = '-1000px';
+	                    dragImageEl.style.opacity = '0.8';
+	                    dragImageEl.style.pointerEvents = 'none';
+	                    document.body.append(dragImageEl);
+	                    e.dataTransfer.setDragImage(
+	                      dragImageEl,
+	                      dragOffsetX,
+	                      dragOffsetY
+	                    );
+
+	                    // Clean up drag image after a short delay
+	                    setTimeout(() => {
+	                      dragImageEl.remove();
+	                    }, 0);
+
+	                    itemEl.classList.add('dragging-icon');
+	                  }
+	                }
+	              }
+	            });
+
+	            itemEl.addEventListener('dragend', () => {
+	              itemEl.classList.remove('dragging-icon');
+	              draggedItem = null;
+	            });
+	          });
+
+	          freeformContainer.addEventListener('dragover', (e) => {
+	            if (e.dataTransfer?.types.includes('icon-freeform')) {
+	              e.preventDefault();
+	              e.dataTransfer.dropEffect = 'move';
+	            }
+	          });
+
+	          freeformContainer.addEventListener('drop', (e) => {
+	            if (e.dataTransfer?.types.includes('icon-freeform') &&
+	                draggedItem) {
+	              e.preventDefault();
+	              e.stopPropagation();
+
+	              const itemName = e.dataTransfer.getData('icon-freeform');
+	              if (itemName) {
+	                // Calculate new position relative to container
+	                const containerRect =
+	                  freeformContainer.getBoundingClientRect();
+	                const newX = e.clientX - containerRect.left - dragOffsetX;
+	                const newY = e.clientY - containerRect.top - dragOffsetY;
+
+	                // Clamp position to container bounds
+	                const maxX = containerRect.width - 120; // icon width
+	                const maxY = containerRect.height - 140; // icon height
+	                const clampedX = Math.max(0, Math.min(newX, maxX));
+	                const clampedY = Math.max(0, Math.min(newY, maxY));
+
+	                // Update position in storage
+	                const customPositionsKey =
+	                  `icon-positions-${currentBasePath}`;
+	                const storedPositions =
+	                  localStorage$1.getItem(customPositionsKey);
+	                const positions = storedPositions
+	                  ? /** @type {Record<string, {x: number, y: number}>} */ (
+	                    JSON.parse(storedPositions)
+	                  )
+	                  : /** @type {Record<string, {x: number, y: number}>} */ ({});
+
+	                positions[itemName] = {x: clampedX, y: clampedY};
+	                localStorage$1.setItem(
+	                  customPositionsKey,
+	                  JSON.stringify(positions)
+	                );
+
+	                // Refresh view
+	                changePath();
+	              }
+	            }
+	          });
+	        }
+	      } else {
+	        // Grid-based positioning for 'snap' mode
+	        cells.forEach((cell) => {
+	          const cellEl = /** @type {HTMLElement} */ (cell);
+	          cellEl.setAttribute('draggable', 'true');
+
+	          // Store drag data
+	          cellEl.addEventListener('dragstart', (e) => {
+	            if (e.dataTransfer) {
+	              const link = cellEl.querySelector('a, p');
+	              if (link) {
+	                const linkEl = /** @type {HTMLElement} */ (link);
+	                const itemPath = linkEl.dataset.path;
+	                const itemName = linkEl.textContent;
+	                if (itemPath && itemName) {
+	                  e.dataTransfer.setData('icon-reposition', itemName);
+	                  e.dataTransfer.effectAllowed = 'move';
+	                  cellEl.classList.add('dragging-icon');
+	                }
+	              }
+	            }
+	          });
+
+	          cellEl.addEventListener('dragend', () => {
+	            cellEl.classList.remove('dragging-icon');
+	          });
+
+	          // Handle drop on cells for repositioning
+	          cellEl.addEventListener('dragover', (e) => {
+	            if (e.dataTransfer?.types.includes('icon-reposition')) {
+	              e.preventDefault();
+	              e.dataTransfer.dropEffect = 'move';
+	              cellEl.classList.add('drop-target-icon');
+	            }
+	          });
+
+	          cellEl.addEventListener('dragleave', () => {
+	            cellEl.classList.remove('drop-target-icon');
+	          });
+
+	          cellEl.addEventListener('drop', (e) => {
+	            if (e.dataTransfer?.types.includes('icon-reposition')) {
+	              e.preventDefault();
+	              e.stopPropagation();
+	              cellEl.classList.remove('drop-target-icon');
+
+	              const draggedItemName =
+	                e.dataTransfer.getData('icon-reposition');
+	              const targetLink = cellEl.querySelector('a, p');
+
+	              if (draggedItemName && targetLink) {
+	                const targetEl = /** @type {HTMLElement} */ (targetLink);
+	                const targetName = targetEl.textContent;
+
+	                if (draggedItemName !== targetName) {
+	                  // Get current positions
+	                  const customPositionsKey =
+	                    `icon-positions-${currentBasePath}`;
+	                  const storedPositions =
+	                    localStorage$1.getItem(customPositionsKey);
+	                  const positions = storedPositions
+	                    // eslint-disable-next-line @stylistic/max-len -- Long
+	                    ? /** @type {Record<string, {row: number, col: number}>} */ (
+	                      JSON.parse(storedPositions)
+	                    )
+	                    // eslint-disable-next-line @stylistic/max-len -- Long
+	                    : /** @type {Record<string, {row: number, col: number}>} */ (
+	                      {}
+	                    );
+
+	                  // Find cell positions in grid
+	                  const allCells = [
+	                    ...iconViewContainer.querySelectorAll('td.list-item')
+	                  ];
+	                  const draggedCell = allCells.find((c) => {
+	                    const l = c.querySelector('a, p');
+	                    return l && l.textContent === draggedItemName;
+	                  });
+	                  const targetCell = cellEl;
+
+	                  if (draggedCell) {
+	                    const draggedRow = draggedCell.parentElement;
+	                    const targetRow = targetCell.parentElement;
+
+	                    if (draggedRow && targetRow) {
+	                      const allRows = [
+	                        ...iconViewContainer.querySelectorAll('tr')
+	                      ];
+	                      const draggedRowIndex = allRows.indexOf(draggedRow);
+	                      const targetRowIndex = allRows.indexOf(targetRow);
+
+	                      const draggedColIndex = [
+	                        ...draggedRow.children
+	                      ].indexOf(draggedCell);
+	                      const targetColIndex = [
+	                        ...targetRow.children
+	                      ].indexOf(targetCell);
+
+	                      // Swap positions
+	                      positions[draggedItemName] = {
+	                        row: targetRowIndex,
+	                        col: targetColIndex
+	                      };
+
+	                      // If target has a position, swap it
+	                      if (targetName && positions[targetName]) {
+	                        positions[targetName] = {
+	                          row: draggedRowIndex,
+	                          col: draggedColIndex
+	                        };
+	                      }
+
+	                      // Save positions
+	                      localStorage$1.setItem(
+	                        customPositionsKey,
+	                        JSON.stringify(positions)
+	                      );
+
+	                      // Refresh view to show new positions
+	                      changePath();
+	                    }
+	                  }
+	                }
+	              }
+	            }
+	          });
+	        });
+	      }
+	    }
 
 	    /**
 	     * Generate metadata HTML for gallery preview panel.
@@ -31004,8 +31517,8 @@
 	      if (cellToSelect) {
 	        const cellEl = /** @type {HTMLElement} */ (cellToSelect);
 	        // Remove any other selections first
-	        const prevSelected = iconViewTable.querySelector(
-	          'td.list-item.selected'
+	        const prevSelected = iconViewContainer.querySelector(
+	          'td.list-item.selected, .icon-freeform-item.selected'
 	        );
 	        /* c8 ignore next 3 -- Guard */
 	        if (prevSelected) {
@@ -31029,15 +31542,28 @@
 	    let typeaheadTimeout = null;
 
 	    const keydownListener = (e) => {
+	      // Determine if we're in free-form mode or table mode
+	      const isFreeform = iconViewContainer.classList.contains(
+	        'icon-freeform-container'
+	      );
+	      const itemSelector = isFreeform
+	        ? '.icon-freeform-item'
+	        : 'td.list-item';
+	      const selectedItemSelector = isFreeform
+	        ? '.icon-freeform-item.selected'
+	        : 'td.list-item.selected';
+
 	      // Handle arrow key navigation
 	      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(
 	        e.key
 	      )) {
 	        e.preventDefault();
-	        const selectedCell = iconViewTable.querySelector(
-	          'td.list-item.selected'
+	        const selectedCell = iconViewContainer.querySelector(
+	          selectedItemSelector
 	        );
-	        const allCells = [...iconViewTable.querySelectorAll('td.list-item')];
+	        const allCells = [
+	          ...iconViewContainer.querySelectorAll(itemSelector)
+	        ];
 
 	        /* c8 ignore next 3 -- Icon view always has cells */
 	        if (allCells.length === 0) {
@@ -31050,7 +31576,7 @@
 	        let newIndex = currentIndex;
 
 	        // Calculate number of columns
-	        const firstRow = iconViewTable.querySelector('tr');
+	        const firstRow = iconViewContainer.querySelector('tr');
 	        const numColumns = firstRow
 	          ? firstRow.querySelectorAll('td.list-item').length
 	          /* c8 ignore next -- Defensive: table always has rows */
@@ -31097,7 +31623,9 @@
 	        typeaheadBuffer += e.key.toLowerCase();
 
 	        // Find matching item
-	        const allCells = [...iconViewTable.querySelectorAll('td.list-item')];
+	        const allCells = [
+	          ...iconViewContainer.querySelectorAll(itemSelector)
+	        ];
 	        const matchingCell = allCells.find((cell) => {
 	          const link = cell.querySelector('a, p');
 	          /* c8 ignore next -- Guard */
@@ -31107,8 +31635,8 @@
 
 	        if (matchingCell) {
 	          // Remove previous selection
-	          const selectedCell = iconViewTable.querySelector(
-	            'td.list-item.selected'
+	          const selectedCell = iconViewContainer.querySelector(
+	            selectedItemSelector
 	          );
 	          if (selectedCell) {
 	            selectedCell.classList.remove('selected');
@@ -31131,13 +31659,13 @@
 	      if (e.metaKey && e.shiftKey && e.key === 'n') {
 	        e.preventDefault();
 	        /* c8 ignore next -- TS */
-	        const folderPath = iconViewTable.dataset.basePath || '/';
+	        const folderPath = iconViewContainer.dataset.basePath || '/';
 	        createNewFolder$1(folderPath);
 
 	      // Cmd+I to show info window
 	      } else if (e.metaKey && e.key === 'i') {
-	        const selectedCell = iconViewTable.querySelector(
-	          'td.list-item.selected'
+	        const selectedCell = iconViewContainer.querySelector(
+	          selectedItemSelector
 	        );
 	        if (selectedCell) {
 	          e.preventDefault();
@@ -31150,8 +31678,8 @@
 
 	      // Cmd+O to open/navigate into selected folder or open file
 	      } else if (e.metaKey && e.key === 'o') {
-	        const selectedCell = iconViewTable.querySelector(
-	          'td.list-item.selected'
+	        const selectedCell = iconViewContainer.querySelector(
+	          selectedItemSelector
 	        );
 
 	        if (selectedCell) {
@@ -31181,8 +31709,8 @@
 
 	      // Cmd+C to copy selected item
 	      } else if (e.metaKey && e.key === 'c') {
-	        const selectedCell = iconViewTable.querySelector(
-	          'td.list-item.selected'
+	        const selectedCell = iconViewContainer.querySelector(
+	          selectedItemSelector
 	        );
 	        if (selectedCell) {
 	          e.preventDefault();
@@ -31195,8 +31723,8 @@
 
 	      // Cmd+X to cut selected item
 	      } else if (e.metaKey && e.key === 'x') {
-	        const selectedCell = iconViewTable.querySelector(
-	          'td.list-item.selected'
+	        const selectedCell = iconViewContainer.querySelector(
+	          selectedItemSelector
 	        );
 	        if (selectedCell) {
 	          e.preventDefault();
@@ -31211,15 +31739,15 @@
 	      } else if (e.metaKey && e.key === 'v' && getClipboard()) {
 	        e.preventDefault();
 	        /* c8 ignore next -- TS */
-	        const targetDir = iconViewTable.dataset.basePath || '/';
+	        const targetDir = iconViewContainer.dataset.basePath || '/';
 	        const clip = getClipboard();
 	        copyOrMoveItem$1(clip.path, targetDir, clip.isCopy);
 	        setClipboard(null);
 
 	      // Cmd+Backspace to delete selected item
 	      } else if (e.metaKey && e.key === 'Backspace') {
-	        const selectedCell = iconViewTable.querySelector(
-	          'td.list-item.selected'
+	        const selectedCell = iconViewContainer.querySelector(
+	          selectedItemSelector
 	        );
 	        if (selectedCell) {
 	          e.preventDefault();
@@ -31232,8 +31760,8 @@
 
 	      // Enter key to rename selected item
 	      } else if (e.key === 'Enter') {
-	        const selectedCell = iconViewTable.querySelector(
-	          'td.list-item.selected'
+	        const selectedCell = iconViewContainer.querySelector(
+	          selectedItemSelector
 	        );
 	        if (selectedCell) {
 	          e.preventDefault();
@@ -31280,19 +31808,19 @@
 	      }
 	    };
 
-	    iconViewTable.addEventListener('keydown', keydownListener);
+	    iconViewContainer.addEventListener('keydown', keydownListener);
 	    // Store reference for cleanup
 	    // @ts-expect-error Custom property
-	    iconViewTable._keydownListener = keydownListener;
+	    iconViewContainer._keydownListener = keydownListener;
 
 	    // Remove old drag handlers if they exist
-	    const oldDragoverHandler = iconViewTable._dragoverHandler;
+	    const oldDragoverHandler = iconViewContainer._dragoverHandler;
 	    if (oldDragoverHandler) {
-	      iconViewTable.removeEventListener('dragover', oldDragoverHandler);
+	      iconViewContainer.removeEventListener('dragover', oldDragoverHandler);
 	    }
-	    const oldDropHandler = iconViewTable._dropHandler;
+	    const oldDropHandler = iconViewContainer._dropHandler;
 	    if (oldDropHandler) {
-	      iconViewTable.removeEventListener('drop', oldDropHandler);
+	      iconViewContainer.removeEventListener('drop', oldDropHandler);
 	    }
 
 	    // Add drop support for table background (empty space)
@@ -31300,7 +31828,7 @@
 	      // Only handle drops on the table itself or empty cells, not on items
 	      const {target} = e;
 	      const targetEl = /** @type {HTMLElement} */ (target);
-	      if (targetEl === iconViewTable || targetEl.tagName === 'TR' ||
+	      if (targetEl === iconViewContainer || targetEl.tagName === 'TR' ||
 	          (targetEl.tagName === 'TD' &&
 	            !targetEl.classList.contains('list-item'))) {
 	        e.preventDefault();
@@ -31309,34 +31837,278 @@
 	        }
 	      }
 	    };
-	    iconViewTable.addEventListener('dragover', dragoverHandler);
+	    iconViewContainer.addEventListener('dragover', dragoverHandler);
 	    // @ts-expect-error Custom property
-	    iconViewTable._dragoverHandler = dragoverHandler;
+	    iconViewContainer._dragoverHandler = dragoverHandler;
 
 	    const dropHandler = (e) => {
 	      const {target} = e;
 	      const targetEl = /** @type {HTMLElement} */ (target);
 	      // Only handle drops on the table itself or empty cells, not on items
-	      if (targetEl === iconViewTable || targetEl.tagName === 'TR' ||
+	      if (targetEl === iconViewContainer || targetEl.tagName === 'TR' ||
 	          (targetEl.tagName === 'TD' &&
 	            !targetEl.classList.contains('list-item'))) {
 	        e.preventDefault();
 	        e.stopPropagation();
 	        const sourcePath = e.dataTransfer?.getData('text/plain');
 	        /* c8 ignore next -- TS */
-	        const targetDir = iconViewTable.dataset.basePath || '/';
+	        const targetDir = iconViewContainer.dataset.basePath || '/';
 	        if (sourcePath && targetDir && !getIsCopyingOrMoving()) {
 	          copyOrMoveItem$1(sourcePath, targetDir, e.altKey);
 	        }
 	      }
 	    };
-	    iconViewTable.addEventListener('drop', dropHandler);
+	    iconViewContainer.addEventListener('drop', dropHandler);
 	    // @ts-expect-error Custom property
-	    iconViewTable._dropHandler = dropHandler;
+	    iconViewContainer._dropHandler = dropHandler;
+
+	    // Add context menu for empty space in icon-view
+	    const contextmenuHandler = (e) => {
+	      const {target} = e;
+	      const targetEl = /** @type {HTMLElement} */ (target);
+	      // Only show context menu on empty space (table, tr, or empty td)
+	      if (targetEl === iconViewContainer || targetEl.tagName === 'TR' ||
+	          (targetEl.tagName === 'TD' &&
+	            !targetEl.classList.contains('list-item'))) {
+	        e.preventDefault();
+	        e.stopPropagation();
+
+	        // Remove any existing context menus
+	        for (const menu of $$('.context-menu')) {
+	          menu.remove();
+	        }
+
+	        // Get current sort mode for icon-view
+	        const currentIconSortMode =
+	          localStorage$1.getItem('icon-view-sort-mode') || 'name';
+
+	        const customContextMenu = jmlExports.jml('ul', {
+	          class: 'context-menu',
+	          style: {
+	            left: e.pageX + 'px',
+	            top: e.pageY + 'px'
+	          }
+	        }, [
+	          ['li', {
+	            class: 'context-menu-item',
+	            $on: {
+	              click () {
+	                customContextMenu.remove();
+	                createNewFolder$1(currentBasePath);
+	              }
+	            }
+	          }, [
+	            'Create new folder'
+	          ]],
+	          ...(getClipboard()
+	            ? [['li', {
+	              class: 'context-menu-item',
+	              $on: {
+	                click () {
+	                  customContextMenu.remove();
+	                  const clip = getClipboard();
+	                  if (clip) {
+	                    copyOrMoveItem$1(clip.path, currentBasePath, clip.isCopy);
+	                  }
+	                }
+	              }
+	            }, [
+	              'Paste'
+	            ]]]
+	            : []),
+	          ['li', {class: 'context-menu-separator'}],
+	          ['li', {
+	            class: 'context-menu-item has-submenu'
+	          }, [
+	            'Sort by',
+	            ['ul', {
+	              class: 'context-submenu'
+	            }, [
+	              ['li', {
+	                class: 'context-menu-item',
+	                $on: {
+	                  click () {
+	                    customContextMenu.remove();
+	                    localStorage$1.setItem('icon-view-sort-mode', 'none');
+	                    changePath();
+	                  }
+	                }
+	              }, [
+	                currentIconSortMode === 'none' ? '✓ None' : 'None'
+	              ]],
+	              ['li', {
+	                class: 'context-menu-item',
+	                $on: {
+	                  click () {
+	                    customContextMenu.remove();
+	                    localStorage$1.setItem('icon-view-sort-mode', 'snap');
+	                    changePath();
+	                  }
+	                }
+	              }, [
+	                currentIconSortMode === 'snap'
+	                  ? '✓ Snap to Grid'
+	                  : 'Snap to Grid'
+	              ]],
+	              ['li', {class: 'context-menu-separator'}],
+	              ['li', {
+	                class: 'context-menu-item',
+	                $on: {
+	                  click () {
+	                    customContextMenu.remove();
+	                    localStorage$1.setItem('icon-view-sort-mode', 'name');
+	                    changePath();
+	                  }
+	                }
+	              }, [
+	                currentIconSortMode === 'name' ? '✓ Name' : 'Name'
+	              ]],
+	              ['li', {
+	                class: 'context-menu-item',
+	                $on: {
+	                  click () {
+	                    customContextMenu.remove();
+	                    localStorage$1.setItem('icon-view-sort-mode', 'kind');
+	                    changePath();
+	                  }
+	                }
+	              }, [
+	                currentIconSortMode === 'kind' ? '✓ Kind' : 'Kind'
+	              ]],
+	              ['li', {
+	                class: 'context-menu-item',
+	                $on: {
+	                  click () {
+	                    customContextMenu.remove();
+	                    localStorage$1.setItem('icon-view-sort-mode', 'dateOpened');
+	                    changePath();
+	                  }
+	                }
+	              }, [
+	                currentIconSortMode === 'dateOpened'
+	                  ? '✓ Date Last Opened'
+	                  : 'Date Last Opened'
+	              ]],
+	              ['li', {
+	                class: 'context-menu-item',
+	                $on: {
+	                  click () {
+	                    customContextMenu.remove();
+	                    localStorage$1.setItem('icon-view-sort-mode', 'dateAdded');
+	                    changePath();
+	                  }
+	                }
+	              }, [
+	                currentIconSortMode === 'dateAdded'
+	                  ? '✓ Date Added'
+	                  : 'Date Added'
+	              ]],
+	              ['li', {
+	                class: 'context-menu-item',
+	                $on: {
+	                  click () {
+	                    customContextMenu.remove();
+	                    localStorage$1.setItem(
+	                      'icon-view-sort-mode',
+	                      'dateModified'
+	                    );
+	                    changePath();
+	                  }
+	                }
+	              }, [
+	                currentIconSortMode === 'dateModified'
+	                  ? '✓ Date Modified'
+	                  : 'Date Modified'
+	              ]],
+	              ['li', {
+	                class: 'context-menu-item',
+	                $on: {
+	                  click () {
+	                    customContextMenu.remove();
+	                    localStorage$1.setItem(
+	                      'icon-view-sort-mode',
+	                      'dateCreated'
+	                    );
+	                    changePath();
+	                  }
+	                }
+	              }, [
+	                currentIconSortMode === 'dateCreated'
+	                  ? '✓ Date Created'
+	                  : 'Date Created'
+	              ]],
+	              ['li', {
+	                class: 'context-menu-item',
+	                $on: {
+	                  click () {
+	                    customContextMenu.remove();
+	                    localStorage$1.setItem('icon-view-sort-mode', 'size');
+	                    changePath();
+	                  }
+	                }
+	              }, [
+	                currentIconSortMode === 'size' ? '✓ Size' : 'Size'
+	              ]]
+	            ]]
+	          ]]
+	        ], document.body);
+
+	        // Ensure main context menu is visible within viewport
+	        requestAnimationFrame(() => {
+	          const menuRect = customContextMenu.getBoundingClientRect();
+	          const viewportWidth = window.innerWidth;
+	          const viewportHeight = window.innerHeight;
+
+	          // Adjust horizontal position if needed
+	          if (menuRect.right > viewportWidth) {
+	            customContextMenu.style.left =
+	              (viewportWidth - menuRect.width - 10) + 'px';
+	          }
+
+	          if (menuRect.left < 0) {
+	            customContextMenu.style.left = '10px';
+	          }
+
+	          // Adjust vertical position if needed
+	          if (menuRect.bottom > viewportHeight) {
+	            customContextMenu.style.top =
+	              (viewportHeight - menuRect.height - 10) + 'px';
+	          }
+
+	          if (menuRect.top < 0) {
+	            customContextMenu.style.top = '10px';
+	          }
+	        });
+
+	        // Hide the custom context menu when clicking anywhere else
+	        const hideCustomContextMenu = () => {
+	          customContextMenu.remove();
+	          document.removeEventListener('click', hideCustomContextMenu);
+	          document.removeEventListener('contextmenu', hideCustomContextMenu);
+	        };
+	        document.addEventListener('click', hideCustomContextMenu, {
+	          capture: true
+	        });
+	        document.addEventListener('contextmenu', hideCustomContextMenu, {
+	          capture: true
+	        });
+	      }
+	    };
+
+	    // Remove old context menu handler if it exists
+	    const oldContextmenuHandler = iconViewContainer._contextmenuHandler;
+	    if (oldContextmenuHandler) {
+	      iconViewContainer.removeEventListener(
+	        'contextmenu', oldContextmenuHandler
+	      );
+	    }
+	    iconViewContainer.addEventListener('contextmenu', contextmenuHandler);
+	    // @ts-expect-error Custom property
+	    iconViewContainer._contextmenuHandler = contextmenuHandler;
 
 	    // Focus the table for keyboard navigation
 	    requestAnimationFrame(() => {
-	      iconViewTable.focus();
+	      iconViewContainer.focus();
 	    });
 	    return;
 	  }

@@ -1,0 +1,47 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - heading "Sticky Finder" [level=2] [ref=e2]
+  - generic [ref=e3]:
+    - button "Create sticky for current path" [ref=e4]:
+      - img [ref=e5]
+    - button "Create global sticky" [ref=e6]:
+      - img [ref=e7]
+  - navigation [ref=e8]:
+    - button [ref=e9]:
+      - img [ref=e10]
+    - button [ref=e11]:
+      - img [ref=e12]
+    - button [ref=e13]:
+      - img [ref=e14]
+    - button [ref=e15]:
+      - img [ref=e16]
+  - generic [ref=e17]:
+    - generic [ref=e18] [cursor=pointer]: / ›
+    - generic [ref=e19] [cursor=pointer]: tmp ›
+    - generic [ref=e20] [cursor=pointer]: test-icon-sort
+  - list [ref=e22]:
+    - listitem [ref=e23]:
+      - link ".." [ref=e24] [cursor=pointer]:
+        - /url: "#path=/tmp"
+    - table [active] [ref=e26]:
+      - row "fil…txt fil…txt fil…txt" [ref=e27]:
+        - cell "fil…txt" [ref=e28]:
+          - img [ref=e29]
+          - paragraph [ref=e30]: fil…txt
+        - cell "fil…txt" [ref=e31]:
+          - img [ref=e32]
+          - paragraph [ref=e33]: fil…txt
+        - cell "fil…txt" [ref=e34]:
+          - img [ref=e35]
+          - paragraph [ref=e36]: fil…txt
+  - list [ref=e37]:
+    - listitem [ref=e38] [cursor=pointer]: Open
+    - listitem [ref=e39] [cursor=pointer]: Open with... ▶
+    - listitem [ref=e40] [cursor=pointer]: Cut
+    - listitem [ref=e41] [cursor=pointer]: Copy
+    - listitem [ref=e42] [cursor=pointer]: Rename
+    - listitem [ref=e43] [cursor=pointer]: Get Info
+    - listitem [ref=e44] [cursor=pointer]: Delete
+```
