@@ -69,9 +69,6 @@ done
 
 ## To-dos
 
-1. Clicking column headers (or column checkboxes?) after
-    expanding is causing a crash; add tests for currently ignored
-    branches if working again
 1. Allow icons to be draggable (Sort by None, Sort by Grid) or Sort by Metadata: Name, Kind, Date Last Opened, Date Added, Date Modified, Date Created, Size, Tags)
 
 1. Ideally would allow separate desktops, windows and tabs, with menu bar

@@ -1468,20 +1468,24 @@ describe('renderer', () => {
           fs.mkdirSync(testDir);
           fs.mkdirSync(`${testDir}/folder-a`);
           fs.mkdirSync(`${testDir}/folder-b`);
-          // Create files with different sizes and dates in folder-a
+          // Create files with different sizes in folder-a to force
+          // sort comparisons in both directions (file vs folder)
           fs.writeFileSync(`${testDir}/folder-a/small-file.txt`, 'x');
           fs.writeFileSync(
             `${testDir}/folder-a/large-file.txt`,
             'x'.repeat(1000)
           );
+          fs.writeFileSync(`${testDir}/folder-a/medium-file.txt`, 'x'.repeat(100));
           fs.mkdirSync(`${testDir}/folder-a/subfolder`);
+          fs.mkdirSync(`${testDir}/folder-a/another-folder`);
           fs.writeFileSync(`${testDir}/file3.txt`, 'content3');
         });
 
         // Enable tree mode
         await page.evaluate(() => {
           localStorage.setItem('list-view-tree-mode', 'true');
-          // Use descending sort to cover line 1893 else branch
+          // Use descending sort to cover lines 1885 (file after folder),
+          // 1907 (desc sort)
           localStorage.setItem('list-view-sort', JSON.stringify({
             column: 'size',
             direction: 'desc'
@@ -1494,17 +1498,22 @@ describe('renderer', () => {
         });
         await page.waitForTimeout(1500);
 
-        // Single expansion to cover tree sort basics
-        // (lines 1869-1879, 1893)
-        await page.evaluate(() => {
-          const expander = /** @type {HTMLElement} */ (
-            document.querySelector('.tree-expander')
-          );
-          if (expander) {
-            expander.click();
-          }
-        });
+        // Expand folder-a specifically (has subfolder + files)
+        // This covers tree sort with mixed content:
+        // - Line 1885 else: files sort after folders (a.isDir false)
+        // - Line 1907 else: descending sort (-comparison)
+        const folderARow = await page.locator(
+          'tr[data-path*="folder-a"]'
+        ).first();
+        const expander = folderARow.locator('.tree-expander');
+        await expander.click();
         await page.waitForTimeout(1000);
+
+        // Verify children were actually added (should see 3 child rows)
+        const childRows = await page.locator(
+          'tr[data-path*="folder-a"][data-depth="1"]'
+        ).count();
+        expect(childRows).toBeGreaterThan(0);
 
         // Clean up and disable tree mode
         await page.evaluate(() => {
@@ -1529,6 +1538,134 @@ describe('renderer', () => {
         expect(headers).toContain('Date Last Opened');
         expect(headers).toContain('Version');
         expect(headers).toContain('Comments');
+      }
+    );
+
+    test(
+      'column header clicks after tree expansion (crash test)',
+      async () => {
+        // Enable metadata columns and tree mode
+        await page.evaluate(() => {
+          const columns = [
+            {id: 'icon', label: '', width: '40px',
+              visible: true, sortable: false},
+            {id: 'name', label: 'Name', width: 'auto',
+              visible: true, sortable: true},
+            {id: 'dateModified', label: 'Date Modified', width: '180px',
+              visible: true, sortable: true},
+            {id: 'dateCreated', label: 'Date Created', width: '180px',
+              visible: true, sortable: true},
+            {id: 'size', label: 'Size', width: '100px',
+              visible: true, sortable: true},
+            {id: 'kind', label: 'Kind', width: '150px',
+              visible: true, sortable: true},
+            {id: 'dateOpened', label: 'Date Last Opened', width: '180px',
+              visible: true, sortable: true},
+            {id: 'version', label: 'Version', width: '100px',
+              visible: true, sortable: true},
+            {id: 'comments', label: 'Comments', width: '200px',
+              visible: true, sortable: true}
+          ];
+          // @ts-expect-error Our own API
+          globalThis.electronAPI.storage.setItem(
+            'list-view-columns',
+            JSON.stringify(columns)
+          );
+          localStorage.setItem('list-view-tree-mode', 'true');
+        });
+
+        // Reload to apply settings
+        await page.reload();
+        await page.waitForTimeout(1000);
+
+        // Set sort configuration after reload (persistent storage)
+        await page.evaluate(() => {
+          const sortConfig = {column: 'size', direction: 'desc'};
+          // @ts-expect-error Our own API
+          globalThis.electronAPI.storage.setItem(
+            'list-view-sort',
+            JSON.stringify(sortConfig)
+          );
+          localStorage.setItem(
+            'list-view-sort',
+            JSON.stringify(sortConfig)
+          );
+        });
+
+        // Switch to list-view
+        await page.locator('#list-view').click();
+        await page.waitForTimeout(500);
+
+        // Create a simple test directory in /tmp
+        await page.evaluate(() => {
+          // @ts-expect-error Our own API
+          const {fs} = globalThis.electronAPI;
+          const testDir = '/tmp/test-crash-fix';
+          try {
+            fs.rmSync(testDir, {recursive: true, force: true});
+          } catch (e) {
+            // Ignore
+          }
+          fs.mkdirSync(testDir);
+          fs.mkdirSync(`${testDir}/folder1`);
+          fs.mkdirSync(`${testDir}/folder2`);
+          fs.writeFileSync(`${testDir}/folder1/file1.txt`, 'test');
+          fs.writeFileSync(`${testDir}/folder1/file2.txt`, 'test');
+          fs.writeFileSync(`${testDir}/file3.txt`, 'test');
+        });
+
+        // Navigate to test directory
+        await page.evaluate(() => {
+          globalThis.location.hash = '#path=/tmp/test-crash-fix';
+        });
+        await page.waitForTimeout(2000);
+
+        // Expand first folder
+        const expander = page.locator('.tree-expander').first();
+        await expander.click();
+        await page.waitForTimeout(1000);
+
+        // Test all sort columns to verify crash is fixed and sorting works
+        // (Previously this would crash when batch metadata loading
+        // continued after DOM rebuild)
+        const sortColumns = [
+          'Size',
+          'Date Modified',
+          'Date Created',
+          'Kind',
+          'Date Last Opened',
+          'Version',
+          'Comments',
+          'Name'
+        ];
+
+        for (const columnName of sortColumns) {
+          const header = page.locator(`th:has-text("${columnName}")`);
+          // eslint-disable-next-line no-await-in-loop -- Sequential behavior
+          await header.click();
+          // eslint-disable-next-line no-await-in-loop -- Sequential behavior
+          await page.waitForTimeout(600);
+        }
+
+        // Click Size again to test descending sort
+        const sizeHeader = page.locator('th:has-text("Size")');
+        await sizeHeader.click();
+        await page.waitForTimeout(600);
+
+        // Verify the view is still responsive
+        const rows = await page.locator('.list-view-table tr').count();
+        expect(rows).toBeGreaterThan(0);
+
+        // Cleanup
+        await page.evaluate(() => {
+          // @ts-expect-error Our own API
+          const {fs} = globalThis.electronAPI;
+          try {
+            fs.rmSync('/tmp/test-crash-fix', {recursive: true, force: true});
+          } catch (e) {
+            // Ignore
+          }
+        });
       }
     );
 

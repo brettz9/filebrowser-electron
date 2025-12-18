@@ -29886,6 +29886,9 @@
 	  };
 	}
 
+	// Track batch metadata loading callback handle for cancellation
+	let batchMetadataCallbackHandle = null;
+
 	// Track mouse button state globally
 	document.addEventListener('mousedown', () => {
 	  mouseIsDown = true;
@@ -30293,6 +30296,17 @@
 	 */
 	function addItems (result, basePath, currentBasePath) {
 	  const view = getCurrentView();
+
+	  // Cancel any pending batch metadata loading from previous view
+	  if (batchMetadataCallbackHandle !== null) {
+	    if ('cancelIdleCallback' in globalThis) {
+	      cancelIdleCallback(batchMetadataCallbackHandle);
+	    /* c8 ignore next 3 -- Fallback only */
+	    } else {
+	      clearTimeout(batchMetadataCallbackHandle);
+	    }
+	    batchMetadataCallbackHandle = null;
+	  }
 
 	  $('i').hidden = true;
 
@@ -31374,8 +31388,6 @@
 	      : defaultColumns;
 
 	    // Update sortable property from defaults (in case defaults changed)
-	    /* c8 ignore next 10 - todo: requires stored columns with
-	       wrong sortable values */
 	    if (storedColumns) {
 	      columns = columns.map((col) => {
 	        const defaultCol = defaultColumns.find((dc) => dc.id === col.id);
@@ -31457,8 +31469,6 @@
 	      case 'size':
 	        comparison = a.size - b.size;
 	        break;
-	      /* c8 ignore next 30 - metadata column sorting causes
-	         app crashes during tests */
 	      case 'dateModified':
 	        comparison = a.dateModified - b.dateModified;
 	        break;
@@ -31649,8 +31659,6 @@
 	                    // Sort child data
 	                    childData.sort((a, b) => {
 	                      if (a.isDir !== b.isDir) {
-	                        /* c8 ignore next 2 -- Todo: Support else
-	                            condition when crash fixed? */
 	                        return a.isDir ? -1 : 1;
 	                      }
 	                      let comparison = 0;
@@ -31661,8 +31669,6 @@
 	                          sensitivity: 'base'
 	                        });
 	                        break;
-	                      /* c8 ignore next 14 - Todo: tree expansion crash
-	                        prevents testing all sort columns */
 	                      case 'size':
 	                        comparison = a.size - b.size;
 	                        break;
@@ -32048,7 +32054,9 @@
 
 	              // Update all cells for this item
 	              cells.forEach(({td, field}) => {
-	                // Guard: check if element is still in DOM (tree might have collapsed)
+	                // Guard: check if element is still in DOM
+	                // (tree might have collapsed)
+	                /* c8 ignore next 3 -- Guard */
 	                if (!td.isConnected) {
 	                  return;
 	                }
@@ -32119,31 +32127,30 @@
 
 	          // Schedule next chunk if there are more items
 	          if (currentIndex < itemsArray.length) {
-	            if ('requestIdleCallback' in globalThis) {
-	              requestIdleCallback(processChunk, {timeout: 100});
-	            /* c8 ignore next 6 -- Fallback for environments
-	                without requestIdleCallback */
-	            } else {
-	              setTimeout(() => processChunk({
-	                timeRemaining: () => 50, didTimeout: false
-	              }), 0);
-	            }
+	            batchMetadataCallbackHandle =
+	              'requestIdleCallback' in globalThis
+	                ? requestIdleCallback(processChunk, {timeout: 100})
+	                /* c8 ignore next 5 -- Fallback for environments
+	                   without requestIdleCallback */
+	                : setTimeout(() => processChunk({
+	                  timeRemaining: () => 50, didTimeout: false
+	                }), 0);
 	          } else {
 	            // eslint-disable-next-line no-console -- Debugging
 	            console.log('[batch] Metadata loading complete');
+	            batchMetadataCallbackHandle = null;
 	          }
 	        };
 
 	        // Start processing
-	        if ('requestIdleCallback' in globalThis) {
-	          requestIdleCallback(processChunk, {timeout: 100});
-	        /* c8 ignore next 6 -- Fallback for environments
-	            without requestIdleCallback */
-	        } else {
-	          setTimeout(() => processChunk({
-	            timeRemaining: () => 50, didTimeout: false
-	          }), 0);
-	        }
+	        batchMetadataCallbackHandle =
+	          'requestIdleCallback' in globalThis
+	            ? requestIdleCallback(processChunk, {timeout: 100})
+	            /* c8 ignore next 5 -- Fallback for environments
+	               without requestIdleCallback */
+	            : setTimeout(() => processChunk({
+	              timeRemaining: () => 50, didTimeout: false
+	            }), 0);
 	      };
 
 	      loadBatchMetadata();
