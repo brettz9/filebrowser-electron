@@ -695,6 +695,18 @@ function addItems (result, basePath, currentBasePath) {
    * @param {Event} e
    */
   const folderContextmenu = (e) => {
+    // Only show folder context menu if clicking on actual content
+    const targetEl = /** @type {HTMLElement} */ (e.target);
+    const isContentClick = targetEl.tagName === 'A' ||
+      targetEl.tagName === 'P' ||
+      targetEl.tagName === 'IMG' ||
+      targetEl.closest('a, p, img');
+
+    if (!isContentClick) {
+      // Let it bubble to parent for empty-space menu
+      return;
+    }
+
     showFolderContextMenuOp(
       {
         jml,
@@ -721,6 +733,18 @@ function addItems (result, basePath, currentBasePath) {
    * @param {Event} e
    */
   const contextmenu = async (e) => {
+    // Only show file context menu if clicking on actual content
+    const targetEl = /** @type {HTMLElement} */ (e.target);
+    const isContentClick = targetEl.tagName === 'A' ||
+      targetEl.tagName === 'P' ||
+      targetEl.tagName === 'IMG' ||
+      targetEl.closest('a, p, img');
+
+    if (!isContentClick) {
+      // Let it bubble to parent for empty-space menu
+      return;
+    }
+
     await showFileContextMenuOp(
       {
         jml,
@@ -1005,10 +1029,10 @@ function addItems (result, basePath, currentBasePath) {
                   let itemsInRow = 0;
 
                   const positionedItems = listItems.map((item) => {
-                    // Get text from the td element's link or p tag
+                    // Get path from the td element's link or p tag
                     const link = item.querySelector('a, p');
-                    const itemText = link ? link.textContent : '';
-                    const pos = positions[itemText];
+                    const itemPath = link ? link.dataset.path : '';
+                    const pos = positions[itemPath];
 
                     let x, y;
                     if (pos && typeof pos.x === 'number') {
@@ -1038,7 +1062,6 @@ function addItems (result, basePath, currentBasePath) {
                         top: `${y}px`
                       },
                       dataset: {
-                        itemName: itemText,
                         path: item.dataset.path
                       }
                     }, [...clonedItem.childNodes]];
@@ -1063,7 +1086,28 @@ function addItems (result, basePath, currentBasePath) {
                       ? JSON.parse(storedPositions)
                       : {};
 
-                    // Calculate required grid size
+                    // Clean up positions for items that no longer exist
+                    const currentItemPaths = new Set(
+                      listItems.map((item) => {
+                        const link = item.querySelector('a, p');
+                        return link ? link.dataset.path : '';
+                      }).filter(Boolean)
+                    );
+
+                    // Remove stale positions
+                    for (const itemPath of Object.keys(positions)) {
+                      if (!currentItemPaths.has(itemPath)) {
+                        delete positions[itemPath];
+                      }
+                    }
+
+                    // Save cleaned positions
+                    localStorage.setItem(
+                      customPositionsKey,
+                      JSON.stringify(positions)
+                    );
+
+                    // Calculate required grid size based on current items only
                     const maxRow = Math.max(...Object.values(positions).
                       map((/** @type {{row: number}} */ p) => {
                         return p.row || 0;
@@ -1073,11 +1117,10 @@ function addItems (result, basePath, currentBasePath) {
                         return p.col || 0;
                       }), -1);
 
-                    // Ensure minimum grid size
-                    const minRows = Math.ceil(listItems.length /
-                      numIconColumns) + 2;
-                    const numRows = Math.max(maxRow + 3, minRows);
-                    const numCols = Math.max(maxCol + 1, numIconColumns);
+                    // Add buffer rows and columns for easier dragging
+                    // Grid should extend a bit beyond positioned items
+                    const numRows = maxRow + 3;
+                    const numCols = Math.max(maxCol + 3, numIconColumns);
 
                     // Create position map for quick lookup
                     const positionMap =
@@ -1091,26 +1134,57 @@ function addItems (result, basePath, currentBasePath) {
                       );
                     listItems.forEach((item) => {
                       const link = item.querySelector('a, p');
-                      const itemText = link ? link.textContent : '';
-                      const pos = positions[itemText];
+                      const itemPath = link ? link.dataset.path : '';
+                      const pos = positions[itemPath];
                       if (pos && typeof pos.row === 'number') {
                         const key = `${pos.row}-${pos.col}`;
                         positionMap.set(key, item);
                       }
                     });
 
-                    // Place items without positions
+                    // Place items without positions in empty cells
                     const unpositionedItems = listItems.filter((item) => {
                       const link = item.querySelector('a, p');
-                      const itemText = link ? link.textContent : '';
-                      const itemPos = positions[itemText];
+                      const itemPath = link ? link.dataset.path : '';
+                      const itemPos = positions[itemPath];
                       return !itemPos || typeof itemPos.row !== 'number';
                     });
 
-                    let unpositionedIndex = 0;
-                    const rows = [];
+                    // Fill empty cells with unpositioned items
+                    let unposIndex = 0;
+                    for (let r = 0;
+                      r <= maxRow + 2 && unposIndex < unpositionedItems.length;
+                      r++) {
+                      for (let c = 0;
+                        c < numCols && unposIndex < unpositionedItems.length;
+                        c++) {
+                        const key = `${r}-${c}`;
+                        if (!positionMap.has(key)) {
+                          positionMap.set(key, unpositionedItems[unposIndex++]);
+                        }
+                      }
+                    }
 
-                    for (let r = 0; r < numRows; r++) {
+                    // If there are still unpositioned items, add rows
+                    let nextAvailableRow = maxRow + 3;
+                    let nextAvailableCol = 0;
+                    while (unposIndex < unpositionedItems.length) {
+                      const key = `${nextAvailableRow}-${nextAvailableCol}`;
+                      positionMap.set(key, unpositionedItems[unposIndex++]);
+                      nextAvailableCol++;
+                      if (nextAvailableCol >= numCols) {
+                        nextAvailableCol = 0;
+                        nextAvailableRow++;
+                      }
+                    }
+
+                    // Update grid size if needed for unpositioned items
+                    const finalNumRows = unposIndex > 0
+                      ? Math.max(numRows, nextAvailableRow)
+                      : numRows;
+
+                    const rows = [];
+                    for (let r = 0; r < finalNumRows; r++) {
                       const rowCells = [];
                       for (let c = 0; c < numCols; c++) {
                         const key = `${r}-${c}`;
@@ -1118,12 +1192,6 @@ function addItems (result, basePath, currentBasePath) {
 
                         if (item) {
                           rowCells.push(item);
-                        } else if (unpositionedIndex <
-                            unpositionedItems.length) {
-                          // Fill empty spots with unpositioned items
-                          rowCells.push(
-                            unpositionedItems[unpositionedIndex++]
-                          );
                         } else {
                           // Empty cell
                           rowCells.push(['td', {}]);
@@ -1332,13 +1400,12 @@ function addItems (result, basePath, currentBasePath) {
                 if (link) {
                   const linkEl = /** @type {HTMLElement} */ (link);
                   const itemPath = linkEl.dataset.path;
-                  const itemName = linkEl.textContent;
-                  if (itemPath && itemName) {
+                  if (itemPath) {
                     draggedItem = itemEl;
                     const rect = itemEl.getBoundingClientRect();
                     dragOffsetX = e.clientX - rect.left;
                     dragOffsetY = e.clientY - rect.top;
-                    e.dataTransfer.setData('icon-freeform', itemName);
+                    e.dataTransfer.setData('icon-freeform', itemPath);
                     e.dataTransfer.effectAllowed = 'move';
 
                     // Create custom drag image with icon and text
@@ -1387,8 +1454,8 @@ function addItems (result, basePath, currentBasePath) {
               e.preventDefault();
               e.stopPropagation();
 
-              const itemName = e.dataTransfer.getData('icon-freeform');
-              if (itemName) {
+              const itemPath = e.dataTransfer.getData('icon-freeform');
+              if (itemPath) {
                 // Calculate new position relative to container
                 const containerRect =
                   freeformContainer.getBoundingClientRect();
@@ -1412,14 +1479,33 @@ function addItems (result, basePath, currentBasePath) {
                   )
                   : /** @type {Record<string, {x: number, y: number}>} */ ({});
 
-                positions[itemName] = {x: clampedX, y: clampedY};
+                positions[itemPath] = {x: clampedX, y: clampedY};
                 localStorage.setItem(
                   customPositionsKey,
                   JSON.stringify(positions)
                 );
 
+                // Store the item path to restore selection
+                const pathToSelect = itemPath;
+
                 // Refresh view
                 changePath();
+
+                // Restore selection after a short delay to allow DOM update
+                setTimeout(() => {
+                  const items = [
+                    ...freeformContainer.querySelectorAll(
+                      '.icon-freeform-item'
+                    )
+                  ];
+                  for (const item of items) {
+                    const link = item.querySelector('a, p');
+                    if (link && link.dataset.path === pathToSelect) {
+                      item.classList.add('selected');
+                      break;
+                    }
+                  }
+                }, 10);
               }
             }
           });
@@ -1437,9 +1523,8 @@ function addItems (result, basePath, currentBasePath) {
               if (link) {
                 const linkEl = /** @type {HTMLElement} */ (link);
                 const itemPath = linkEl.dataset.path;
-                const itemName = linkEl.textContent;
-                if (itemPath && itemName) {
-                  e.dataTransfer.setData('icon-reposition', itemName);
+                if (itemPath) {
+                  e.dataTransfer.setData('icon-reposition', itemPath);
                   e.dataTransfer.effectAllowed = 'move';
                   cellEl.classList.add('dragging-icon');
                 }
@@ -1450,106 +1535,106 @@ function addItems (result, basePath, currentBasePath) {
           cellEl.addEventListener('dragend', () => {
             cellEl.classList.remove('dragging-icon');
           });
+        });
 
-          // Handle drop on cells for repositioning
-          cellEl.addEventListener('dragover', (e) => {
-            if (e.dataTransfer?.types.includes('icon-reposition')) {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = 'move';
-              cellEl.classList.add('drop-target-icon');
-            }
-          });
+        // Allow dropping anywhere on the table to snap to grid
+        iconViewContainer.addEventListener('dragover', (e) => {
+          if (e.dataTransfer?.types.includes('icon-reposition')) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+          }
+        });
 
-          cellEl.addEventListener('dragleave', () => {
-            cellEl.classList.remove('drop-target-icon');
-          });
+        iconViewContainer.addEventListener('drop', (e) => {
+          if (e.dataTransfer?.types.includes('icon-reposition')) {
+            e.preventDefault();
+            e.stopPropagation();
 
-          cellEl.addEventListener('drop', (e) => {
-            if (e.dataTransfer?.types.includes('icon-reposition')) {
-              e.preventDefault();
-              e.stopPropagation();
-              cellEl.classList.remove('drop-target-icon');
+            const draggedItemPath =
+              e.dataTransfer.getData('icon-reposition');
 
-              const draggedItemName =
-                e.dataTransfer.getData('icon-reposition');
-              const targetLink = cellEl.querySelector('a, p');
+            if (draggedItemPath) {
+              // Calculate which grid cell the mouse is over
+              const allRows = [
+                ...iconViewContainer.querySelectorAll('tr')
+              ];
+              const firstRow = allRows[0];
+              const allCellsInFirstRow = firstRow
+                ? [...firstRow.querySelectorAll('td')]
+                : [];
 
-              if (draggedItemName && targetLink) {
-                const targetEl = /** @type {HTMLElement} */ (targetLink);
-                const targetName = targetEl.textContent;
+              // Get the first cell to determine cell dimensions
+              const firstCell =
+                allCellsInFirstRow[0];
 
-                if (draggedItemName !== targetName) {
-                  // Get current positions
-                  const customPositionsKey =
-                    `icon-positions-${currentBasePath}`;
-                  const storedPositions =
-                    localStorage.getItem(customPositionsKey);
-                  const positions = storedPositions
-                    // eslint-disable-next-line @stylistic/max-len -- Long
-                    ? /** @type {Record<string, {row: number, col: number}>} */ (
-                      JSON.parse(storedPositions)
-                    )
-                    // eslint-disable-next-line @stylistic/max-len -- Long
-                    : /** @type {Record<string, {row: number, col: number}>} */ (
-                      {}
-                    );
+              if (!firstCell) {
+                return;
+              }
 
-                  // Find cell positions in grid
-                  const allCells = [
-                    ...iconViewContainer.querySelectorAll('td.list-item')
-                  ];
-                  const draggedCell = allCells.find((c) => {
-                    const l = c.querySelector('a, p');
-                    return l && l.textContent === draggedItemName;
-                  });
-                  const targetCell = cellEl;
+              const firstCellRect = firstCell.getBoundingClientRect();
+              const cellWidth = firstCellRect.width;
+              const cellHeight = firstCellRect.height;
 
-                  if (draggedCell) {
-                    const draggedRow = draggedCell.parentElement;
-                    const targetRow = targetCell.parentElement;
+              // Get container position
+              const containerRect =
+                iconViewContainer.getBoundingClientRect();
 
-                    if (draggedRow && targetRow) {
-                      const allRows = [
-                        ...iconViewContainer.querySelectorAll('tr')
-                      ];
-                      const draggedRowIndex = allRows.indexOf(draggedRow);
-                      const targetRowIndex = allRows.indexOf(targetRow);
+              // Calculate row and column based on mouse position
+              // Allow positions beyond current grid
+              const relativeY = e.clientY - containerRect.top;
+              const relativeX = e.clientX - containerRect.left;
 
-                      const draggedColIndex = [
-                        ...draggedRow.children
-                      ].indexOf(draggedCell);
-                      const targetColIndex = [
-                        ...targetRow.children
-                      ].indexOf(targetCell);
+              const targetRowIndex = Math.max(0,
+                Math.floor(relativeY / cellHeight));
+              const targetColIndex = Math.max(0,
+                Math.floor(relativeX / cellWidth));
 
-                      // Swap positions
-                      positions[draggedItemName] = {
-                        row: targetRowIndex,
-                        col: targetColIndex
-                      };
+              // Get current positions
+              const customPositionsKey =
+                `icon-positions-${currentBasePath}`;
+              const storedPositions =
+                localStorage.getItem(customPositionsKey);
+              const positions = storedPositions
+                ? /** @type {Record<string, {row: number, col: number}>} */ (
+                  JSON.parse(storedPositions)
+                )
+                : /** @type {Record<string, {row: number, col: number}>} */ (
+                  {}
+                );
 
-                      // If target has a position, swap it
-                      if (targetName && positions[targetName]) {
-                        positions[targetName] = {
-                          row: draggedRowIndex,
-                          col: draggedColIndex
-                        };
-                      }
+              // Set new position for dragged item
+              positions[draggedItemPath] = {
+                row: targetRowIndex,
+                col: targetColIndex
+              };
 
-                      // Save positions
-                      localStorage.setItem(
-                        customPositionsKey,
-                        JSON.stringify(positions)
-                      );
+              // Save positions
+              localStorage.setItem(
+                customPositionsKey,
+                JSON.stringify(positions)
+              );
 
-                      // Refresh view to show new positions
-                      changePath();
-                    }
+              // Store the dragged item path to restore selection
+              const pathToSelect = draggedItemPath;
+
+              // Refresh view to show new positions
+              changePath();
+
+              // Restore selection after a short delay to allow DOM update
+              setTimeout(() => {
+                const allCells = [
+                  ...iconViewContainer.querySelectorAll('td.list-item')
+                ];
+                for (const cell of allCells) {
+                  const link = cell.querySelector('a, p');
+                  if (link && link.dataset.path === pathToSelect) {
+                    cell.classList.add('selected');
+                    break;
                   }
                 }
-              }
+              }, 10);
             }
-          });
+          }
         });
       }
     }
@@ -2088,10 +2173,22 @@ function addItems (result, basePath, currentBasePath) {
     const contextmenuHandler = (e) => {
       const {target} = e;
       const targetEl = /** @type {HTMLElement} */ (target);
-      // Only show context menu on empty space (table, tr, or empty td)
-      if (targetEl === iconViewContainer || targetEl.tagName === 'TR' ||
-          (targetEl.tagName === 'TD' &&
-            !targetEl.classList.contains('list-item'))) {
+
+      // Check if clicking on actual content (link, icon, or text)
+      const isContentClick = targetEl.tagName === 'A' ||
+        targetEl.tagName === 'P' ||
+        targetEl.tagName === 'IMG' ||
+        targetEl.closest('a, p, img');
+
+      // Show context menu on empty space (container, rows, cells, or
+      // free-form items when not clicking content)
+      if (!isContentClick && (
+        targetEl === iconViewContainer ||
+        targetEl.tagName === 'TR' ||
+        targetEl.tagName === 'TD' ||
+        targetEl.classList.contains('icon-freeform-container') ||
+        targetEl.classList.contains('icon-freeform-item')
+      )) {
         e.preventDefault();
         e.stopPropagation();
 
@@ -3212,6 +3309,9 @@ function addItems (result, basePath, currentBasePath) {
       const pickerMenu = document.createElement('div');
       pickerMenu.className = 'column-picker-menu';
 
+      // Define closePickerFn first so checkboxes can reference it
+      let closePickerFn;
+
       columns.forEach((col) => {
         if (col.id === 'icon' || col.id === 'name') {
           return; // Skip icon and name columns (always visible)
@@ -3221,9 +3321,17 @@ function addItems (result, basePath, currentBasePath) {
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.checked = col.visible;
+        checkbox.dataset.columnId = col.id;
         checkbox.addEventListener('change', () => {
           col.visible = checkbox.checked;
           localStorage.setItem('list-view-columns', JSON.stringify(columns));
+          // Remove picker menu and its event listeners before changePath
+          if (pickerMenu.parentNode) {
+            pickerMenu.remove();
+          }
+          if (closePickerFn) {
+            document.removeEventListener('click', closePickerFn);
+          }
           changePath();
         });
 
@@ -3241,7 +3349,7 @@ function addItems (result, basePath, currentBasePath) {
       document.body.append(pickerMenu);
 
       // Close picker when clicking outside
-      const closePickerFn = (evt) => {
+      closePickerFn = (evt) => {
         if (!pickerMenu.contains(/** @type {Node} */ (evt.target)) &&
             evt.target !== columnPickerButton) {
           pickerMenu.remove();

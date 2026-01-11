@@ -328,6 +328,75 @@ describe('List View', () => {
     expect(sortStateAsc.direction).toBe('asc');
   });
 
+  test('clicking column header after expanding folders works', async () => {
+    await page.evaluate((dir) => {
+      globalThis.location.hash = `#path=${encodeURIComponent(dir)}`;
+    }, testDir);
+    await page.waitForTimeout(1000);
+
+    // Enable tree mode
+    const treeModeToggle = await page.locator('.tree-mode-toggle');
+    await treeModeToggle.click();
+    await page.waitForTimeout(1500);
+
+    // Expand a folder
+    const firstExpander = await page.locator('.tree-expander:not(.empty)').first();
+    await firstExpander.click();
+    await page.waitForTimeout(1000);
+
+    // Now click a column header to sort
+    const sizeHeader = await page.locator('th[data-column-id="size"]');
+    await sizeHeader.click();
+    await page.waitForTimeout(1000);
+
+    // Verify it worked - should have sort-asc class
+    const hasSortClass = await sizeHeader.evaluate((el) => {
+      return el.classList.contains('sort-asc');
+    });
+    expect(hasSortClass).toBe(true);
+
+    // Click again to test it doesn't crash
+    await sizeHeader.click();
+    await page.waitForTimeout(1000);
+
+    const hasDescClass = await sizeHeader.evaluate((el) => {
+      return el.classList.contains('sort-desc');
+    });
+    expect(hasDescClass).toBe(true);
+  });
+
+  test('clicking column checkbox after expanding folders works', async () => {
+    await page.evaluate((dir) => {
+      globalThis.location.hash = `#path=${encodeURIComponent(dir)}`;
+    }, testDir);
+    await page.waitForTimeout(1000);
+
+    // Enable tree mode
+    const treeModeToggle = await page.locator('.tree-mode-toggle');
+    await treeModeToggle.click();
+    await page.waitForTimeout(1500);
+
+    // Expand a folder
+    const firstExpander = await page.locator('.tree-expander:not(.empty)').first();
+    await firstExpander.click();
+    await page.waitForTimeout(1000);
+
+    // Now open column picker
+    const columnPickerButton = await page.locator('.column-picker-button');
+    await columnPickerButton.click();
+    await page.waitForTimeout(500);
+
+    // Click a checkbox to toggle column visibility (use dateOpened which is hidden by default)
+    const dateOpenedCheckbox = await page.locator('input[data-column-id="dateOpened"]');
+    await dateOpenedCheckbox.click();
+    await page.waitForTimeout(1000);
+
+    // Verify the column is now visible
+    const dateOpenedHeader = await page.locator('th[data-column-id="dateOpened"]');
+    const isVisible = await dateOpenedHeader.isVisible();
+    expect(isVisible).toBe(true);
+  });
+
   test('shows column picker button', async () => {
     await page.evaluate((dir) => {
       globalThis.location.hash = `#path=${encodeURIComponent(dir)}`;

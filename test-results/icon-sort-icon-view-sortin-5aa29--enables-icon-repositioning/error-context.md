@@ -25,23 +25,14 @@
     - listitem [ref=e23]:
       - link ".." [ref=e24] [cursor=pointer]:
         - /url: "#path=/tmp"
-    - table [active] [ref=e26]:
-      - row "fil…txt fil…txt fil…txt" [ref=e27]:
-        - cell "fil…txt" [ref=e28]:
-          - img [ref=e29]
-          - paragraph [ref=e30]: fil…txt
-        - cell "fil…txt" [ref=e31]:
-          - img [ref=e32]
-          - paragraph [ref=e33]: fil…txt
-        - cell "fil…txt" [ref=e34]:
-          - img [ref=e35]
-          - paragraph [ref=e36]: fil…txt
-  - list [ref=e37]:
-    - listitem [ref=e38] [cursor=pointer]: Open
-    - listitem [ref=e39] [cursor=pointer]: Open with... ▶
-    - listitem [ref=e40] [cursor=pointer]: Cut
-    - listitem [ref=e41] [cursor=pointer]: Copy
-    - listitem [ref=e42] [cursor=pointer]: Rename
-    - listitem [ref=e43] [cursor=pointer]: Get Info
-    - listitem [ref=e44] [cursor=pointer]: Delete
+    - generic [active] [ref=e26]:
+      - generic [ref=e27]:
+        - img [ref=e28]
+        - paragraph [ref=e29]: file1.txt
+      - generic [ref=e30]:
+        - img [ref=e31]
+        - paragraph [ref=e32]: file2.txt
+      - generic [ref=e33]:
+        - img [ref=e34]
+        - paragraph [ref=e35]: file3.txt
 ```
