@@ -737,8 +737,9 @@ function addItems (result, basePath, currentBasePath) {
     const targetEl = /** @type {HTMLElement} */ (e.target);
     const isContentClick = targetEl.tagName === 'A' ||
       targetEl.tagName === 'P' ||
+      targetEl.tagName === 'SPAN' ||
       targetEl.tagName === 'IMG' ||
-      targetEl.closest('a, p, img');
+      targetEl.closest('a, p, span, img');
 
     if (!isContentClick) {
       // Let it bubble to parent for empty-space menu
@@ -2175,17 +2176,21 @@ function addItems (result, basePath, currentBasePath) {
       const targetEl = /** @type {HTMLElement} */ (target);
 
       // Check if clicking on actual content (link, icon, or text)
-      const isContentClick = targetEl.tagName === 'A' ||
+      // But allow if the parent is a valid empty space target
+      const isContentClick = (targetEl.tagName === 'A' ||
         targetEl.tagName === 'P' ||
-        targetEl.tagName === 'IMG' ||
-        targetEl.closest('a, p, img');
+        targetEl.tagName === 'IMG') &&
+        !targetEl.closest('tr, table[data-base-path]');
 
-      // Show context menu on empty space (container, rows, cells, or
-      // free-form items when not clicking content)
+      // Show context menu on empty space (container, table, rows, cells,
+      // or free-form items when not clicking content)
       if (!isContentClick && (
         targetEl === iconViewContainer ||
+        targetEl.tagName === 'TABLE' ||
         targetEl.tagName === 'TR' ||
-        targetEl.tagName === 'TD' ||
+        targetEl.closest('table[data-base-path], tr') ||
+        (targetEl.tagName === 'TD' &&
+          !targetEl.classList.contains('list-item')) ||
         targetEl.classList.contains('icon-freeform-container') ||
         targetEl.classList.contains('icon-freeform-item')
       )) {
@@ -2200,6 +2205,19 @@ function addItems (result, basePath, currentBasePath) {
         // Get current sort mode for icon-view
         const currentIconSortMode =
           localStorage.getItem('icon-view-sort-mode') || 'name';
+
+        // Define cleanup function first so menu items can reference it
+        const hideCustomContextMenu = (() => {
+          let fn;
+          return {
+            set (f) {
+              fn = f;
+            },
+            get () {
+              return fn;
+            }
+          };
+        })();
 
         const customContextMenu = jml('ul', {
           class: 'context-menu',
@@ -2248,6 +2266,15 @@ function addItems (result, basePath, currentBasePath) {
                 $on: {
                   click () {
                     customContextMenu.remove();
+                    const fn = hideCustomContextMenu.get();
+                    if (fn) {
+                      document.removeEventListener(
+                        'click', fn, {capture: true}
+                      );
+                      document.removeEventListener(
+                        'contextmenu', fn, {capture: true}
+                      );
+                    }
                     localStorage.setItem('icon-view-sort-mode', 'none');
                     changePath();
                   }
@@ -2260,6 +2287,15 @@ function addItems (result, basePath, currentBasePath) {
                 $on: {
                   click () {
                     customContextMenu.remove();
+                    const fn = hideCustomContextMenu.get();
+                    if (fn) {
+                      document.removeEventListener(
+                        'click', fn, {capture: true}
+                      );
+                      document.removeEventListener(
+                        'contextmenu', fn, {capture: true}
+                      );
+                    }
                     localStorage.setItem('icon-view-sort-mode', 'snap');
                     changePath();
                   }
@@ -2275,6 +2311,15 @@ function addItems (result, basePath, currentBasePath) {
                 $on: {
                   click () {
                     customContextMenu.remove();
+                    const fn = hideCustomContextMenu.get();
+                    if (fn) {
+                      document.removeEventListener(
+                        'click', fn, {capture: true}
+                      );
+                      document.removeEventListener(
+                        'contextmenu', fn, {capture: true}
+                      );
+                    }
                     localStorage.setItem('icon-view-sort-mode', 'name');
                     changePath();
                   }
@@ -2287,6 +2332,15 @@ function addItems (result, basePath, currentBasePath) {
                 $on: {
                   click () {
                     customContextMenu.remove();
+                    const fn = hideCustomContextMenu.get();
+                    if (fn) {
+                      document.removeEventListener(
+                        'click', fn, {capture: true}
+                      );
+                      document.removeEventListener(
+                        'contextmenu', fn, {capture: true}
+                      );
+                    }
                     localStorage.setItem('icon-view-sort-mode', 'kind');
                     changePath();
                   }
@@ -2299,7 +2353,18 @@ function addItems (result, basePath, currentBasePath) {
                 $on: {
                   click () {
                     customContextMenu.remove();
-                    localStorage.setItem('icon-view-sort-mode', 'dateOpened');
+                    const fn = hideCustomContextMenu.get();
+                    if (fn) {
+                      document.removeEventListener(
+                        'click', fn, {capture: true}
+                      );
+                      document.removeEventListener(
+                        'contextmenu', fn, {capture: true}
+                      );
+                    }
+                    localStorage.setItem(
+                      'icon-view-sort-mode', 'dateOpened'
+                    );
                     changePath();
                   }
                 }
@@ -2313,7 +2378,18 @@ function addItems (result, basePath, currentBasePath) {
                 $on: {
                   click () {
                     customContextMenu.remove();
-                    localStorage.setItem('icon-view-sort-mode', 'dateAdded');
+                    const fn = hideCustomContextMenu.get();
+                    if (fn) {
+                      document.removeEventListener(
+                        'click', fn, {capture: true}
+                      );
+                      document.removeEventListener(
+                        'contextmenu', fn, {capture: true}
+                      );
+                    }
+                    localStorage.setItem(
+                      'icon-view-sort-mode', 'dateAdded'
+                    );
                     changePath();
                   }
                 }
@@ -2327,6 +2403,15 @@ function addItems (result, basePath, currentBasePath) {
                 $on: {
                   click () {
                     customContextMenu.remove();
+                    const fn = hideCustomContextMenu.get();
+                    if (fn) {
+                      document.removeEventListener(
+                        'click', fn, {capture: true}
+                      );
+                      document.removeEventListener(
+                        'contextmenu', fn, {capture: true}
+                      );
+                    }
                     localStorage.setItem(
                       'icon-view-sort-mode',
                       'dateModified'
@@ -2344,6 +2429,15 @@ function addItems (result, basePath, currentBasePath) {
                 $on: {
                   click () {
                     customContextMenu.remove();
+                    const fn = hideCustomContextMenu.get();
+                    if (fn) {
+                      document.removeEventListener(
+                        'click', fn, {capture: true}
+                      );
+                      document.removeEventListener(
+                        'contextmenu', fn, {capture: true}
+                      );
+                    }
                     localStorage.setItem(
                       'icon-view-sort-mode',
                       'dateCreated'
@@ -2361,6 +2455,15 @@ function addItems (result, basePath, currentBasePath) {
                 $on: {
                   click () {
                     customContextMenu.remove();
+                    const fn = hideCustomContextMenu.get();
+                    if (fn) {
+                      document.removeEventListener(
+                        'click', fn, {capture: true}
+                      );
+                      document.removeEventListener(
+                        'contextmenu', fn, {capture: true}
+                      );
+                    }
                     localStorage.setItem('icon-view-sort-mode', 'size');
                     changePath();
                   }
@@ -2400,15 +2503,20 @@ function addItems (result, basePath, currentBasePath) {
         });
 
         // Hide the custom context menu when clicking anywhere else
-        const hideCustomContextMenu = () => {
+        const hideMenuFn = () => {
           customContextMenu.remove();
-          document.removeEventListener('click', hideCustomContextMenu);
-          document.removeEventListener('contextmenu', hideCustomContextMenu);
+          document.removeEventListener(
+            'click', hideMenuFn, {capture: true}
+          );
+          document.removeEventListener(
+            'contextmenu', hideMenuFn, {capture: true}
+          );
         };
-        document.addEventListener('click', hideCustomContextMenu, {
+        hideCustomContextMenu.set(hideMenuFn);
+        document.addEventListener('click', hideMenuFn, {
           capture: true
         });
-        document.addEventListener('contextmenu', hideCustomContextMenu, {
+        document.addEventListener('contextmenu', hideMenuFn, {
           capture: true
         });
       }
@@ -3310,7 +3418,17 @@ function addItems (result, basePath, currentBasePath) {
       pickerMenu.className = 'column-picker-menu';
 
       // Define closePickerFn first so checkboxes can reference it
-      let closePickerFn;
+      const closePickerFn = (() => {
+        let fn;
+        return {
+          set (f) {
+            fn = f;
+          },
+          get () {
+            return fn;
+          }
+        };
+      })();
 
       columns.forEach((col) => {
         if (col.id === 'icon' || col.id === 'name') {
@@ -3324,13 +3442,16 @@ function addItems (result, basePath, currentBasePath) {
         checkbox.dataset.columnId = col.id;
         checkbox.addEventListener('change', () => {
           col.visible = checkbox.checked;
-          localStorage.setItem('list-view-columns', JSON.stringify(columns));
+          localStorage.setItem(
+            'list-view-columns', JSON.stringify(columns)
+          );
           // Remove picker menu and its event listeners before changePath
           if (pickerMenu.parentNode) {
             pickerMenu.remove();
           }
-          if (closePickerFn) {
-            document.removeEventListener('click', closePickerFn);
+          const fn = closePickerFn.get();
+          if (fn) {
+            document.removeEventListener('click', fn);
           }
           changePath();
         });
@@ -3349,15 +3470,16 @@ function addItems (result, basePath, currentBasePath) {
       document.body.append(pickerMenu);
 
       // Close picker when clicking outside
-      closePickerFn = (evt) => {
+      const closeMenuFn = (evt) => {
         if (!pickerMenu.contains(/** @type {Node} */ (evt.target)) &&
             evt.target !== columnPickerButton) {
           pickerMenu.remove();
-          document.removeEventListener('click', closePickerFn);
+          document.removeEventListener('click', closeMenuFn);
         }
       };
+      closePickerFn.set(closeMenuFn);
       setTimeout(() => {
-        document.addEventListener('click', closePickerFn);
+        document.addEventListener('click', closeMenuFn);
       }, 0);
     };
 

@@ -37,33 +37,37 @@ afterEach(async () => {
 });
 
 describe('icon view sorting', () => {
-  test.only('right-click empty space shows Sort by submenu', async () => {
+  test('right-click empty space shows Sort by submenu', async () => {
+    // Create test directory with one file
+    await page.evaluate(() => {
+      // @ts-expect-error Our own API
+      const {fs} = globalThis.electronAPI;
+      const testDir = '/tmp/test-context-menu';
+      fs.rmSync(testDir, {recursive: true, force: true});
+      fs.mkdirSync(testDir);
+      fs.writeFileSync(`${testDir}/file1.txt`, 'test');
+    });
+
     // Switch to icon-view
     await page.locator('#icon-view').click();
     await page.waitForTimeout(500);
 
-    // Navigate to a test folder
+    // Navigate to test folder
     await page.evaluate(() => {
-      globalThis.location.hash = '#path=/tmp';
+      globalThis.location.hash = '#path=/tmp/test-context-menu';
     });
     await page.waitForTimeout(1000);
 
-    // Get the table element
+    // Get the table element and a table row
     const table = await page.locator('table[data-base-path]');
     await table.waitFor({state: 'visible', timeout: 5000});
 
-    // Get table bounding box
-    const box = await table.boundingBox();
-    if (!box) {
-      throw new Error('Table not found');
-    }
+    // Find the first TR that contains the file
+    const firstRow = await table.locator('tr').first();
+    await firstRow.waitFor({state: 'visible'});
 
-    // Right-click on empty area (bottom-right of table)
-    await page.mouse.click(
-      box.x + box.width - 50,
-      box.y + box.height - 50,
-      {button: 'right'}
-    );
+    // Right-click directly on the TR element (not its content)
+    await firstRow.click({button: 'right', force: true});
 
     await page.waitForTimeout(500);
 
@@ -97,7 +101,7 @@ describe('icon view sorting', () => {
     await page.waitForTimeout(300);
   });
 
-  test.only('selecting None mode enables icon repositioning', async () => {
+  test('selecting None mode enables icon repositioning', async () => {
     // Create test files in /tmp
     await page.evaluate(() => {
       // @ts-expect-error Our own API
@@ -128,17 +132,14 @@ describe('icon view sorting', () => {
 
     // Get the table element
     const table = await page.locator('table[data-base-path]');
-    const box = await table.boundingBox();
-    if (!box) {
-      throw new Error('Table not found');
-    }
+    await table.waitFor({state: 'visible', timeout: 5000});
+
+    // Get first row to right-click
+    const firstRow = await table.locator('tr').first();
+    await firstRow.waitFor({state: 'visible'});
 
     // Right-click to show context menu
-    await page.mouse.click(
-      box.x + box.width - 50,
-      box.y + box.height - 50,
-      {button: 'right'}
-    );
+    await firstRow.click({button: 'right', force: true});
     await page.waitForTimeout(500);
 
     // Click Sort by > None
@@ -154,8 +155,9 @@ describe('icon view sorting', () => {
     await noneItem.click();
     await page.waitForTimeout(1000);
 
-    // Verify cells are draggable
-    const firstCell = await page.locator('td.list-item').first();
+    // Verify cells are draggable (in None mode, items are divs with
+    // class icon-freeform-item)
+    const firstCell = await page.locator('.icon-freeform-item').first();
     const isDraggable = await firstCell.evaluate(
       (el) => el.getAttribute('draggable')
     );
@@ -163,7 +165,8 @@ describe('icon view sorting', () => {
 
     // Verify the sort mode is stored
     const sortMode = await page.evaluate(() => {
-      return localStorage.getItem('icon-view-sort-mode');
+      // @ts-expect-error Our own API
+      return globalThis.electronAPI.storage.getItem('icon-view-sort-mode');
     });
     expect(sortMode).toBe('none');
 
@@ -179,7 +182,7 @@ describe('icon view sorting', () => {
     });
   });
 
-  test.only('dragging icon to empty cell repositions it', async () => {
+  test('dragging icon to empty cell repositions it', async () => {
     // Create test files
     await page.evaluate(() => {
       // @ts-expect-error Our own API
