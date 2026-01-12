@@ -814,6 +814,37 @@ function addItems (result, basePath, currentBasePath) {
         $on: {
           ...(view === 'icon-view' || view === 'gallery-view'
             ? {
+              async contextmenu (e) {
+                // Only show file menu if actually clicking on the file
+                // content (P or IMG), not on TD padding
+                const targetEl = /** @type {HTMLElement} */ (e.target);
+                const pElement = this.querySelector('p[data-path]');
+                const clickedOnContent = targetEl.tagName === 'P' ||
+                  targetEl.tagName === 'IMG' ||
+                  targetEl.closest('p[data-path], img');
+
+                if (pElement && !isDir && clickedOnContent) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  await showFileContextMenuOp(
+                    {
+                      jml,
+                      shell,
+                      spawnSync,
+                      getOpenWithApps,
+                      getAppIcons,
+                      startRename,
+                      deleteItem,
+                      getClipboard,
+                      setClipboard,
+                      copyOrMoveItem,
+                      path,
+                      showInfoWindow
+                    },
+                    e
+                  );
+                }
+              },
               click: [function (e) {
                 /**
                  * @returns {Promise<string>}
@@ -874,7 +905,7 @@ function addItems (result, basePath, currentBasePath) {
                 }
                 location.href = this.querySelector('a').href;
               }, true],
-              contextmenu: isDir ? folderContextmenu : contextmenu
+              ...(isDir ? {contextmenu: folderContextmenu} : {})
             }
             : {}
           )
@@ -2176,21 +2207,18 @@ function addItems (result, basePath, currentBasePath) {
       const targetEl = /** @type {HTMLElement} */ (target);
 
       // Check if clicking on actual content (link, icon, or text)
-      // But allow if the parent is a valid empty space target
-      const isContentClick = (targetEl.tagName === 'A' ||
+      const isContentClick = targetEl.tagName === 'A' ||
         targetEl.tagName === 'P' ||
-        targetEl.tagName === 'IMG') &&
-        !targetEl.closest('tr, table[data-base-path]');
+        targetEl.tagName === 'IMG' ||
+        targetEl.closest('a, p, img');
 
-      // Show context menu on empty space (container, table, rows, cells,
-      // or free-form items when not clicking content)
+      // Show context menu on empty space (container, rows, table, or
+      // cells - not on file/folder content)
       if (!isContentClick && (
         targetEl === iconViewContainer ||
         targetEl.tagName === 'TABLE' ||
         targetEl.tagName === 'TR' ||
-        targetEl.closest('table[data-base-path], tr') ||
-        (targetEl.tagName === 'TD' &&
-          !targetEl.classList.contains('list-item')) ||
+        targetEl.tagName === 'TD' ||
         targetEl.classList.contains('icon-freeform-container') ||
         targetEl.classList.contains('icon-freeform-item')
       )) {

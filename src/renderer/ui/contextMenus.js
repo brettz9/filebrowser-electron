@@ -231,6 +231,8 @@ export function showFolderContextMenu (
       $on: {
         click () {
           customContextMenu.style.display = 'none';
+          document.removeEventListener('click', hideCustomContextMenu);
+          document.removeEventListener('contextmenu', hideCustomContextMenu);
           // Find the text element (p, span, or a) with this path
           const targetElement = $(
             `p[data-path="${CSS.escape(pth)}"], ` +
@@ -250,6 +252,8 @@ export function showFolderContextMenu (
       $on: {
         click () {
           customContextMenu.style.display = 'none';
+          document.removeEventListener('click', hideCustomContextMenu);
+          document.removeEventListener('contextmenu', hideCustomContextMenu);
           showInfoWindow({jml, itemPath: pth});
         }
       }
@@ -262,6 +266,8 @@ export function showFolderContextMenu (
         click (ev) {
           ev.stopPropagation();
           customContextMenu.style.display = 'none';
+          document.removeEventListener('click', hideCustomContextMenu);
+          document.removeEventListener('contextmenu', hideCustomContextMenu);
           deleteItem(pth);
         }
       }
@@ -460,6 +466,8 @@ export async function showFileContextMenu (
       $on: {
         click () {
           customContextMenu.style.display = 'none';
+          document.removeEventListener('click', hideCustomContextMenu);
+          document.removeEventListener('contextmenu', hideCustomContextMenu);
           // Find the text element (p, span, or a) with this path
           const targetElement = $(
             `p[data-path="${CSS.escape(pth)}"], ` +
@@ -479,6 +487,8 @@ export async function showFileContextMenu (
       $on: {
         click () {
           customContextMenu.style.display = 'none';
+          document.removeEventListener('click', hideCustomContextMenu);
+          document.removeEventListener('contextmenu', hideCustomContextMenu);
           showInfoWindow({jml, itemPath: pth});
         }
       }
@@ -491,6 +501,8 @@ export async function showFileContextMenu (
         click (ev) {
           ev.stopPropagation();
           customContextMenu.style.display = 'none';
+          document.removeEventListener('click', hideCustomContextMenu);
+          document.removeEventListener('contextmenu', hideCustomContextMenu);
           deleteItem(pth);
         }
       }
@@ -550,7 +562,7 @@ export async function showFileContextMenu (
   const submenu = /** @type {HTMLElement|null} */ (
     customContextMenu.querySelector('.context-submenu')
   );
-  if (submenu) {
+  if (submenu && document.body.contains(customContextMenu)) {
     submenu.querySelectorAll('.context-menu-item').forEach((
       item, idx
     ) => {
