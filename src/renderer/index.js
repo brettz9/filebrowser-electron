@@ -2202,7 +2202,7 @@ function addItems (result, basePath, currentBasePath) {
     iconViewContainer._dropHandler = dropHandler;
 
     // Add context menu for empty space in icon-view
-    const contextmenuHandler = (e) => {
+    const contextmenuHandler = async (e) => {
       const {target} = e;
       const targetEl = /** @type {HTMLElement} */ (target);
 
@@ -2211,6 +2211,70 @@ function addItems (result, basePath, currentBasePath) {
         targetEl.tagName === 'P' ||
         targetEl.tagName === 'IMG' ||
         targetEl.closest('a, p, img');
+
+      // If clicking on content, show file/folder menu
+      if (isContentClick) {
+        const contentElement = targetEl.tagName === 'A' ||
+          targetEl.tagName === 'P' ||
+          targetEl.tagName === 'IMG'
+          ? targetEl
+          : targetEl.closest('a, p, img');
+
+        if (contentElement) {
+          const pathElement = contentElement.tagName === 'IMG'
+            ? contentElement.parentElement?.querySelector('a, p')
+            : contentElement;
+
+          if (pathElement) {
+            const isFolder = pathElement.tagName === 'A';
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (isFolder) {
+              showFolderContextMenuOp(
+                {
+                  jml,
+                  jQuery,
+                  path,
+                  shell,
+                  existsSync,
+                  writeFileSync,
+                  decodeURIComponentFn: decodeURIComponent,
+                  encodeURIComponentFn: encodeURIComponent,
+                  changePath,
+                  startRename,
+                  deleteItem,
+                  getClipboard,
+                  setClipboard,
+                  copyOrMoveItem,
+                  showInfoWindow
+                },
+                e
+              );
+            } else {
+              await showFileContextMenuOp(
+                {
+                  jml,
+                  shell,
+                  spawnSync,
+                  getOpenWithApps,
+                  getAppIcons,
+                  startRename,
+                  deleteItem,
+                  getClipboard,
+                  setClipboard,
+                  copyOrMoveItem,
+                  path,
+                  showInfoWindow
+                },
+                e
+              );
+            }
+          }
+        }
+        return;
+      }
 
       // Show context menu on empty space (container, rows, table, or
       // cells - not on file/folder content)

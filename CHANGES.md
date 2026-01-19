@@ -4,6 +4,7 @@
 
 - feat: gallery view
 - feat: back/forward commands
+- feat: Allow icons to be draggable (Sort by None, Sort by Grid) or Sort by Metadata: Name, Kind, Date Last Opened, Date Added, Date Modified, Date Created, Size)
 - fix: make icon view show thumbnails, requiring double-click to open
 - fix: ellipsis for long file names
 

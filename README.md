@@ -69,8 +69,6 @@ done
 
 ## To-dos
 
-1. Allow icons to be draggable (Sort by None, Sort by Grid) or Sort by Metadata: Name, Kind, Date Last Opened, Date Added, Date Modified, Date Created, Size)
-
 1. Ideally would allow separate desktops, windows and tabs, with menu bar
     1. At such point, ensure key commands (e.g., copy/cut/paste attached to
         icon table) work globally instead of only when the element (table)
