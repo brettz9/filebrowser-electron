@@ -69,6 +69,7 @@ done
 
 ## To-dos
 
+1. Crashes with column header or checkbox clicks?
 1. Allow icons to be draggable (Sort by None, Sort by Grid) or Sort by Metadata: Name, Kind, Date Last Opened, Date Added, Date Modified, Date Created, Size)
 
 1. Ideally would allow separate desktops, windows and tabs, with menu bar
