@@ -69,7 +69,7 @@ done
 
 ## To-dos
 
-1. Allow icons to be draggable (Sort by None, Sort by Grid) or Sort by Metadata: Name, Kind, Date Last Opened, Date Added, Date Modified, Date Created, Size, Tags)
+1. Allow icons to be draggable (Sort by None, Sort by Grid) or Sort by Metadata: Name, Kind, Date Last Opened, Date Added, Date Modified, Date Created, Size)
 
 1. Ideally would allow separate desktops, windows and tabs, with menu bar
     1. At such point, ensure key commands (e.g., copy/cut/paste attached to
@@ -90,6 +90,7 @@ done
 
 ## Misc. to-dos
 
+1. Add tags (including sort by tags for icon view)
 1. Allow "Show package contents" context menu for apps
 1. Allow column view to start from non-root (as with list and
     other views)
