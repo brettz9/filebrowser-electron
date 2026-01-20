@@ -69,10 +69,6 @@ done
 
 ## To-dos
 
-1. Icon view
-  1. Not remembering Snap to Grid setting! (in Applications)
-  1. Snap to Grid should adjust previously moved icons
-
 1. Sticky
   1. Bug with local sticky not showing in other views besides column view
   1. Consider stickies with scrolling
