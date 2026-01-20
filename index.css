@@ -139,8 +139,12 @@ div.gallery {
 
 .icon {
   height: auto;
-  max-height: 80px;
-  max-width: 80px;
+  width: auto;
+  min-width: 80px;
+  min-height: 80px;
+  max-height: 120px !important;
+  max-width: 120px !important;
+  object-fit: contain;
 }
 
 .icon-container {
@@ -411,9 +415,14 @@ table[data-base-path] td {
 }
 
 .icon-freeform-item img {
-  width: 64px;
-  height: 64px;
+  width: auto;
+  height: auto;
+  min-width: 80px;
+  min-height: 80px;
+  max-width: 120px !important;
+  max-height: 120px !important;
   margin-bottom: 5px;
+  object-fit: contain;
 }
 
 .icon-freeform-item p,
