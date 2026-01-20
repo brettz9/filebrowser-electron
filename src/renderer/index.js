@@ -1234,9 +1234,11 @@ function addItems (result, basePath, currentBasePath) {
                       }
                     }
 
-                    // Update grid size if needed for unpositioned items
-                    const finalNumRows = unposIndex > 0
-                      ? Math.max(numRows, nextAvailableRow)
+                    // Update grid size to include all rows needed
+                    // If we placed items, nextAvailableRow points to the next row after the last item
+                    // If we didn't finish a row, we still need that partial row
+                    const finalNumRows = unposIndex > 0 && nextAvailableRow > numRows
+                      ? (nextAvailableCol > 0 ? nextAvailableRow + 1 : nextAvailableRow)
                       : numRows;
 
                     const rows = [];
