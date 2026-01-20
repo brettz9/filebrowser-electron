@@ -30,7 +30,7 @@ nav button.selected {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
 }
 
 .gallery-preview-image {
@@ -45,9 +45,10 @@ nav button.selected {
 }
 
 div.gallery {
-  overflow: scroll !important;
-  flex: 1;
+  overflow-x: scroll !important;
+  overflow-y: hidden !important;
   width: 100%;
+  white-space: nowrap;
 }
 
 .gallery-preview-panel {
@@ -145,6 +146,12 @@ div.gallery {
   max-height: 120px !important;
   max-width: 120px !important;
   object-fit: contain;
+}
+
+/* Remove min-width constraint for gallery view */
+.gallery-container .icon {
+  min-width: unset;
+  min-height: unset;
 }
 
 .icon-container {
@@ -379,14 +386,12 @@ div.gallery {
 
 /* Ensure empty cells in icon view have minimum height */
 table[data-base-path] {
-  width: 100%;
-  table-layout: fixed;
+  table-layout: auto;
 }
 
 table[data-base-path] td {
   min-height: 100px;
   vertical-align: top;
-  width: auto;
 }
 
 /* Free-form positioning container for "None" mode */

@@ -1008,10 +1008,10 @@ function addItems (result, basePath, currentBasePath) {
 
   // Calculate number of icon columns based on window width
   const calculateIconColumns = () => {
-    // Approximate width of one icon including padding/margin
-    const iconWidth = 130;
+    // Approximate width of one icon including padding/margin and text label
+    const iconWidth = 160;
     // Container padding, scrollbar, and buffer
-    const containerPadding = 80;
+    const containerPadding = 120;
     const availableWidth = window.innerWidth - containerPadding;
     const cols = Math.max(2, Math.floor(availableWidth / iconWidth));
     return cols;
