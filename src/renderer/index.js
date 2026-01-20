@@ -2334,14 +2334,8 @@ function addItems (result, basePath, currentBasePath) {
 
       // Show context menu on empty space (container, rows, table, or
       // cells - not on file/folder content)
-      if (!isContentClick && (
-        targetEl === iconViewContainer ||
-        targetEl.tagName === 'TABLE' ||
-        targetEl.tagName === 'TR' ||
-        targetEl.tagName === 'TD' ||
-        targetEl.classList.contains('icon-freeform-container') ||
-        targetEl.classList.contains('icon-freeform-item')
-      )) {
+      // Allow any click that's not on content to show the menu
+      if (!isContentClick) {
         e.preventDefault();
         e.stopPropagation();
 

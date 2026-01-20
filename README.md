@@ -72,8 +72,8 @@ done
 1. Sticky
   1. Bug with local sticky not showing in other views besides column view
   1. Consider stickies with scrolling
-
 1. Favorites
+
 1. Ideally would allow separate desktops, windows and tabs, with menu bar
     1. At such point, ensure key commands (e.g., copy/cut/paste attached to
         icon table) work globally instead of only when the element (table)
