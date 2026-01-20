@@ -71,7 +71,6 @@ done
 
 1. Sticky
   1. Bug with local sticky not showing in other views besides column view
-  1. Consider stickies with scrolling
 1. Favorites
 
 1. Ideally would allow separate desktops, windows and tabs, with menu bar
@@ -93,8 +92,9 @@ done
 
 ## Misc. to-dos
 
-1. Add tags (including sort by tags for icon view)
-1. Allow "Show package contents" context menu for apps
+1. File search
 1. Allow column view to start from non-root (as with list and
     other views)
-1. File search
+1. Add tags (including sort by tags for icon view)
+1. Allow "Show package contents" context menu for apps
+1. Consider how to handle stickies with scrolling

@@ -903,7 +903,28 @@ function addItems (result, basePath, currentBasePath) {
                   clearTimeout(clickTimer);
                   clickTimer = null;
                 }
-                location.href = this.querySelector('a').href;
+                const anchor = this.querySelector('a');
+                if (anchor) {
+                  // It's a folder - navigate to it
+                  location.href = anchor.href;
+                } else {
+                  // It's a file - open it
+                  const fileElement = this.querySelector('p, span');
+                  if (fileElement) {
+                    const itemPath = fileElement.dataset?.path;
+                    if (itemPath) {
+                      const decodedPath = decodeURIComponent(itemPath);
+                      // @ts-expect-error - Test hook
+                      if (globalThis.testShellOpenPath) {
+                        // @ts-expect-error - Test hook
+                        globalThis.testShellOpenPath(decodedPath);
+                      /* c8 ignore next 3 -- Test hook bypasses this path */
+                      } else {
+                        globalThis.electronAPI.shell.openPath(decodedPath);
+                      }
+                    }
+                  }
+                }
               }, true],
               ...(isDir ? {contextmenu: folderContextmenu} : {})
             }
@@ -987,8 +1008,10 @@ function addItems (result, basePath, currentBasePath) {
 
   // Calculate number of icon columns based on window width
   const calculateIconColumns = () => {
-    const iconWidth = 130; // Approximate width of one icon including padding/margin
-    const containerPadding = 80; // Container padding, scrollbar, and buffer
+    // Approximate width of one icon including padding/margin
+    const iconWidth = 130;
+    // Container padding, scrollbar, and buffer
+    const containerPadding = 80;
     const availableWidth = window.innerWidth - containerPadding;
     const cols = Math.max(2, Math.floor(availableWidth / iconWidth));
     return cols;
@@ -1235,10 +1258,14 @@ function addItems (result, basePath, currentBasePath) {
                     }
 
                     // Update grid size to include all rows needed
-                    // If we placed items, nextAvailableRow points to the next row after the last item
+                    // If we placed items, `nextAvailableRow` points to the
+                    //   next row after the last item
                     // If we didn't finish a row, we still need that partial row
-                    const finalNumRows = unposIndex > 0 && nextAvailableRow > numRows
-                      ? (nextAvailableCol > 0 ? nextAvailableRow + 1 : nextAvailableRow)
+                    const finalNumRows = unposIndex > 0 &&
+                      nextAvailableRow > numRows
+                      ? (nextAvailableCol > 0
+                        ? nextAvailableRow + 1
+                        : nextAvailableRow)
                       : numRows;
 
                     const rows = [];
@@ -2232,17 +2259,17 @@ function addItems (result, basePath, currentBasePath) {
     if (oldClickHandler) {
       iconViewContainer.removeEventListener('click', oldClickHandler);
     }
-    
+
     const emptySpaceClickHandler = (e) => {
       const {target} = e;
       const targetEl = /** @type {HTMLElement} */ (target);
-      
+
       // Check if clicking on empty space (not on content)
       const isContentClick = targetEl.tagName === 'A' ||
         targetEl.tagName === 'P' ||
         targetEl.tagName === 'IMG' ||
         targetEl.closest('a, p, img');
-      
+
       // If clicking on empty space, deselect current selection
       if (!isContentClick) {
         const selected = iconViewContainer.querySelector(
