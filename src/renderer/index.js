@@ -985,7 +985,16 @@ function addItems (result, basePath, currentBasePath) {
     return li;
   });
 
-  const numIconColumns = 4;
+  // Calculate number of icon columns based on window width
+  const calculateIconColumns = () => {
+    const iconWidth = 130; // Approximate width of one icon including padding/margin
+    const containerPadding = 80; // Container padding, scrollbar, and buffer
+    const availableWidth = window.innerWidth - containerPadding;
+    const cols = Math.max(2, Math.floor(availableWidth / iconWidth));
+    return cols;
+  };
+
+  const numIconColumns = calculateIconColumns();
 
   jml(ul, [
     ((view === 'icon-view' || view === 'gallery-view') && basePath !== '/'
@@ -1053,12 +1062,14 @@ function addItems (result, basePath, currentBasePath) {
                     : {};
 
                   // Calculate default grid for items without positions
-                  const itemsPerRow = 4;
+                  const itemsPerRow = numIconColumns;
                   const itemWidth = 140;
                   const itemHeight = 120;
                   let nextX = 20;
                   let nextY = 20;
                   let itemsInRow = 0;
+
+                  let positionsChanged = false;
 
                   const positionedItems = listItems.map((item) => {
                     // Get path from the td element's link or p tag
@@ -1074,6 +1085,11 @@ function addItems (result, basePath, currentBasePath) {
                       // Auto-layout in grid for new items
                       x = nextX;
                       y = nextY;
+
+                      // Store the calculated position immediately
+                      positions[itemPath] = {x, y};
+                      positionsChanged = true;
+
                       nextX += itemWidth;
                       itemsInRow++;
                       if (itemsInRow >= itemsPerRow) {
@@ -1098,6 +1114,14 @@ function addItems (result, basePath, currentBasePath) {
                       }
                     }, [...clonedItem.childNodes]];
                   });
+
+                  // Save positions if any new items were auto-positioned
+                  if (positionsChanged) {
+                    localStorage.setItem(
+                      customPositionsKey,
+                      JSON.stringify(positions)
+                    );
+                  }
 
                   return ['div', {
                     class: 'icon-freeform-container',
@@ -4700,4 +4724,17 @@ if (saved) {
     }
   });
 }
+
+// Add window resize listener for icon view
+let resizeTimeout;
+window.addEventListener('resize', () => {
+  const currentView = getCurrentView();
+  if (currentView === 'icon-view' || currentView === 'gallery-view') {
+    // Debounce resize to avoid too many refreshes
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      changePath();
+    }, 200);
+  }
+});
 })();

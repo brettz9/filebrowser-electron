@@ -374,9 +374,15 @@ div.gallery {
 }
 
 /* Ensure empty cells in icon view have minimum height */
+table[data-base-path] {
+  width: 100%;
+  table-layout: fixed;
+}
+
 table[data-base-path] td {
   min-height: 100px;
   vertical-align: top;
+  width: auto;
 }
 
 /* Free-form positioning container for "None" mode */
