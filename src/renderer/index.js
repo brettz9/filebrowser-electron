@@ -2225,6 +2225,36 @@ function addItems (result, basePath, currentBasePath) {
     // @ts-expect-error Custom property
     iconViewContainer._dropHandler = dropHandler;
 
+    // Add click handler for empty space to deselect items
+    const oldClickHandler = iconViewContainer._emptySpaceClickHandler;
+    if (oldClickHandler) {
+      iconViewContainer.removeEventListener('click', oldClickHandler);
+    }
+    
+    const emptySpaceClickHandler = (e) => {
+      const {target} = e;
+      const targetEl = /** @type {HTMLElement} */ (target);
+      
+      // Check if clicking on empty space (not on content)
+      const isContentClick = targetEl.tagName === 'A' ||
+        targetEl.tagName === 'P' ||
+        targetEl.tagName === 'IMG' ||
+        targetEl.closest('a, p, img');
+      
+      // If clicking on empty space, deselect current selection
+      if (!isContentClick) {
+        const selected = iconViewContainer.querySelector(
+          'td.list-item.selected, .icon-freeform-item.selected'
+        );
+        if (selected) {
+          selected.classList.remove('selected');
+        }
+      }
+    };
+    iconViewContainer.addEventListener('click', emptySpaceClickHandler);
+    // @ts-expect-error Custom property
+    iconViewContainer._emptySpaceClickHandler = emptySpaceClickHandler;
+
     // Add context menu for empty space in icon-view
     const contextmenuHandler = async (e) => {
       const {target} = e;
