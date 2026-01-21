@@ -8,6 +8,61 @@ nav button.selected {
   color: white;
 }
 
+/* Sidebar styles */
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 120px;
+  width: 200px;
+  height: calc(100vh - 120px);
+  background-color: #f5f5f5;
+  border-right: 1px solid #ddd;
+  overflow-y: auto;
+  z-index: 5;
+}
+
+.sidebar-header {
+  padding: 12px 16px;
+  font-weight: bold;
+  font-size: 13px;
+  color: #666;
+  border-bottom: 1px solid #ddd;
+  background-color: #eaeaea;
+}
+
+.sidebar-items {
+  padding: 8px 0;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.sidebar-item:hover {
+  background-color: #e0e0e0;
+}
+
+.sidebar-item-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 10px;
+  object-fit: contain;
+}
+
+.sidebar-item-label {
+  font-size: 13px;
+  color: #333;
+}
+
+/* Main content with sidebar offset */
+.main-content {
+  margin-left: 200px;
+}
+
 .list-item.selected, .list-item.selected a {
   background-color: blue;
   color: white !important;

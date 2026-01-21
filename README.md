@@ -69,8 +69,6 @@ done
 
 ## To-dos
 
-1. Favorites
-
 1. Ideally would allow separate desktops, windows and tabs, with menu bar
     1. At such point, ensure key commands (e.g., copy/cut/paste attached to
         icon table) work globally instead of only when the element (table)
@@ -96,3 +94,4 @@ done
 1. Add tags (including sort by tags for icon view)
 1. Allow "Show package contents" context menu for apps
 1. Consider how to handle stickies with scrolling
+1. Allow dragging to sidebar (favorites); add separate "Locations"

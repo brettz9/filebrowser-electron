@@ -30202,7 +30202,8 @@
 	    });
 	  }
 
-	  const localSaved = localStorage$1.getItem(`stickyNotes-local-${stickyNotePath}`);
+	  const localSaved =
+	    localStorage$1.getItem(`stickyNotes-local-${stickyNotePath}`);
 	  stickyNotes.clear(({metadata}) => {
 	    return metadata.type === 'local';
 	  });
@@ -34562,6 +34563,61 @@ Click "Create global sticky" to create more notes.`,
 	(async () => {
 	// We can't use `@default` for CSS path, so we've copied it out
 	await addMillerColumnPlugin(jQuery, {stylesheets: ['miller-columns.css']});
+
+	// Initialize sidebar with favorite folders
+	const initializeSidebar = async () => {
+	  const sidebarItems = $('.sidebar-items');
+	  if (!sidebarItems) {
+	    return;
+	  }
+
+	  // Get home directory using os.homedir()
+	  const homeDir = globalThis.electronAPI.os.homedir();
+
+	  // Define favorite folders
+	  const favorites = [
+	    {name: 'Home', path: homeDir},
+	    {name: 'Desktop', path: path.join(homeDir, 'Desktop')},
+	    {name: 'Documents', path: path.join(homeDir, 'Documents')},
+	    {name: 'Downloads', path: path.join(homeDir, 'Downloads')},
+	    {name: 'Pictures', path: path.join(homeDir, 'Pictures')},
+	    {name: 'Applications', path: '/Applications'}
+	  ];
+
+	  // Create sidebar items
+	  for (const favorite of favorites) {
+	    // Check if path exists
+	    if (!existsSync(favorite.path)) {
+	      continue;
+	    }
+
+	    // Get icon for the folder
+	    const iconUrl = await getIconDataURLForFile(favorite.path);
+
+	    jmlExports.jml('div', {
+	      class: 'sidebar-item',
+	      $on: {
+	        click () {
+	          // Navigate to this path
+	          globalThis.location.hash = `#path=${
+            encodeURIComponent(favorite.path)
+          }`;
+	        }
+	      }
+	    }, [
+	      ['img', {
+	        class: 'sidebar-item-icon',
+	        src: iconUrl
+	      }],
+	      ['span', {
+	        class: 'sidebar-item-label'
+	      }, [favorite.name]]
+	    ], sidebarItems);
+	  }
+	};
+
+	await initializeSidebar();
+
 	changePath();
 
 	const saved = localStorage$1.getItem('stickyNotes-global');

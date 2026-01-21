@@ -118,6 +118,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     argv: process.argv,
     versions: process.versions
   },
+  os: {
+    homedir: () => os.homedir(),
+    tmpdir: () => os.tmpdir()
+  },
   spawnSync: (...args) => spawnSync(...args),
   getFileMetadata: (filePath) => {
     // Use native binding if available for better performance
