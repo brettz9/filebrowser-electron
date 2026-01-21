@@ -34584,16 +34584,19 @@ Click "Create global sticky" to create more notes.`,
 	    {name: 'Applications', path: '/Applications'}
 	  ];
 
+	  // Filter to only existing paths
+	  const existingFavorites = favorites.filter((favorite) => {
+	    return existsSync(favorite.path);
+	  });
+
+	  // Load all icons in parallel
+	  const iconsPromises = existingFavorites.map((favorite) => {
+	    return getIconDataURLForFile(favorite.path);
+	  });
+	  const icons = await Promise.all(iconsPromises);
+
 	  // Create sidebar items
-	  for (const favorite of favorites) {
-	    // Check if path exists
-	    if (!existsSync(favorite.path)) {
-	      continue;
-	    }
-
-	    // Get icon for the folder
-	    const iconUrl = await getIconDataURLForFile(favorite.path);
-
+	  existingFavorites.forEach((favorite, index) => {
 	    jmlExports.jml('div', {
 	      class: 'sidebar-item',
 	      $on: {
@@ -34607,13 +34610,13 @@ Click "Create global sticky" to create more notes.`,
 	    }, [
 	      ['img', {
 	        class: 'sidebar-item-icon',
-	        src: iconUrl
+	        src: icons[index]
 	      }],
 	      ['span', {
 	        class: 'sidebar-item-label'
 	      }, [favorite.name]]
 	    ], sidebarItems);
-	  }
+	  });
 	};
 
 	await initializeSidebar();
