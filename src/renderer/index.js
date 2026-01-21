@@ -372,6 +372,9 @@ function changePath () {
   //         start from a non-root path as with other views
   const basePath = view === 'three-columns' ? '/' : currentBasePath;
 
+  // For three-columns view, also load sticky notes for the current path
+  const stickyNotePath = view === 'three-columns' ? currentBasePath : basePath;
+
   // Save scroll positions of selected items before refresh
   const scrollPositions = new Map();
   if (view === 'three-columns') {
@@ -402,7 +405,8 @@ function changePath () {
     });
   }
 
-  const localSaved = localStorage.getItem(`stickyNotes-local-${basePath}`);
+  const localSaved =
+    localStorage.getItem(`stickyNotes-local-${stickyNotePath}`);
   stickyNotes.clear(({metadata}) => {
     return metadata.type === 'local';
   });
@@ -410,7 +414,7 @@ function changePath () {
     stickyNotes.loadNotes(JSON.parse(localSaved));
     stickyNotes.notes.forEach((note) => {
       if (note.metadata.type === 'local') {
-        addLocalStickyInputListeners(note, basePath);
+        addLocalStickyInputListeners(note, stickyNotePath);
       }
     });
   }
@@ -4720,7 +4724,7 @@ $('#filebrowser').title = `
 $('#create-sticky').addEventListener('click', () => {
   const currentView = getCurrentView();
   const pth = currentView === 'icon-view' || currentView === 'gallery-view'
-    ? jQuery('table[data-base-path]').attr('data-base-path')
+    ? getBasePath()
     : ($columns && $columns.find(
       'li.miller-selected a, li.miller-selected span'
     /* c8 ignore next 2 -- When tested alone, appears to be
@@ -4735,10 +4739,17 @@ chosen.<br /><br />
 
 Click "Create sticky for current path" to create more notes.`,
     x: 100,
-    y: 150
+    y: 150,
+    zIndex: 100
   });
 
   addLocalStickyInputListeners(note, pth);
+
+  // Save the note immediately after creation
+  const notes = stickyNotes.getAllNotes(({metadata}) => {
+    return metadata.type === 'local' && metadata.path === pth;
+  });
+  localStorage.setItem(`stickyNotes-local-${pth}`, JSON.stringify(notes));
 });
 
 $('#create-global-sticky').addEventListener('click', () => {
@@ -4751,10 +4762,17 @@ This sticky will show regardless of whatever file or folder is selected.
 
 Click "Create global sticky" to create more notes.`,
     x: 150,
-    y: 170
+    y: 170,
+    zIndex: 100
   });
 
   addGlobalStickyInputListeners(note);
+
+  // Save the note immediately after creation
+  const notes = stickyNotes.getAllNotes(({metadata}) => {
+    return metadata.type === 'global';
+  });
+  localStorage.setItem('stickyNotes-global', JSON.stringify(notes));
 });
 
 // eslint-disable-next-line @stylistic/max-len -- Long

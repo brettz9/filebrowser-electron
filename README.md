@@ -69,8 +69,6 @@ done
 
 ## To-dos
 
-1. Sticky
-  1. Bug with local sticky not showing in other views besides column view
 1. Favorites
 
 1. Ideally would allow separate desktops, windows and tabs, with menu bar
