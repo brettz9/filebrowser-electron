@@ -69,6 +69,8 @@ done
 
 ## To-dos
 
+0. sticky idea: desktop whose folders organize emails which can be viewed and sent right from the desktop; also can view browser tabs, social media posts, etc.
+
 1. Ideally would allow separate desktops, windows and tabs, with menu bar
     1. At such point, ensure key commands (e.g., copy/cut/paste attached to
         icon table) work globally instead of only when the element (table)
